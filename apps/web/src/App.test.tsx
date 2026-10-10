@@ -52,14 +52,16 @@ const screens: [string, WizardState][] = [
   ["files (demo)", demo],
   ["details (demo)", stateAfter({ type: "startDemo" }, { type: "next" })],
   [
-    "review (demo)",
-    stateAfter({ type: "startDemo" }, { type: "goTo", screen: "review" }),
-  ],
-  [
-    "download (demo)",
-    stateAfter({ type: "startDemo" }, { type: "goTo", screen: "download" }),
+    "dashboard (demo)",
+    stateAfter({ type: "startDemo" }, { type: "goTo", screen: "dashboard" }),
   ],
 ];
+const dashboard = screens[3]?.[1] ?? demo;
+
+/** Each download button, from its own opening tag to its name. */
+const downloadButtons = (html: string, name: RegExp): string[] =>
+  html.match(new RegExp(`<button(?:(?!<button)[^])*?${name.source}`, "g")) ??
+  [];
 
 describe("App", () => {
   for (const [name, state] of screens) {
@@ -82,10 +84,11 @@ describe("App", () => {
   });
 
   it("never groups the digits of a year", () => {
-    const review = text(render(screens[3]?.[1] ?? demo, "en"));
-    expect(review).toContain("Review tax year 2026");
+    const results = text(render(dashboard, "en"));
+    expect(results).toContain("Tax year 2026 · estimate");
+    expect(results).toContain(en.dash.taxToPay("2026"));
     expect(text(render(demo, "en"))).toContain("Tax year 2026");
-    expect(review).not.toContain("2,026");
+    expect(results).not.toContain("2,026");
   });
 
   it("keeps each form name on one line in the hero headline", () => {
@@ -119,13 +122,15 @@ describe("App", () => {
     );
   });
 
-  it("renders the review as tabs, with every panel present and only one shown", () => {
-    const html = render(screens[3]?.[1] ?? demo, "en");
-    expect(html).toContain('role="tablist"');
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
-    expect(html.match(/aria-selected="true"/g)).toHaveLength(1);
-    expect(html.match(/role="tabpanel"/g)).toHaveLength(3);
-    expect(html.match(/role="tabpanel"[^>]*hidden=""/g)).toHaveLength(2);
+  it("opens the results in the app shell, on the overview, with no stepper", () => {
+    const html = render(dashboard, "en");
+    expect(html).toMatch(/<div class="app has-shell"/);
+    // The results navigation only: the flow's stepper is behind it.
+    expect(html.match(/<nav /g)).toHaveLength(1);
+    expect(html).toMatch(/aria-current="page"[^>]*>[^]*?Overview/);
+    expect(html).not.toContain('aria-current="step"');
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    expect(html).toContain('<main id="main"');
   });
 
   it("marks every flow screen of the demo as demo data", () => {
@@ -158,21 +163,22 @@ describe("App", () => {
     expect(html).toMatch(/aria-current="step"[^>]*>.*?Details/);
   });
 
-  it("shows the review's headline figures from the demo data", () => {
-    const html = text(render(screens[3]?.[1] ?? demo, "en"));
+  it("leads the results with the demo's tax to pay and both returns behind it", () => {
+    const html = text(render(dashboard, "en"));
+    expect(html).toContain("€1,791.37");
     expect(html).toContain("€1,770.04");
-    expect(html).toContain("€182.59");
     expect(html).toContain("€21.33");
-    expect(html).toContain("Apple Inc.");
+    expect(html).toContain("€182.59");
+    expect(html).toContain("Doh_KDVP_2026.xml");
   });
 
-  it("prepares the review of own files, and shows no made-up numbers meanwhile", () => {
+  it("prepares the results of own files, and shows no made-up numbers meanwhile", () => {
     const own = ownState(
       read,
       { type: "setDetail", field: "taxNumber", value: "12345678" },
-      { type: "goTo", screen: "review" },
+      { type: "goTo", screen: "dashboard" },
     );
-    expect(own.screen).toBe("review");
+    expect(own.screen).toBe("dashboard");
     const html = text(render(own));
     expect(html).toContain(en.review.preparing);
     expect(html).not.toContain("€1,770.04");
@@ -271,20 +277,19 @@ describe("App", () => {
     );
   });
 
-  it("shows the review of own files as the engine prepared it", () => {
+  it("shows the results of own files as the engine prepared them", () => {
     const html = text(render(preparedState(read, prepared)));
-    expect(html).toContain("Review tax year 2026");
-    expect(html).toContain("US1912161007");
+    expect(html).toContain(en.dash.taxToPay("2026"));
+    expect(html).toContain("Doh_Div_2026.xml");
     expect(html).not.toContain(en.review.preparing);
     expect(html).not.toContain(en.demoBanner.body);
   });
 
   it("offers own returns for download at once, with the user's details in them", () => {
-    const state = preparedState(read, prepared, { type: "next" });
-    expect(state.screen).toBe("download");
+    const state = preparedState(read, prepared);
+    expect(state.screen).toBe("dashboard");
     const html = render(state);
-    const buttons =
-      html.match(/<button[^>]*>[^]*?Download Doh-(?:KDVP|Div)/g) ?? [];
+    const buttons = downloadButtons(html, /Download Doh-(?:KDVP|Div)/);
     expect(buttons).toHaveLength(2);
     for (const button of buttons) expect(button).not.toContain("disabled");
     expect(text(html)).toContain(en.download.ownFiles);
@@ -305,17 +310,16 @@ describe("App", () => {
     expect(html).toMatch(/aria-describedby="[^"]*details-taxNumber-error/);
   });
 
-  it("never shows a blank Download screen before own returns are prepared", () => {
+  it("never offers a download before own returns are prepared", () => {
     const own = ownState(
       read,
       { type: "setDetail", field: "taxNumber", value: "12345678" },
-      { type: "goTo", screen: "download" },
+      { type: "goTo", screen: "dashboard" },
     );
-    // The review is not prepared, so the jump is refused...
-    expect(own.screen).toBe("files");
-    // ...and even a forced download state renders a message, not nothing.
-    const forced = text(render({ ...own, screen: "download" }));
-    expect(forced).toContain(en.review.emptyTitle);
+    const html = render(own);
+    expect(text(html)).toContain(en.review.preparing);
+    expect(html).not.toContain("Download Doh-");
+    expect(html).not.toContain(en.dash.downloadAll);
   });
 
   it("refuses files that are not CSV or XML, and says so", () => {
@@ -333,25 +337,23 @@ describe("App", () => {
     expect(html).toContain(en.files.unsupportedBlocked);
   });
 
-  it("lets the demo go on from the review, which nothing blocks", () => {
-    const html = render(screens[3]?.[1] ?? demo);
-    expect(html).toMatch(/<button[^>]*>Continue/);
-    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Continue/);
-  });
-
-  it("stops at the review of own files while no return can be written", () => {
+  it("withholds each return on its own, and still shows the results", () => {
     const withheld = {
       ...prepared,
       kdvp: { ...prepared.kdvp, xml: null, blocking: 1 },
       div: { ...prepared.div, xml: null, blocking: 1 },
     };
-    const stopped = render(preparedState(read, withheld));
-    expect(stopped).toMatch(/<button[^>]*disabled[^>]*>Continue/);
-    expect(stopped).toMatch(/aria-describedby="review-attention"/);
-    // With one return written, the user goes on to download it.
+    const both = render(preparedState(read, withheld));
+    for (const button of downloadButtons(both, /Download Doh-(?:KDVP|Div)/)) {
+      expect(button).toContain('aria-disabled="true"');
+    }
+    expect(text(both)).toContain(en.dash.taxToPay("2026"));
+    // With one return written, it can be downloaded while the other waits.
     const one = { ...withheld, kdvp: prepared.kdvp };
-    const going = render(preparedState(read, one));
-    expect(going).not.toMatch(/<button[^>]*disabled[^>]*>Continue/);
+    const html = render(preparedState(read, one));
+    const [kdvp, div] = downloadButtons(html, /Download Doh-(?:KDVP|Div)/);
+    expect(kdvp).not.toContain("disabled");
+    expect(div).toContain('aria-describedby="div-not-written"');
   });
 
   it("refuses a file too large to read, unread, and says why", () => {
@@ -390,7 +392,7 @@ describe("App", () => {
       ...prepared,
       kdvp: { ...prepared.kdvp, fileName: "evil.html" },
     } as typeof prepared;
-    const html = text(render(preparedState(read, renamed, { type: "next" })));
+    const html = text(render(preparedState(read, renamed)));
     expect(html).toContain("Doh_KDVP_2026.xml");
     expect(html).not.toContain("evil.html");
   });
@@ -434,17 +436,16 @@ describe("App", () => {
     expect(html).toContain("5 more notes are not shown.");
   });
 
-  it("points out the demo's warning above the review tabs", () => {
-    const html = text(render(screens[3]?.[1] ?? demo, "en"));
+  it("points out the demo's notes on the overview", () => {
+    const html = text(render(dashboard, "en"));
     expect(html).toContain("2 notes need your attention before you download.");
   });
 
   it("keeps the download buttons disabled while the files are written, and says so", () => {
-    const html = render(screens[4]?.[1] ?? demo, "sl");
-    const buttons =
-      html.match(/<button[^>]*>[^]*?Prenesi Doh-(?:KDVP|Div)/g) ?? [];
+    const html = render(dashboard, "sl");
+    const buttons = downloadButtons(html, /Prenesi Doh-(?:KDVP|Div)/);
     expect(buttons).toHaveLength(2);
-    for (const button of buttons) expect(button).toContain("disabled");
+    for (const button of buttons) expect(button).toContain("aria-disabled");
     expect(text(html)).toContain(sl.download.preparing);
     expect(text(html)).toContain("Doh_KDVP_2026.xml");
     // Tax year 2026 is due on Monday 1 March 2027 (28 February is a Sunday).

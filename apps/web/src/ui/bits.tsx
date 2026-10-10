@@ -122,16 +122,27 @@ export const TOUR_BUTTON_ID = "demo-tour";
  * Shown on every flow screen while the data on it is made up, with the
  * button that starts the guided tour again (#27).
  */
-export function DemoBanner({ onTour }: { readonly onTour: () => void }) {
+/**
+ * The demo's warning. In the wizard it carries the tour's replay button; in
+ * the dashboard that button is in the page header, so there is one only.
+ */
+export function DemoBanner({ onTour }: { readonly onTour?: () => void }) {
   const { t } = useI18n();
   return (
     <Note
       tone="warn"
       action={
-        <Button id={TOUR_BUTTON_ID} variant="ghost" size="sm" onClick={onTour}>
-          <SignpostIcon size={16} weight="bold" aria-hidden />
-          {t.tour.action}
-        </Button>
+        onTour === undefined ? undefined : (
+          <Button
+            id={TOUR_BUTTON_ID}
+            variant="ghost"
+            size="sm"
+            onClick={onTour}
+          >
+            <SignpostIcon size={16} weight="bold" aria-hidden />
+            {t.tour.action}
+          </Button>
+        )
       }
     >
       <strong>{t.demoBanner.title}</strong> {t.demoBanner.body}

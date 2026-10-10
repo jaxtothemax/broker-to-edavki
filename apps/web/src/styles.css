@@ -1237,6 +1237,444 @@ input {
   }
 }
 
+/* ─── Dashboard shell (#47) ───────────────────────────────────────────────
+   A sidebar beside the content on a desktop, an icon rail on a tablet and a
+   bar along the bottom of a phone: one <nav>, restyled. The app header stays
+   the only sticky bar at the top, which the guided tour measures. */
+
+.app.has-shell .app-header .container,
+.app.has-shell .app-footer .container {
+  max-width: none;
+}
+
+.shell {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: start;
+}
+
+.side {
+  position: sticky;
+  top: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: calc(100dvh - 64px);
+  overflow-y: auto;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.side-nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.nav-item.is-current {
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+}
+
+.nav-item[aria-disabled="true"] {
+  cursor: default;
+}
+
+.nav-item[aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--text-2);
+}
+
+.nav-icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.nav-item.is-current .nav-icon {
+  color: var(--accent-text);
+}
+
+.nav-count {
+  margin-left: auto;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+.nav-item.is-warn .nav-count {
+  color: var(--warn-text);
+}
+
+.side-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.side-actions .btn {
+  justify-content: flex-start;
+}
+
+.shell .app-main {
+  min-width: 0;
+}
+
+.dash-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.dash-page[hidden] {
+  display: none;
+}
+
+.shell-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 32px 40px 80px;
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+.page-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.page-eyebrow {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.page-head h1 {
+  font-size: clamp(26px, 2.6vw, 32px);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.page-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.overview-stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.returns-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.returns-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: var(--card-pad);
+}
+
+.returns-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.returns-head h2 {
+  font-size: var(--fs-xl);
+  letter-spacing: -0.02em;
+}
+
+.return-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.return-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px 14px;
+  padding-block: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.return-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.return-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.return-title {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+}
+
+.return-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.drill-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.drill-section .section-title {
+  margin-bottom: 0;
+  font-size: var(--fs-xl);
+  letter-spacing: -0.02em;
+}
+
+.drill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.drill-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--card-pad);
+  container-type: inline-size;
+}
+
+.drill-card:hover {
+  border-color: var(--border-strong);
+}
+
+.drill-card h3 {
+  color: var(--text-2);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+
+.drill-count {
+  font-size: 26px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.035em;
+}
+
+.drill-open {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+/* The whole card opens its page; the button stays the one control. */
+.drill-open::after {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-xl);
+  content: "";
+}
+
+/* Raised above .actions-row, which comes later and would show it. */
+.actions-row.phone-actions {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .returns-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 1023px) {
+  .shell {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+
+  .side {
+    padding: 12px 8px;
+  }
+
+  .nav-item {
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-height: 56px;
+    padding: 8px 4px;
+    font-size: var(--fs-xs);
+    text-align: center;
+  }
+
+  .nav-count {
+    display: none;
+  }
+
+  /* The count is hidden on the rail; a note asking for attention keeps a
+     mark, and its words stay in the button's name. */
+  .nav-item.is-warn .nav-icon::after {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--r-pill);
+    background: var(--warn);
+    content: "";
+  }
+
+  .side-actions .btn {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .side-actions .side-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .shell-page {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 720px) {
+  .overview-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  html:has(.app.has-shell) {
+    scroll-padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  .app.has-shell {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 15;
+    height: auto;
+    overflow: visible;
+    padding: 0 0 env(safe-area-inset-bottom);
+    border-top: 1px solid var(--border);
+    border-right: 0;
+    background: var(--glass);
+    backdrop-filter: saturate(160%) blur(14px);
+    -webkit-backdrop-filter: saturate(160%) blur(14px);
+  }
+
+  .side-nav ul {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: 0;
+  }
+
+  .nav-item {
+    min-height: 64px;
+    border-radius: 0;
+  }
+
+  .nav-item.is-current {
+    background: transparent;
+    color: var(--accent-text);
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  .side-actions {
+    display: none;
+  }
+
+  .actions-row.phone-actions {
+    display: flex;
+  }
+
+  .return-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .return-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    align-items: flex-start;
+  }
+
+  .shell-page {
+    padding: 16px;
+  }
+}
+
 /* ─── Flow ────────────────────────────────────────────────────────────────── */
 
 .flow {
@@ -2167,7 +2605,7 @@ button.step-item:hover {
   gap: 12px;
 }
 
-.ledger-head h3 {
+.ledger-head h2 {
   font-size: var(--fs-lg);
 }
 
@@ -2245,7 +2683,7 @@ button.step-item:hover {
   gap: 10px;
 }
 
-.note-group h3 {
+.note-group h2 {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3045,6 +3483,12 @@ button.step-item:hover {
 /* Backgrounds are replaced by system colors there, so states that rely on a
    fill get a system color or an outline instead. */
 @media (forced-colors: active) {
+  /* The current page is marked by its frame, not its fill. */
+  .nav-item.is-current {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
   /* The tour draws its own marks: no dim, a Highlight frame round the lit
      card, and lines and rings in the text color. */
   .tour-canvas {
@@ -3112,6 +3556,8 @@ button.step-item:hover {
 
 @media (prefers-reduced-motion: no-preference) {
   .btn,
+  .nav-item,
+  .drill-card,
   .icon-btn,
   .tab,
   .segment,
@@ -3139,7 +3585,8 @@ button.step-item:hover {
 
   .app-main > section,
   .flow > .screen,
-  .tab-panel {
+  .tab-panel,
+  .dash-page {
     animation: rise 480ms var(--ease-out) both;
   }
 

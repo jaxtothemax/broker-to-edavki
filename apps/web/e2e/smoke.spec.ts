@@ -86,6 +86,30 @@ test("nothing scrolls sideways at 320px", async ({ page }) => {
   expect(Math.min(...names)).toBeGreaterThan(150);
 });
 
+test("the dashboard keeps its navigation at hand on the narrowest phone", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: /Preizkusi demo|Explore the demo/ })
+    .first()
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  for (let step = 0; step < 2; step += 1) {
+    await page.locator(".actions-row .btn-primary").click();
+  }
+  const nav = page.getByRole("navigation", { name: /^(Results|Rezultati)$/ });
+  // A bar along the bottom of the screen, wherever the page is scrolled.
+  await expect(nav).toBeInViewport();
+  await page.evaluate(() => {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" });
+  });
+  await expect(nav).toBeInViewport();
+  expect(await scrollsSideways(page)).toBe(false);
+});
+
 test("the watcher sees what the policy blocks", async ({ page }) => {
   // Proves the checks above can fail: an injected <style> element is exactly
   // what `style-src 'self'` refuses, and what a tour library would add.

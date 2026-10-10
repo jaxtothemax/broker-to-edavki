@@ -17,7 +17,7 @@ const ANCHORS = {
   "files.text": "text",
   "details.form": "box",
   "details.taxNumber": "box",
-  "summary.gainsTax": "box",
+  "summary.tax": "box",
   "summary.estimateChip": "box",
   "summary.netBase": "box",
   "summary.buckets": "box",

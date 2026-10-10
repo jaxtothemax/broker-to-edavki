@@ -60,8 +60,7 @@ export interface Messages {
     readonly label: string;
     readonly files: string;
     readonly details: string;
-    readonly review: string;
-    readonly download: string;
+    readonly dashboard: string;
     readonly done: string;
   };
   readonly demoBanner: { readonly title: string; readonly body: string };
@@ -152,8 +151,6 @@ export interface Messages {
     readonly payersMissing: PluralForms;
   };
   readonly review: {
-    readonly title: (year: string) => string;
-    readonly intro: string;
     readonly salesLabel: string;
     readonly gainsTaxLabel: string;
     readonly dividendsLabel: string;
@@ -167,13 +164,8 @@ export interface Messages {
     readonly dividendSplitTitle: (rate: string) => string;
     readonly stillDue: string;
     readonly showNotes: string;
-    readonly tabsLabel: string;
-    readonly tabGains: string;
-    readonly tabGainsShort: string;
-    readonly tabDividends: string;
-    readonly tabDividendsShort: string;
-    readonly tabNotes: (count: string) => string;
-    readonly tabNotesShort: string;
+    /** The payments table's name for screen readers. */
+    readonly dividendsCaption: string;
     readonly colSold: string;
     readonly colProceeds: string;
     readonly colCost: string;
@@ -237,7 +229,6 @@ export interface Messages {
     readonly foreignTaxProof: string;
   };
   readonly download: {
-    readonly title: string;
     readonly intro: (deadline: string) => string;
     readonly due: (deadline: string) => string;
     readonly preparingChip: string;
@@ -264,6 +255,33 @@ export interface Messages {
       forms: number,
     ) => readonly string[];
     readonly startOver: string;
+  };
+  /** The results dashboard (#47): its navigation, pages and overview. */
+  readonly dash: {
+    readonly navLabel: string;
+    readonly overview: string;
+    readonly gains: string;
+    readonly dividends: string;
+    readonly notes: string;
+    readonly countGains: PluralForms;
+    readonly countDividends: PluralForms;
+    readonly countNotes: PluralForms;
+    readonly eyebrowEstimate: (year: string) => string;
+    readonly eyebrowYear: (year: string) => string;
+    readonly gainsLead: string;
+    readonly dividendsLead: string;
+    readonly notesLead: string;
+    readonly downloadAll: string;
+    readonly backToDetails: string;
+    readonly taxToPay: (year: string) => string;
+    readonly onGains: string;
+    readonly onDividends: string;
+    readonly returnsTitle: string;
+    readonly drillTitle: string;
+    readonly viewGains: string;
+    readonly viewDividends: string;
+    readonly viewNotes: string;
+    readonly noNotes: string;
   };
   readonly tour: {
     readonly action: string;
@@ -390,7 +408,7 @@ export interface Messages {
       country: string,
       rate: string,
       product: string,
-      excess: string,
+      withheld: string,
     ) => string;
     readonly findingSeverity: (
       blocking: string,
@@ -453,7 +471,7 @@ export const en: Messages = {
         body: "Your tax number and address go into the XML header and nowhere else.",
       },
       {
-        title: "Review every figure",
+        title: "See every figure",
         body: "Each purchase, sale and dividend with its exchange rate, its source row and any warning.",
       },
       {
@@ -476,8 +494,7 @@ export const en: Messages = {
     label: "Progress",
     files: "Files",
     details: "Details",
-    review: "Review",
-    download: "Download",
+    dashboard: "Results",
     done: "completed",
   },
   demoBanner: {
@@ -510,7 +527,7 @@ export const en: Messages = {
     stillReading: "Wait until your files are read.",
     problemsTitle: "Problems in your files",
     problemsBody:
-      "Until these are fixed, the returns are not written. You can still continue and look at the review.",
+      "Until these are fixed, the returns are not written. You can still continue and look at the results.",
     accountsTitle: "Are these Trading 212 files from one account?",
     accountsBody:
       "Trading 212 exports do not say which account they come from. Overlapping files of one account are read once; files of separate accounts are all counted.",
@@ -567,7 +584,7 @@ export const en: Messages = {
     requiredNote: "Only the tax number is required.",
     requiredSuffix: "(required)",
     demoNote: "Not required in the demo.",
-    next: "Review results",
+    next: "See results",
     asideTitle: "What happens to your details",
     asidePoints: [
       "They go into the XML header and nowhere else.",
@@ -605,9 +622,6 @@ export const en: Messages = {
     },
   },
   review: {
-    title: (year) => `Review tax year ${year}`,
-    intro:
-      "Check every figure before you download. TaxReporter prepares the return; eDavki calculates the final tax.",
     salesLabel: "Securities sold",
     gainsTaxLabel: "Estimated tax on gains",
     dividendsLabel: "Dividends received",
@@ -622,13 +636,7 @@ export const en: Messages = {
     dividendSplitTitle: (rate) => `Slovenian tax at ${rate}`,
     stillDue: "Still due",
     showNotes: "Show notes",
-    tabsLabel: "Forms and notes",
-    tabGains: "Gains (Doh-KDVP)",
-    tabGainsShort: "Gains",
-    tabDividends: "Dividends (Doh-Div)",
-    tabDividendsShort: "Dividends",
-    tabNotes: (count) => `Notes (${count})`,
-    tabNotesShort: "Notes",
+    dividendsCaption: "Dividends (Doh-Div)",
     colSold: "Sold",
     colProceeds: "Proceeds",
     colCost: "Cost",
@@ -678,9 +686,9 @@ export const en: Messages = {
       warning: "Check these",
       info: "For your information",
     },
-    emptyTitle: "Nothing to review yet",
+    emptyTitle: "Nothing to show yet",
     emptyBody:
-      "Add your broker exports to see your returns here, or explore the review with the demo data.",
+      "Add your broker exports to see your returns here, or explore the results with the demo data.",
     noSales:
       "No securities were sold in this tax year, so there is no Doh-KDVP to file.",
     noDividends: "No dividends were paid in this tax year.",
@@ -692,19 +700,19 @@ export const en: Messages = {
       one: "{n} more note is not shown.",
       other: "{n} more notes are not shown.",
     },
-    blocked: "Fix the notes that stop the returns before you continue.",
+    blocked:
+      "Neither return is written until the notes that stop them are fixed.",
     blockedOne: (form) =>
-      `${form} is not written until the notes that stop it are fixed. You can continue with the other return.`,
+      `${form} is not written until the notes that stop it are fixed. The other return can still be downloaded.`,
     preparing:
       "Working out your returns from your files, at Banka Slovenije rates.",
     prepareFailed:
-      "Your returns could not be worked out. Go back and continue again, or reload the page; nothing was sent anywhere.",
+      "Your returns could not be worked out. Go back to details and continue again, or reload the page; nothing was sent anywhere.",
     unnamedFile: "a file",
     foreignTaxProof:
       "FURS can ask for proof that foreign tax was finally paid. Keep your brokers' annual statements.",
   },
   download: {
-    title: "Download and import",
     intro: (deadline) =>
       `Import each file into eDavki, check the form, and submit it by ${deadline}.`,
     due: (deadline) => `Due ${deadline}`,
@@ -729,10 +737,10 @@ export const en: Messages = {
     demoFiles:
       "These files hold the demo's made-up trades for a made-up taxpayer, tax number 12345678. They are written exactly as yours are, so you can see what eDavki receives, but do not import them into eDavki.",
     ownFiles:
-      "Check each form against the review before you submit it in eDavki. TaxReporter prepares the returns; filing them is up to you.",
+      "Check each form against these results before you submit it in eDavki. TaxReporter prepares the returns; filing them is up to you.",
     notWritten: {
-      one: "Not written: {n} problem in the review must be fixed first.",
-      other: "Not written: {n} problems in the review must be fixed first.",
+      one: "Not written: {n} problem in the notes must be fixed first.",
+      other: "Not written: {n} problems in the notes must be fixed first.",
     },
     failed:
       "The files could not be written. Reload the page to try again; nothing was sent anywhere.",
@@ -742,12 +750,44 @@ export const en: Messages = {
     importSteps: (deadline, forms) => [
       "Log in to eDavki.",
       "Open Dokumenti, then Uvoz, and choose the file.",
-      "Open the imported form and compare it with this review.",
+      "Open the imported form and compare it with these results.",
       forms > 1
         ? `Submit it by ${deadline}, then repeat for the second file.`
         : `Submit it by ${deadline}.`,
     ],
     startOver: "Start over",
+  },
+  dash: {
+    navLabel: "Results",
+    overview: "Overview",
+    gains: "Gains",
+    dividends: "Dividends",
+    notes: "Notes",
+    countGains: {
+      one: "{n} security sold",
+      other: "{n} securities sold",
+    },
+    countDividends: { one: "{n} payment", other: "{n} payments" },
+    countNotes: { one: "{n} note", other: "{n} notes" },
+    eyebrowEstimate: (year) => `Tax year ${year} · estimate`,
+    eyebrowYear: (year) => `Tax year ${year}`,
+    gainsLead:
+      "Every sale on Doh-KDVP, with the purchases it was matched to first in, first out, each at its Banka Slovenije rate and with its row in your files.",
+    dividendsLead:
+      "Every payment on Doh-Div, with the tax withheld abroad and the part of it Slovenia credits, each at its Banka Slovenije rate.",
+    notesLead:
+      "What TaxReporter found in your files and how the rules applied, with what stops a return first.",
+    downloadAll: "Download for eDavki",
+    backToDetails: "Back to details",
+    taxToPay: (year) => `Tax to pay for ${year}`,
+    onGains: "On gains, Doh-KDVP",
+    onDividends: "On dividends, Doh-Div",
+    returnsTitle: "Returns",
+    drillTitle: "In detail",
+    viewGains: "View all gains",
+    viewDividends: "View all dividends",
+    viewNotes: "View notes",
+    noNotes: "Nothing to note",
   },
   tour: {
     action: "Guided tour",
@@ -778,7 +818,7 @@ export const en: Messages = {
       summary: {
         title: "Estimates, split by tax rate",
         intro:
-          "The review shows every figure behind both returns. It starts with what they add up to.",
+          "The overview starts with what both returns add up to: the tax to pay, as an estimate.",
       },
       saleRate: {
         title: "A sale, its rate and its source",
@@ -896,8 +936,8 @@ export const en: Messages = {
       `Withheld in ${country} on the ${gross} gross paid by ${payer}.`,
     // The credit for foreign tax, capped at the treaty rate:
     // docs/research/04-si-tax-rules.md §7.2.
-    treatyCappedCredit: (country, rate, product, excess) =>
-      `The treaty with ${country} allows ${rate}: ${product}. The other ${excess} withheld does not reduce the Slovenian tax.`,
+    treatyCappedCredit: (country, rate, product, withheld) =>
+      `The treaty with ${country} allows ${rate}: ${product}. The rest of the ${withheld} withheld does not reduce the Slovenian tax.`,
     findingSeverity: (blocking, warning, info) =>
       `Notes come in three kinds. \u201c${blocking}\u201d holds its return back until it is fixed, \u201c${warning}\u201d is worth reading, and \u201c${info}\u201d needs nothing.`,
     notOnTheseReturns:
@@ -908,7 +948,7 @@ export const en: Messages = {
     edavkiImport:
       "Written on this device and saved there; nothing is uploaded. In eDavki, a file like this is imported under Dokumenti, then Uvoz.",
     youReviewAndSubmit:
-      "After the import, eDavki shows the form for you to compare with this review and submit yourself. TaxReporter never files, and eDavki calculates the final tax.",
+      "After the import, eDavki shows the form for you to compare with these results and submit yourself. TaxReporter never files, and eDavki calculates the final tax.",
   },
 };
 
@@ -961,7 +1001,7 @@ export const sl: Messages = {
         body: "Davčna številka in naslov gresta samo v glavo datoteke XML.",
       },
       {
-        title: "Preglejte vsako številko",
+        title: "Oglejte si vsako številko",
         body: "Vsak nakup, prodaja in dividenda s tečajem, vrstico vira in morebitnim opozorilom.",
       },
       {
@@ -984,8 +1024,7 @@ export const sl: Messages = {
     label: "Napredek",
     files: "Datoteke",
     details: "Podatki",
-    review: "Pregled",
-    download: "Prenos",
+    dashboard: "Rezultati",
     done: "končano",
   },
   demoBanner: {
@@ -1018,7 +1057,7 @@ export const sl: Messages = {
     stillReading: "Počakajte, da bodo datoteke prebrane.",
     problemsTitle: "Težave v vaših datotekah",
     problemsBody:
-      "Dokler niso odpravljene, napovedi niso zapisane. Pregled si lahko vseeno ogledate.",
+      "Dokler niso odpravljene, napovedi niso zapisane. Rezultate si lahko vseeno ogledate.",
     accountsTitle: "Ali so te datoteke Trading 212 iz enega računa?",
     accountsBody:
       "Izvozi Trading 212 ne navajajo, iz katerega računa so. Datoteke istega računa, ki se prekrivajo, so prebrane enkrat; datoteke ločenih računov se upoštevajo vse.",
@@ -1092,7 +1131,7 @@ export const sl: Messages = {
     requiredNote: "Obvezna je le davčna številka.",
     requiredSuffix: "(obvezno)",
     demoNote: "V demu podatki niso obvezni.",
-    next: "Na pregled",
+    next: "Na rezultate",
     asideTitle: "Kaj se zgodi z vašimi podatki",
     asidePoints: [
       "Gredo v glavo datoteke XML in nikamor drugam.",
@@ -1134,9 +1173,6 @@ export const sl: Messages = {
     },
   },
   review: {
-    title: (year) => `Pregled za davčno leto ${year}`,
-    intro:
-      "Pred prenosom preverite vsako številko. TaxReporter pripravi napoved, končni davek pa izračunajo eDavki.",
     salesLabel: "Prodani vrednostni papirji",
     gainsTaxLabel: "Ocena davka od dobička",
     dividendsLabel: "Prejete dividende",
@@ -1150,13 +1186,7 @@ export const sl: Messages = {
     dividendSplitTitle: (rate) => `Slovenski davek po stopnji ${rate}`,
     stillDue: "Za doplačilo",
     showNotes: "Pokaži opombe",
-    tabsLabel: "Obrazca in opombe",
-    tabGains: "Dobiček (Doh-KDVP)",
-    tabGainsShort: "Dobiček",
-    tabDividends: "Dividende (Doh-Div)",
-    tabDividendsShort: "Dividende",
-    tabNotes: (count) => `Opombe (${count})`,
-    tabNotesShort: "Opombe",
+    dividendsCaption: "Dividende (Doh-Div)",
     colSold: "Prodano",
     colProceeds: "Vrednost ob odsvojitvi",
     colCost: "Nabavna vrednost",
@@ -1212,9 +1242,9 @@ export const sl: Messages = {
       warning: "Preverite",
       info: "V vednost",
     },
-    emptyTitle: "Ni še česa pregledati",
+    emptyTitle: "Ni še česa prikazati",
     emptyBody:
-      "Dodajte izvoze posrednikov, da tu vidite svoje napovedi, ali preizkusite pregled z demo podatki.",
+      "Dodajte izvoze posrednikov, da tu vidite svoje napovedi, ali preizkusite rezultate z demo podatki.",
     noSales:
       "V tem davčnem letu niste prodali vrednostnih papirjev, zato napovedi Doh-KDVP ni treba oddati.",
     noDividends: "V tem davčnem letu niste prejeli dividend.",
@@ -1230,19 +1260,19 @@ export const sl: Messages = {
       few: "Še {n} opombe niso prikazane.",
       other: "Še {n} opomb ni prikazanih.",
     },
-    blocked: "Pred nadaljevanjem odpravite opombe, ki ustavijo napovedi.",
+    blocked:
+      "Nobena napoved ni zapisana, dokler niso odpravljene opombe, ki ju ustavijo.",
     blockedOne: (form) =>
-      `${form} ni zapisan, dokler niso odpravljene opombe, ki ga ustavijo. Z drugo napovedjo lahko nadaljujete.`,
+      `${form} ni zapisan, dokler niso odpravljene opombe, ki ga ustavijo. Drugo napoved lahko vseeno prenesete.`,
     preparing:
       "Napovedi se pripravljajo iz vaših datotek, po tečajih Banke Slovenije.",
     prepareFailed:
-      "Napovedi ni bilo mogoče pripraviti. Vrnite se in nadaljujte znova ali znova naložite stran; nič ni bilo nikamor poslano.",
+      "Napovedi ni bilo mogoče pripraviti. Vrnite se na podatke in nadaljujte znova ali znova naložite stran; nič ni bilo nikamor poslano.",
     unnamedFile: "datoteka",
     foreignTaxProof:
       "FURS lahko zahteva dokazilo, da je bil tuji davek dokončno plačan. Shranite letna poročila borznih posrednikov.",
   },
   download: {
-    title: "Prenos in uvoz",
     intro: (deadline) =>
       `Vsako datoteko uvozite v eDavke, preverite obrazec in ga oddajte do ${deadline}.`,
     due: (deadline) => `Rok: ${deadline}`,
@@ -1272,12 +1302,12 @@ export const sl: Messages = {
     demoFiles:
       "Datoteki vsebujeta izmišljene posle iz demonstracije za izmišljenega zavezanca z davčno številko 12345678. Zapisani sta natanko tako kot vaše, zato vidite, kaj prejmejo eDavki, vendar ju v eDavke ne uvažajte.",
     ownFiles:
-      "Pred oddajo v eDavkih vsak obrazec primerjajte s pregledom. TaxReporter napovedi pripravi, oddate jih vi.",
+      "Pred oddajo v eDavkih vsak obrazec primerjajte s temi rezultati. TaxReporter napovedi pripravi, oddate jih vi.",
     notWritten: {
-      one: "Ni zapisano: najprej je treba odpraviti {n} težavo v pregledu.",
-      two: "Ni zapisano: najprej je treba odpraviti {n} težavi v pregledu.",
-      few: "Ni zapisano: najprej je treba odpraviti {n} težave v pregledu.",
-      other: "Ni zapisano: najprej je treba odpraviti {n} težav v pregledu.",
+      one: "Ni zapisano: najprej je treba odpraviti {n} težavo v opombah.",
+      two: "Ni zapisano: najprej je treba odpraviti {n} težavi v opombah.",
+      few: "Ni zapisano: najprej je treba odpraviti {n} težave v opombah.",
+      other: "Ni zapisano: najprej je treba odpraviti {n} težav v opombah.",
     },
     failed:
       "Datotek ni bilo mogoče zapisati. Za nov poskus znova naložite stran; nič ni bilo nikamor poslano.",
@@ -1287,12 +1317,56 @@ export const sl: Messages = {
     importSteps: (deadline, forms) => [
       "Prijavite se v eDavke.",
       "Odprite Dokumenti, nato Uvoz, in izberite datoteko.",
-      "Odprite uvoženi obrazec in ga primerjajte s tem pregledom.",
+      "Odprite uvoženi obrazec in ga primerjajte s temi rezultati.",
       forms > 1
         ? `Oddajte ga do ${deadline} in postopek ponovite za drugo datoteko.`
         : `Oddajte ga do ${deadline}.`,
     ],
     startOver: "Začni znova",
+  },
+  dash: {
+    navLabel: "Rezultati",
+    overview: "Pregled",
+    gains: "Dobiček",
+    dividends: "Dividende",
+    notes: "Opombe",
+    countGains: {
+      one: "{n} prodan vrednostni papir",
+      two: "{n} prodana vrednostna papirja",
+      few: "{n} prodani vrednostni papirji",
+      other: "{n} prodanih vrednostnih papirjev",
+    },
+    countDividends: {
+      one: "{n} izplačilo",
+      two: "{n} izplačili",
+      few: "{n} izplačila",
+      other: "{n} izplačil",
+    },
+    countNotes: {
+      one: "{n} opomba",
+      two: "{n} opombi",
+      few: "{n} opombe",
+      other: "{n} opomb",
+    },
+    eyebrowEstimate: (year) => `Davčno leto ${year} · ocena`,
+    eyebrowYear: (year) => `Davčno leto ${year}`,
+    gainsLead:
+      "Vsaka prodaja na obrazcu Doh-KDVP, z nakupi, s katerimi je povezana po metodi FIFO, vsak po tečaju Banke Slovenije in z vrstico v vaših datotekah.",
+    dividendsLead:
+      "Vsako izplačilo na obrazcu Doh-Div, z davkom, odtegnjenim v tujini, in delom, ki ga Slovenija prizna, vsako po tečaju Banke Slovenije.",
+    notesLead:
+      "Kaj je TaxReporter našel v vaših datotekah in kako so bila uporabljena pravila, najprej to, kar ustavi napoved.",
+    downloadAll: "Prenos za eDavke",
+    backToDetails: "Nazaj na podatke",
+    taxToPay: (year) => `Davek za plačilo za ${year}`,
+    onGains: "Od dobička, Doh-KDVP",
+    onDividends: "Od dividend, Doh-Div",
+    returnsTitle: "Napovedi",
+    drillTitle: "Podrobno",
+    viewGains: "Ves dobiček",
+    viewDividends: "Vse dividende",
+    viewNotes: "Opombe",
+    noNotes: "Ni opomb",
   },
   tour: {
     action: "Vodeni ogled",
@@ -1324,7 +1398,7 @@ export const sl: Messages = {
       summary: {
         title: "Ocene, razdeljene po stopnjah",
         intro:
-          "Pregled pokaže vse številke za obe napovedi. Začne s tem, koliko skupaj znašajo.",
+          "Pregled se začne s tem, koliko skupaj znašata obe napovedi: z davkom za plačilo, kot oceno.",
       },
       saleRate: {
         title: "Prodaja, njen tečaj in vir",
@@ -1424,8 +1498,8 @@ export const sl: Messages = {
       `Izplačano ${paid}, na praznik sistema TARGET: plačilni sistem evra ne deluje in Banka Slovenije ne objavi tečajnice. Kot ob koncu tedna TaxReporter uporabi zadnjo pred njim: ${listDate}.`,
     foreignTaxWithheld: (country, gross, payer) =>
       `Odtegnjeno v državi ${country} od bruto zneska ${gross}, ki ga je izplačala družba ${payer}.`,
-    treatyCappedCredit: (country, rate, product, excess) =>
-      `Pogodba z državo ${country} dovoljuje ${rate}: ${product}. Preostalih ${excess} odtegnjenega davka ne zmanjša slovenskega davka.`,
+    treatyCappedCredit: (country, rate, product, withheld) =>
+      `Pogodba z državo ${country} dovoljuje ${rate}: ${product}. Preostanek od ${withheld} odtegnjenega davka ne zmanjša slovenskega davka.`,
     findingSeverity: (blocking, warning, info) =>
       `Opombe so treh vrst. \u201e${blocking}\u201c zadrži napoved, dokler ni popravljeno, \u201e${warning}\u201c je vredno prebrati, \u201e${info}\u201c pa ne zahteva ničesar.`,
     notOnTheseReturns:
@@ -1435,7 +1509,7 @@ export const sl: Messages = {
     edavkiImport:
       "Zapisana je na tej napravi in tam shranjena, ničesar se ne naloži. V eDavkih se taka datoteka uvozi pod Dokumenti, nato Uvoz.",
     youReviewAndSubmit:
-      "Po uvozu eDavki prikažejo obrazec, ki ga primerjate s tem pregledom in sami oddate. TaxReporter napovedi nikoli ne odda, končni davek pa izračunajo eDavki.",
+      "Po uvozu eDavki prikažejo obrazec, ki ga primerjate s temi rezultati in sami oddate. TaxReporter napovedi nikoli ne odda, končni davek pa izračunajo eDavki.",
   },
 };
 

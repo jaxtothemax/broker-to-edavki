@@ -259,9 +259,9 @@ function SecurityItem({
         />
       </summary>
       <div className="security-body">
-        <h3 className="sub-title">{t.review.rowsTitle}</h3>
+        <h2 className="sub-title">{t.review.rowsTitle}</h2>
         <InventoryTable security={security} />
-        <h3 className="sub-title">{t.review.lotsTitle}</h3>
+        <h2 className="sub-title">{t.review.lotsTitle}</h2>
         <LotsTable security={security} />
       </div>
     </details>
@@ -289,7 +289,7 @@ function EstimateBreakdown({ estimate }: { readonly estimate: GainsEstimate }) {
   return (
     <div className="card ledger-card">
       <div className="ledger-head">
-        <h3>{t.review.estimateTitle}</h3>
+        <h2>{t.review.estimateTitle}</h2>
         <Chip>{t.review.estimateChip}</Chip>
       </div>
       <dl className="ledger">

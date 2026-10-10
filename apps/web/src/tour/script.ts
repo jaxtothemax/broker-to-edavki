@@ -37,7 +37,7 @@ import {
   type ReturnPreview,
   type SecurityResult,
 } from "../model/preview";
-import type { ReviewView } from "../screens/ReviewStep";
+import type { DashboardView, DashPage } from "../screens/dashboard/view";
 import type { FlowStep } from "../state/wizard";
 import { bucketLabel } from "../ui/bits";
 
@@ -101,7 +101,7 @@ export type StopId =
 export interface TourStop {
   readonly id: StopId;
   /** What the stop shows, over the user's own view. */
-  readonly view: { readonly screen: FlowStep; readonly review?: ReviewView };
+  readonly view: { readonly screen: FlowStep; readonly dash?: DashboardView };
   /** The elements left lit; one cutout covers them all. */
   readonly focus: readonly AnchorPath[];
   /** Space around the lit elements: less for a table row. */
@@ -112,9 +112,13 @@ export interface TourStop {
   readonly notes: readonly [TourNote, ...TourNote[]];
 }
 
-const review = (open: readonly string[] = []): ReviewView => ({
-  tab: "gains",
-  open: new Set(open),
+/** A dashboard page, with the sold securities it opens. */
+const dash = (
+  page: DashPage,
+  sold: readonly string[] = [],
+): { readonly screen: FlowStep; readonly dash: DashboardView } => ({
+  screen: "dashboard",
+  dash: { page, sold: new Set(sold) },
 });
 
 const security = (
@@ -256,8 +260,8 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "summary",
-    view: { screen: "review", review: review() },
-    focus: [path("summary.gainsTax")],
+    view: dash("overview"),
+    focus: [path("summary.tax")],
     pad: 8,
     prefer: "gutter",
     title: ({ t }) => t.tour.stops.summary.title,
@@ -307,7 +311,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "saleRate",
-    view: { screen: "review", review: review([DEMO_AAPL]) },
+    view: dash("gains", [DEMO_AAPL]),
     focus: [path(["sec.item", DEMO_AAPL], "sec.rows")],
     pad: 8,
     prefer: "row",
@@ -384,7 +388,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "holding",
-    view: { screen: "review", review: review([DEMO_AAPL]) },
+    view: dash("gains", [DEMO_AAPL]),
     focus: [path(["sec.item", DEMO_AAPL], "sec.lots")],
     pad: 8,
     prefer: "row",
@@ -438,7 +442,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "fifoBrokers",
-    view: { screen: "review", review: review([DEMO_NVDA]) },
+    view: dash("gains", [DEMO_NVDA]),
     focus: [path(["sec.item", DEMO_NVDA], "sec.rows")],
     pad: 8,
     prefer: "row",
@@ -516,7 +520,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "slices",
-    view: { screen: "review", review: review([DEMO_VWCE]) },
+    view: dash("gains", [DEMO_VWCE]),
     focus: [path(["sec.item", DEMO_VWCE], "sec.lots")],
     pad: 8,
     prefer: "row",
@@ -571,7 +575,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "loss",
-    view: { screen: "review", review: review([DEMO_ASML]) },
+    view: dash("gains", [DEMO_ASML]),
     focus: [path(["sec.item", DEMO_ASML], "sec.summary")],
     pad: 8,
     prefer: "row",
@@ -618,7 +622,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "holiday",
-    view: { screen: "review", review: { tab: "dividends", open: new Set() } },
+    view: dash("dividends"),
     focus: [path(["div.row", dividendKey(DEMO_HOLIDAY)])],
     pad: 4,
     prefer: "row",
@@ -669,7 +673,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "treaty",
-    view: { screen: "review", review: { tab: "dividends", open: new Set() } },
+    view: dash("dividends"),
     focus: [path(["div.row", dividendKey(DEMO_TREATY)])],
     pad: 4,
     prefer: "row",
@@ -694,14 +698,10 @@ export const TOUR: readonly TourStop[] = [
       {
         target: path(["div.row", dividendKey(DEMO_TREATY)], "div.credit"),
         text: ({ t, locale, preview }) => {
+          // The figures named are the row's own, beside the note: the part
+          // not credited is the notes page's to state (excessWithholding).
           const d = dividendAt(preview, DEMO_TREATY);
-          const excess = preview.findings.find(
-            (f) =>
-              f.code === "excessWithholding" &&
-              f.params["isin"] === DEMO_TREATY.isin,
-          )?.params["excessEur"];
-          if (d === null || d.treatyRate === null || typeof excess !== "string")
-            return null;
+          if (d === null || d.treatyRate === null) return null;
           const rate = formatPercent(d.treatyRate, locale);
           return {
             lead: formatEur(d.creditEur, locale),
@@ -709,7 +709,7 @@ export const TOUR: readonly TourStop[] = [
               formatCountry(d.country, locale),
               rate,
               `${times(formatEur(d.grossEur, locale), rate)} = ${formatEur(d.creditEur, locale)}`,
-              formatEur(excess, locale),
+              formatEur(d.foreignTaxEur, locale),
             ),
           };
         },
@@ -718,7 +718,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "notes",
-    view: { screen: "review", review: { tab: "notes", open: new Set() } },
+    view: dash("notes"),
     focus: [path("notes.noneBlocking"), path(["notes.group", "warning"])],
     pad: 8,
     prefer: "row",
@@ -767,7 +767,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     id: "download",
-    view: { screen: "download" },
+    view: dash("overview"),
     focus: [path(["download.form", "kdvp"])],
     pad: 8,
     prefer: "gutter",

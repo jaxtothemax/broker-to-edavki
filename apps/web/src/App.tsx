@@ -1,6 +1,7 @@
 /**
  * The app root: theme, language, and the flow from the start screen to the
- * download. All state lives in memory; nothing is stored or sent anywhere.
+ * results dashboard. All state lives in memory; nothing is stored or sent
+ * anywhere.
  *
  * The user's own files are read in the engine worker (ADR 0013). Their bytes
  * are taken when a file is added and kept here, by file id, for as long as
@@ -23,15 +24,13 @@ import { createRunner } from "./engine/runner";
 import type { Locale } from "./i18n/format";
 import { I18nProvider, useI18n } from "./i18n/i18n";
 import { formFileName } from "./model/preview";
-import { DetailsStep } from "./screens/DetailsStep";
-import { DownloadStep } from "./screens/DownloadStep";
-import { DEMO_FILES_BUTTON_ID, FilesStep } from "./screens/FilesStep";
+import { DashboardShell } from "./screens/dashboard/DashboardShell";
 import {
-  EmptyReview,
-  initialReviewView,
-  ReviewStep,
-  type ReviewView,
-} from "./screens/ReviewStep";
+  initialDashboardView,
+  type DashboardView,
+} from "./screens/dashboard/view";
+import { DetailsStep } from "./screens/DetailsStep";
+import { DEMO_FILES_BUTTON_ID, FilesStep } from "./screens/FilesStep";
 import { StartScreen } from "./screens/StartScreen";
 import {
   createTourReducer,
@@ -41,7 +40,6 @@ import {
 import { NOTE_COUNTS, TOUR } from "./tour/script";
 import { focusTarget, TourLayer, type TourRestore } from "./tour/TourLayer";
 import {
-  blockingReason,
   initialWizardState,
   labelsOf,
   payerDetails,
@@ -71,11 +69,11 @@ const noRestore = (focus: TourRestore["focus"] = null): TourRestore => ({
   scrollers: new Map(),
 });
 
-/** The demo's returns, from the engine the download step loads when it opens. */
+/** The demo's returns, from the engine the dashboard loads when it opens. */
 const writeDemoReturns = () =>
   import("./engine/demoReturns").then((engine) => engine.buildDemoReturns());
 
-/** Where the review of the user's own files stands. */
+/** Where the results of the user's own files stand. */
 function reviewStatus(state: WizardState): "ready" | "preparing" | "failed" {
   if (state.mode === "demo") return "ready";
   switch (state.preparing.status) {
@@ -107,15 +105,16 @@ function Frame({
   const restore = useRef<TourRestore>(noRestore());
   const restorePending = useRef(false);
   const [theme, setTheme] = useState<Theme>(initialTheme);
-  // The review's tab and open securities. Leaving the review resets them, as
-  // they were reset when the review's own state went with it.
-  const [reviewView, setReviewView] = useState<ReviewView>(initialReviewView);
+  // The dashboard's page and open securities. Leaving the dashboard resets
+  // them: it opens on its overview every time.
+  const [dashView, setDashView] = useState<DashboardView>(initialDashboardView);
   const [viewScreen, setViewScreen] = useState(state.screen);
   if (viewScreen !== state.screen) {
     setViewScreen(state.screen);
-    if (state.screen !== "review") setReviewView(initialReviewView);
+    if (state.screen !== "dashboard") setDashView(initialDashboardView);
   }
   const previousScreen = useRef(state.screen);
+  const previousPage = useRef(dashView.page);
   // Each added file, by id, and its bytes once the engine first needs them:
   // a file refused unread is never read at all.
   const handles = useRef(new Map<string, File>());
@@ -151,7 +150,7 @@ function Frame({
   const shownScreen = stop?.view.screen ?? state.screen;
   const shown: WizardState =
     shownScreen === state.screen ? state : { ...state, screen: shownScreen };
-  const shownReview = stop?.view.review ?? reviewView;
+  const shownDash = stop?.view.dash ?? dashView;
 
   // The tour has ended: give back the scroll and the focus it took. The
   // user's own view is already back, by construction, in this commit.
@@ -197,8 +196,8 @@ function Frame({
     document.title =
       state.screen === "start"
         ? t.app.name
-        : `${t.stepper[state.screen]} · ${t.app.name}`;
-  }, [state.screen, t]);
+        : `${state.screen === "dashboard" ? t.dash[dashView.page] : t.stepper[state.screen]} · ${t.app.name}`;
+  }, [state.screen, dashView.page, t]);
 
   // A new screen replaces the whole content: move focus to its heading so
   // keyboard and screen-reader users land at its start, hearing which screen it
@@ -217,6 +216,18 @@ function Frame({
       document.getElementById("main");
     target?.focus({ preventScroll: true });
   }, [state.screen]);
+
+  // A new page of the dashboard is a new screen to the user: the same move
+  // to its heading, from a navigation button that stays where it was.
+  useEffect(() => {
+    if (previousPage.current === dashView.page) return;
+    previousPage.current = dashView.page;
+    if (tourOpen.current || state.screen !== "dashboard") return;
+    window.scrollTo({ top: 0 });
+    document
+      .querySelector<HTMLElement>("#main h1")
+      ?.focus({ preventScroll: true });
+  }, [dashView.page, state.screen]);
 
   // A file no longer listed (or never listed, from a drop larger than a
   // session) takes its bytes with it.
@@ -278,11 +289,11 @@ function Frame({
     );
   });
 
-  // The review of own files is prepared when it opens, from what is entered;
-  // a change to any of it sets the preparation back to idle.
+  // The results of own files are prepared when the dashboard opens, from
+  // what is entered; a change to any of it sets the preparation back to idle.
   useEffect(() => {
     const { preparing, reading } = state;
-    if (state.mode !== "own" || state.screen !== "review") return;
+    if (state.mode !== "own" || state.screen !== "dashboard") return;
     if (preparing.status !== "idle" || reading.status !== "read") return;
     runner.prepare(
       reading.fileIds,
@@ -345,13 +356,18 @@ function Frame({
     state.preparing.status === "idle"
       ? []
       : state.preparing.fileIds.map((id) => labels.get(id) ?? id);
-  const demoBlocked = demoPreview.findings.some(
-    (f) => f.severity === "blocking",
-  );
+  const restart = () => {
+    dispatch({ type: "restart" });
+  };
+  const inShell = state.screen !== "start" && shownScreen === "dashboard";
 
   return (
     <div
-      className={cx("app", tourRun !== null && "is-touring")}
+      className={cx(
+        "app",
+        tourRun !== null && "is-touring",
+        inShell && "has-shell",
+      )}
       data-theme={theme}
     >
       <SkipLink />
@@ -364,123 +380,106 @@ function Frame({
           setTheme(theme === "dark" ? "light" : "dark");
         }}
       />
-      <Main>
-        {state.screen === "start" ? (
-          <StartScreen
-            onStartDemo={startDemo}
-            onStartOwn={() => {
-              dispatch({ type: "startOwn" });
-            }}
-          />
-        ) : (
-          <div className="container flow">
-            <Stepper
-              state={shown}
-              onGoTo={(screen) => {
-                dispatch({ type: "goTo", screen });
+      {inShell ? (
+        <DashboardShell
+          preview={preview}
+          status={reviewStatus(state)}
+          fileNames={fileNames}
+          forms={
+            prepared === null
+              ? null
+              : { kdvp: prepared.kdvp, div: prepared.div }
+          }
+          returns={state.mode === "demo" ? writeDemoReturns : ownReturns}
+          demo={state.mode === "demo"}
+          view={shownDash}
+          // The tour's view is its own: a change it causes is not the user's.
+          onViewChange={stop === undefined ? setDashView : noChange}
+          onBack={back}
+          onRestart={restart}
+          onTour={replayTour}
+          onStartDemo={startDemo}
+        />
+      ) : (
+        <Main>
+          {state.screen === "start" ? (
+            <StartScreen
+              onStartDemo={startDemo}
+              onStartOwn={() => {
+                dispatch({ type: "startOwn" });
               }}
             />
-            {state.mode === "demo" ? <DemoBanner onTour={replayTour} /> : null}
-            <ErrorBoundary
-              resetKey={shownScreen}
-              fallback={
-                <div className="screen">
-                  <Note tone="danger" role="alert">
-                    {t.app.crashed}
-                  </Note>
-                  <div className="actions-row">
-                    <Button size="lg" onClick={back}>
-                      {t.nav.back}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="lg"
-                      onClick={() => {
-                        dispatch({ type: "restart" });
-                      }}
-                    >
-                      {t.download.startOver}
-                    </Button>
+          ) : (
+            <div className="container flow">
+              <Stepper
+                state={shown}
+                onGoTo={(screen) => {
+                  dispatch({ type: "goTo", screen });
+                }}
+              />
+              {state.mode === "demo" ? (
+                <DemoBanner onTour={replayTour} />
+              ) : null}
+              <ErrorBoundary
+                resetKey={shownScreen}
+                fallback={
+                  <div className="screen">
+                    <Note tone="danger" role="alert">
+                      {t.app.crashed}
+                    </Note>
+                    <div className="actions-row">
+                      <Button size="lg" onClick={back}>
+                        {t.nav.back}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="lg"
+                        onClick={() => {
+                          dispatch({ type: "restart" });
+                        }}
+                      >
+                        {t.download.startOver}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              }
-            >
-              {shownScreen === "files" ? (
-                <FilesStep
-                  state={shown}
-                  taxYear={TAX_YEAR}
-                  onAddFiles={addFiles}
-                  onRemoveFile={(id) => {
-                    dispatch({ type: "removeFile", id });
-                  }}
-                  onSetAccounts={(choice) => {
-                    dispatch({ type: "setAccounts", accounts: choice });
-                  }}
-                  onUseDemoFiles={() => {
-                    enterDemo("useDemoFiles");
-                  }}
-                  onBack={back}
-                  onNext={next}
-                />
-              ) : null}
-              {shownScreen === "details" ? (
-                <DetailsStep
-                  state={shown}
-                  onChange={(field, value) => {
-                    dispatch({ type: "setDetail", field, value });
-                  }}
-                  onPayerChange={(isin, field, value) => {
-                    dispatch({ type: "setPayer", isin, field, value });
-                  }}
-                  onBack={back}
-                  onNext={next}
-                />
-              ) : null}
-              {shownScreen === "review" ? (
-                <ReviewStep
-                  preview={preview}
-                  status={reviewStatus(state)}
-                  fileNames={fileNames}
-                  forms={
-                    prepared === null
-                      ? null
-                      : { kdvp: prepared.kdvp, div: prepared.div }
-                  }
-                  canContinue={
-                    state.mode === "own"
-                      ? blockingReason(state, "review") === null
-                      : !demoBlocked
-                  }
-                  view={shownReview}
-                  // The tour's view is its own: a toggle it causes is not the user's.
-                  onViewChange={stop === undefined ? setReviewView : noChange}
-                  onBack={back}
-                  onNext={next}
-                  onStartDemo={startDemo}
-                />
-              ) : null}
-              {shownScreen === "download" ? (
-                preview === null ||
-                (state.mode === "own" && ownReturns === null) ? (
-                  // Unreachable through the flow (own files block at the
-                  // review until prepared), but never render a blank screen.
-                  <EmptyReview onStartDemo={startDemo} />
-                ) : (
-                  <DownloadStep
-                    preview={preview}
-                    demo={state.mode === "demo"}
-                    returns={ownReturns ?? writeDemoReturns}
-                    onBack={back}
-                    onRestart={() => {
-                      dispatch({ type: "restart" });
+                }
+              >
+                {shownScreen === "files" ? (
+                  <FilesStep
+                    state={shown}
+                    taxYear={TAX_YEAR}
+                    onAddFiles={addFiles}
+                    onRemoveFile={(id) => {
+                      dispatch({ type: "removeFile", id });
                     }}
+                    onSetAccounts={(choice) => {
+                      dispatch({ type: "setAccounts", accounts: choice });
+                    }}
+                    onUseDemoFiles={() => {
+                      enterDemo("useDemoFiles");
+                    }}
+                    onBack={back}
+                    onNext={next}
                   />
-                )
-              ) : null}
-            </ErrorBoundary>
-          </div>
-        )}
-      </Main>
+                ) : null}
+                {shownScreen === "details" ? (
+                  <DetailsStep
+                    state={shown}
+                    onChange={(field, value) => {
+                      dispatch({ type: "setDetail", field, value });
+                    }}
+                    onPayerChange={(isin, field, value) => {
+                      dispatch({ type: "setPayer", isin, field, value });
+                    }}
+                    onBack={back}
+                    onNext={next}
+                  />
+                ) : null}
+              </ErrorBoundary>
+            </div>
+          )}
+        </Main>
+      )}
       <AppFooter />
       {tourRun === null || stop === undefined ? null : (
         // A failure in the tour closes it and gives the page back, rather

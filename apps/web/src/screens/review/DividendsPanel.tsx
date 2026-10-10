@@ -37,7 +37,7 @@ export function DividendsPanel({
   const withheld = dividends.some((row) => /[1-9]/.test(row.foreignTaxEur));
   return (
     <div className="panel-stack">
-      <DataTable caption={t.review.tabDividends}>
+      <DataTable caption={t.review.dividendsCaption}>
         <thead>
           <tr>
             <th scope="col">{t.review.colDate}</th>

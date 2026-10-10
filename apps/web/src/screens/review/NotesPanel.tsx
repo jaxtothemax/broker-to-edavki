@@ -61,12 +61,12 @@ export function NotesPanel({
             className="note-group"
             {...explain("notes.group", severity)}
           >
-            <h3>
+            <h2>
               {t.review.severity[severity]}
               <span className="count" aria-hidden>
                 {formatNumber(String(group.length), locale)}
               </span>
-            </h3>
+            </h2>
             <div className="note-stack">
               {group.slice(0, SHOWN_PER_GROUP).map((d, i) => (
                 <Note

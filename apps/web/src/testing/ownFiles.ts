@@ -112,7 +112,7 @@ export function preparedState(
     ...(Object.entries(TAXPAYER) as [keyof TaxpayerDetails, string][]).map(
       ([field, value]): WizardAction => ({ type: "setDetail", field, value }),
     ),
-    { type: "goTo", screen: "review" },
+    { type: "goTo", screen: "dashboard" },
     { type: "prepareStarted", request: 2, fileIds },
     { type: "prepareDone", request: 2, reply: prepared },
     ...actions,

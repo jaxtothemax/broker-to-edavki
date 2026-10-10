@@ -1,6 +1,9 @@
 /**
- * The import → details → review → download flow as a pure reducer, so every
- * navigation rule is unit-testable without a DOM.
+ * The import → details → dashboard flow as a pure reducer, so every
+ * navigation rule is unit-testable without a DOM. The dashboard (#47) is
+ * where the flow ends: the figures, the entries and the downloads, each
+ * return withheld on its own while a note stops it (ADR 0018 §6), so no
+ * step after it needs a gate.
  *
  * Two modes: "demo" walks the flow on the bundled demo data, "own" reads the
  * user's own files in the engine worker (ADR 0013). The reducer holds what
@@ -27,7 +30,7 @@ import type { BrokerId, IsoDate } from "../model/preview";
 /** The tax year v0.1 prepares returns for (filed by 1 March 2027). */
 export const TAX_YEAR = 2026;
 
-export const FLOW_STEPS = ["files", "details", "review", "download"] as const;
+export const FLOW_STEPS = ["files", "details", "dashboard"] as const;
 export type FlowStep = (typeof FLOW_STEPS)[number];
 export type Screen = "start" | FlowStep;
 export type Mode = "demo" | "own";
@@ -331,15 +334,6 @@ export function isPayerIncomplete(
   );
 }
 
-/** Whether the prepared returns hold a form to download, or need none. */
-function hasDownload(reply: PrepareReply): boolean {
-  const forms = [reply.kdvp, reply.div];
-  return (
-    forms.some((form) => form.xml !== null) ||
-    forms.every((form) => !form.needed)
-  );
-}
-
 function demoFiles(): AddedFile[] {
   return demoPreview.files.map((file) => ({
     kind: "demo",
@@ -359,9 +353,7 @@ export type BlockingReason =
   | "stillReading"
   | "readFailed"
   | "unreadableFile"
-  | "taxNumber"
-  | "notPrepared"
-  | "nothingWritten";
+  | "taxNumber";
 
 const UNREADABLE = new Set(["refused", "clash", "notRead"]);
 
@@ -391,10 +383,6 @@ export function blockingReason(
     !isValidTaxNumber(state.details.taxNumber)
   ) {
     return "taxNumber";
-  }
-  if (step === "review" && state.mode === "own") {
-    if (state.preparing.status !== "prepared") return "notPrepared";
-    if (!hasDownload(state.preparing.reply)) return "nothingWritten";
   }
   return null;
 }
