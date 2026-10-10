@@ -134,7 +134,12 @@ wrapped as untrusted; descriptions, counterparty names and IBANs never do.
   and derivative trades are set aside with a reason, and the rest name what they are.
 - **A refusal still blocks every year** for Trade Republic: dividends, crypto, bonds and the
   other refused rows state no reach under ADR 0017 (#52).
-- **A spreadsheet re-save** of any CSV export no longer reads by accident: it fails whole.
+- **The semicolon revision has no time of day.** FIFO orders such a day as it does for any
+  untimed trade: purchases before sales, then by key. Where a day has purchases at different
+  prices and a sale ends partway through them, the engine warns that the order decided which
+  shares the sale used (`sameDayLotOrder`); nothing blocks.
+- **A spreadsheet re-save** of a Trade Republic or Trading 212 export with semicolons is no
+  export either adapter knows, as it was not before semicolons were read: it fails whole.
 - **The format strings** are `traderepublic-csv-2026` and `traderepublic-csv-value-date`; the
   first is unchanged.
 

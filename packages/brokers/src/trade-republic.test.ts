@@ -534,6 +534,52 @@ describe("tradeRepublic: the semicolon revision with value_date", () => {
     ]);
   });
 
+  it("has no time of day, so FIFO orders a day by side and warns where the order of its lots decides", () => {
+    // A purchase and a sale of the fund on one day: no blocking finding.
+    const sameDay = valueDateRows(
+      valueDateRow({
+        shares: "2.0000000000",
+        price: "100.000000",
+        amount: "-200.00",
+      }),
+      valueDateRow({
+        type: "SELL",
+        shares: "-1.0000000000",
+        price: "101.000000",
+        amount: "101.00",
+        transaction_id: "00000000-0000-4000-8000-000000000201",
+      }),
+    );
+    const plain = matchFifo(validateLedger(sameDay.events));
+    expect(plain.diagnostics).toEqual([]);
+    // Two purchases at different prices that day, and a sale that ends
+    // between them: which lot it took is not known, and it says so.
+    const twoLots = valueDateRows(
+      valueDateRow({
+        shares: "1.0000000000",
+        price: "100.000000",
+        amount: "-100.00",
+      }),
+      valueDateRow({
+        shares: "1.0000000000",
+        price: "102.000000",
+        amount: "-102.00",
+        transaction_id: "00000000-0000-4000-8000-000000000202",
+      }),
+      valueDateRow({
+        type: "SELL",
+        shares: "-1.0000000000",
+        price: "101.000000",
+        amount: "101.00",
+        transaction_id: "00000000-0000-4000-8000-000000000203",
+      }),
+    );
+    const fifo = matchFifo(validateLedger(twoLots.events));
+    expect(fifo.diagnostics.map((d) => [d.severity, d.code])).toEqual([
+      ["warning", "sameDayLotOrder"],
+    ]);
+  });
+
   it("refuses a datetime that is not its date at midnight, as the revision writes it", () => {
     for (const datetime of [
       "2026-02-02T09:30:00.000000Z",
