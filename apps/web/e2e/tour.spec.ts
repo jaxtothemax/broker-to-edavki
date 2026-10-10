@@ -74,9 +74,11 @@ async function snapshot(page: Page) {
       (d) => d.getAttribute("data-explain-key") ?? "",
     ),
     scrollY: Math.round(window.scrollY),
-    tables: [...document.querySelectorAll<HTMLElement>(".table-scroll")].map(
-      (t) => t.scrollLeft,
-    ),
+    tables: [
+      ...document.querySelectorAll<HTMLElement>(
+        ".dash-page:not([hidden]) .table-scroll",
+      ),
+    ].map((t) => t.scrollLeft),
     focused:
       document.activeElement?.id ?? document.activeElement?.tagName ?? "",
   }));
@@ -142,14 +144,23 @@ for (const exit of ["Escape", "Skip", "Finish"] as const) {
     }
     await results(page).getByRole("button", { name: DIVIDENDS }).click();
     await expect(page.locator("#main h1")).toHaveText(DIVIDENDS);
+    // The shown page's table, scrolled sideways, and the window scrolled
+    // down; the tour starts from the keyboard, which scrolls nothing.
     await page.evaluate(() => {
       window.scrollTo({ top: 420, behavior: "instant" });
-      const table = document.querySelector<HTMLElement>(".table-scroll");
+      const table = document.querySelector<HTMLElement>(
+        ".dash-page:not([hidden]) .table-scroll",
+      );
       if (table !== null) table.scrollLeft = 30;
+      document
+        .querySelector<HTMLElement>("#demo-tour")
+        ?.focus({ preventScroll: true });
     });
-    await page.locator("#demo-tour").focus();
     const before = await snapshot(page);
-    await page.locator("#demo-tour").click();
+    // Proves the check below can fail: something was scrolled to give back.
+    expect(before.scrollY).toBeGreaterThan(0);
+    expect(before.tables).toContain(30);
+    await page.keyboard.press("Enter");
     await expect(dialog).toBeVisible();
     // Go to the stop that opens Apple's row on the gains tab.
     const apple = page.locator('details[data-explain-key="US0378331005"]');

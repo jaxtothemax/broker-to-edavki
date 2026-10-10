@@ -24,8 +24,9 @@ follows, the 30-day rule for losses, the credit for tax withheld abroad, and how
 imported into eDavki without filing it.
 
 You will be able to leave the tour at any point with Escape or **Skip tour**, and the demo
-will be just as you left it. The demo's banner starts the tour again. Nothing records that
-you have seen it.
+will be just as you left it. The **Guided tour** button starts it again: on the demo's banner
+in the first steps, and at the top of each page of your results. Nothing records that you have
+seen it.
 
 ## 1. Export your history from your broker
 

@@ -110,7 +110,7 @@ export interface PayerPrompt {
   readonly payments: number;
 }
 
-/** One return as the download step offers it. */
+/** One return as the dashboard's overview offers it. */
 export interface FormOutput {
   /** The XML eDavki imports, or null when it is withheld or not needed. */
   readonly xml: string | null;
@@ -349,7 +349,7 @@ const isMonth = (v: unknown): v is MonthlyAmount =>
   MONTH.test(v["month"]) &&
   isDecimal(v["grossEur"]);
 
-/** The review, every field its screens read. */
+/** The results, every field the dashboard reads. */
 function isPreview(v: unknown): v is ReturnPreview {
   if (!isRecord(v)) return false;
   const totals = v["gainsTotals"];

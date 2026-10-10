@@ -69,6 +69,18 @@ const noRestore = (focus: TourRestore["focus"] = null): TourRestore => ({
   scrollers: new Map(),
 });
 
+/** The tables shown and scrolled sideways, by their names (DataTable). */
+function scrolledTables(): Map<string, number> {
+  const tables = new Map<string, number>();
+  for (const table of document.querySelectorAll<HTMLElement>(".table-scroll")) {
+    const name = table.getAttribute("aria-label");
+    if (name === null || table.scrollLeft === 0) continue;
+    if (table.getClientRects().length === 0) continue;
+    tables.set(name, table.scrollLeft);
+  }
+  return tables;
+}
+
 /** The demo's returns, from the engine the dashboard loads when it opens. */
 const writeDemoReturns = () =>
   import("./engine/demoReturns").then((engine) => engine.buildDemoReturns());
@@ -157,9 +169,15 @@ function Frame({
   useLayoutEffect(() => {
     if (tour.run !== null || !restorePending.current) return;
     restorePending.current = false;
-    const { focus, scrollY, scrollers } = restore.current;
+    const { focus, scrollY, scrollers, tables } = restore.current;
     for (const [scroller, left] of scrollers) {
       if (scroller.isConnected) scroller.scrollLeft = left;
+    }
+    for (const table of document.querySelectorAll<HTMLElement>(
+      ".table-scroll",
+    )) {
+      const left = tables?.get(table.getAttribute("aria-label") ?? "");
+      if (left !== undefined) table.scrollLeft = left;
     }
     if (scrollY !== null)
       window.scrollTo({ top: scrollY, behavior: "instant" });
@@ -343,7 +361,11 @@ function Frame({
   };
   const replayTour = () => {
     // Taken before the tour shows a shorter screen, which clamps the scroll.
-    restore.current = { ...noRestore(TOUR_BUTTON_ID), scrollY: window.scrollY };
+    restore.current = {
+      ...noRestore(TOUR_BUTTON_ID),
+      scrollY: window.scrollY,
+      tables: scrolledTables(),
+    };
     tourDispatch({ type: "replay" });
   };
   const back = () => {
@@ -381,25 +403,50 @@ function Frame({
         }}
       />
       {inShell ? (
-        <DashboardShell
-          preview={preview}
-          status={resultsStatus(state)}
-          fileNames={fileNames}
-          forms={
-            prepared === null
-              ? null
-              : { kdvp: prepared.kdvp, div: prepared.div }
+        // The shell renders its own <main>; this boundary catches what
+        // fails in the shell itself, outside its pages' own boundaries.
+        <ErrorBoundary
+          resetKey={`shell:${shownScreen}`}
+          fallback={
+            <Main>
+              <div className="container flow">
+                <div className="screen">
+                  <Note tone="danger" role="alert">
+                    {t.app.crashed}
+                  </Note>
+                  <div className="actions-row">
+                    <Button size="lg" onClick={back}>
+                      {t.nav.back}
+                    </Button>
+                    <Button variant="ghost" size="lg" onClick={restart}>
+                      {t.download.startOver}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Main>
           }
-          returns={state.mode === "demo" ? writeDemoReturns : ownReturns}
-          demo={state.mode === "demo"}
-          view={shownDash}
-          // The tour's view is its own: a change it causes is not the user's.
-          onViewChange={stop === undefined ? setDashView : noChange}
-          onBack={back}
-          onRestart={restart}
-          onTour={replayTour}
-          onStartDemo={startDemo}
-        />
+        >
+          <DashboardShell
+            preview={preview}
+            status={resultsStatus(state)}
+            fileNames={fileNames}
+            forms={
+              prepared === null
+                ? null
+                : { kdvp: prepared.kdvp, div: prepared.div }
+            }
+            returns={state.mode === "demo" ? writeDemoReturns : ownReturns}
+            demo={state.mode === "demo"}
+            view={shownDash}
+            // The tour's view is its own: a change it causes is not the user's.
+            onViewChange={stop === undefined ? setDashView : noChange}
+            onBack={back}
+            onRestart={restart}
+            onTour={replayTour}
+            onStartDemo={startDemo}
+          />
+        </ErrorBoundary>
       ) : (
         <Main>
           {state.screen === "start" ? (

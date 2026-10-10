@@ -1,5 +1,5 @@
 /**
- * The web UI's view of a prepared return. The review screens render only this
+ * The web UI's view of a prepared return. The dashboard renders only this
  * shape; the engine worker maps the pipeline's output onto it
  * (engine/toPreview.ts), so the screens never depend on parser or lot-engine
  * internals, and nothing but plain data crosses from the worker (ADR 0013).
@@ -18,7 +18,7 @@ export function formFileName(form: "kdvp" | "div", taxYear: number): string {
   return `${form === "kdvp" ? "Doh_KDVP" : "Doh_Div"}_${String(taxYear)}.xml`;
 }
 
-/** Brokers the review can show, in display order. */
+/** Brokers the dashboard can show, in display order. */
 export const BROKERS = ["trading212", "ibkr", "traderepublic"] as const;
 export type BrokerId = (typeof BROKERS)[number];
 

@@ -445,7 +445,7 @@ export const en: Messages = {
     opensInNewTab: "(opens in a new tab)",
     themeLight: "Light theme",
     crashed:
-      "Something went wrong showing this step. Nothing was sent anywhere. Go back, or start over.",
+      "Something went wrong showing this page. Nothing was sent anywhere. Go back, or start over.",
   },
   brokers: {
     trading212: "Trading 212",
@@ -984,7 +984,7 @@ export const sl: Messages = {
     opensInNewTab: "(odpre se v novem zavihku)",
     themeLight: "Svetla tema",
     crashed:
-      "Pri prikazu tega koraka je šlo nekaj narobe. Nič ni bilo nikamor poslano. Vrnite se ali začnite znova.",
+      "Pri prikazu te strani je šlo nekaj narobe. Nič ni bilo nikamor poslano. Vrnite se ali začnite znova.",
   },
   brokers: {
     trading212: "Trading 212",

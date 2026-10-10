@@ -108,6 +108,10 @@ and are open to review.
    withholds Doh-Div and leaves Doh-KDVP ready; a finding from reading the files, which can
    bear on either, withholds both. The review lets the user continue while either form can be
    written, and the download step names each withheld form and why.
+
+   > **Amended by ADR 0018 §6 (2026-10-10):** the review and download steps are now one
+   > results dashboard. Its overview names each withheld form and why, and offers the other
+   > for download; the rule above stands.
 10. **Findings reach the page as codes, and become sentences there.** A finding crosses as its
     code, severity and parameters: a file as its position in the request, never its name;
     file text only inside `UntrustedText`. The page names files and words the parameters in

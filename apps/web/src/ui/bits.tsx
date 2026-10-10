@@ -1,4 +1,4 @@
-/** Small presentational pieces shared by the start screen, the flow and the review. */
+/** Small presentational pieces shared by the start screen, the flow and the dashboard. */
 import { ArrowsLeftRightIcon, SignpostIcon } from "@phosphor-icons/react";
 
 import {

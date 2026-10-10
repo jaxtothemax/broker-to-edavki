@@ -2,7 +2,7 @@
  * Doh-KDVP: one disclosure per security, holding its inventory list (what the
  * XML will contain) and the FIFO-matched lots behind the gain, followed by how
  * the estimate is built. Native <details> keeps the disclosure accessible;
- * which ones are open is held by the caller, as part of the review's view.
+ * which ones are open is held by the caller, as part of the dashboard's view.
  */
 import { CaretDownIcon } from "@phosphor-icons/react";
 

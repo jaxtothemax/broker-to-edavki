@@ -76,6 +76,12 @@ export interface TourRestore {
   scrollY: number | null;
   /** Each sideways scroller the tour moved, and where it was. */
   readonly scrollers: Map<HTMLElement, number>;
+  /**
+   * Each table the user had scrolled sideways when the tour started, by its
+   * name: a stop on another screen unmounts the table, so the one the user
+   * comes back to is a new element, found again by the same name.
+   */
+  readonly tables?: ReadonlyMap<string, number>;
 }
 
 /**
