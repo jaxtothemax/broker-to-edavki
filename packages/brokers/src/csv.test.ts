@@ -48,6 +48,43 @@ describe("readCsv", () => {
     expect(table.rows.map((r) => r.row)).toEqual([3, 5]);
   });
 
+  it("reads with commas unless the header line has only semicolons", () => {
+    const comma = readCsv("Action,Total\nDeposit,10\n");
+    expect(comma.delimiter).toBe(",");
+    // Semicolons: commas in a cell are text, quoted or not.
+    const semicolon = readCsv('A;B\n1,5;x, y\n"a;b";"c,d"\n');
+    expect(semicolon.delimiter).toBe(";");
+    expect(semicolon.header).toEqual(["A", "B"]);
+    expect(semicolon.rows.map((r) => r.cells)).toEqual([
+      ["1,5", "x, y"],
+      ["a;b", "c,d"],
+    ]);
+    // Quoted header names: only a delimiter outside quotes counts.
+    expect(readCsv('"A;1",B\nx,y\n').header).toEqual(["A;1", "B"]);
+    expect(readCsv('"A,1";B\nx;y\n').header).toEqual(["A,1", "B"]);
+    expect(readCsv('"A";"B"\n"x";"y"\n').delimiter).toBe(";");
+    // A comma anywhere outside quotes chooses the comma, as before
+    // semicolons were read; a header of one name, too.
+    expect(readCsv("A,B;C\n1,2;3\n").header).toEqual(["A", "B;C"]);
+    expect(readCsv("Only\n1\n").delimiter).toBe(",");
+  });
+
+  it("chooses the delimiter past a byte-order mark and empty lines, as it reads", () => {
+    const table = readCsv(`${String.fromCharCode(0xfeff)}\n\r\nA;B\n1;2\r\n`);
+    expect([table.delimiter, table.header]).toEqual([";", ["A", "B"]]);
+    expect(table.rows).toEqual([{ row: 4, cells: ["1", "2"] }]);
+    // Only the header line chooses: a comma in a later line is a cell's.
+    expect(readCsv("A;B\nx,1;2\n").rows[0]?.cells).toEqual(["x,1", "2"]);
+  });
+
+  it("refuses with semicolons what it refuses with commas", () => {
+    expect(failure(() => readCsv('A;B\n"x"y;1\n'))).toBe("strayQuote 2");
+    expect(failure(() => readCsv("A;B\n1;2;3\n"))).toBe("rowLength 2");
+    expect(failure(() => readCsv("A;A\n1;2\n"))).toBe("duplicateHeaderName 1");
+    // A comma file whose cells hold semicolons is still read with commas.
+    expect(failure(() => readCsv("A,B\n1;2\n"))).toBe("rowLength 2");
+  });
+
   it("refuses broken quoting rather than guessing where a cell ends", () => {
     expect(failure(() => readCsv('A,B\n"open,1\n'))).toBe(
       "unterminatedQuote 2",

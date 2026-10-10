@@ -64,21 +64,34 @@ const PART = /^[A-Za-z0-9_.-]{1,64}$/;
  */
 const CURRENCY = /^(?:[A-Z]{3}|GBp|ZAc)$/;
 
-const IGNORED_REASONS: ReadonlySet<unknown> = new Set<IgnoredReason>([
-  "deposit",
-  "withdrawal",
-  "interest",
-  "currencyConversion",
-  "cardSpending",
-  "fee",
-  "cashTransfer",
-  "header",
-  "pairedRow",
-  "summary",
-  "reversed",
-  "securitiesTransfer",
-  "derivative",
-]);
+/**
+ * Every reason an ignored row may give, as a record the compiler checks
+ * against `IgnoredReason`: a reason added there and missing here does not
+ * compile, where a copied list let it through and blocked every row that
+ * gave it (#15).
+ */
+const IGNORED_REASONS = {
+  deposit: true,
+  withdrawal: true,
+  interest: true,
+  currencyConversion: true,
+  cardSpending: true,
+  fee: true,
+  cashTransfer: true,
+  header: true,
+  pairedRow: true,
+  summary: true,
+  reversed: true,
+  securitiesTransfer: true,
+  derivative: true,
+  gift: true,
+  brokerTaxSettlement: true,
+} as const satisfies Record<IgnoredReason, true>;
+
+/** Whether a value is a reason of `IgnoredReason`, own keys only. */
+function isIgnoredReason(reason: unknown): boolean {
+  return typeof reason === "string" && Object.hasOwn(IGNORED_REASONS, reason);
+}
 
 const KINDS = ["trade", "split", "dividend", "withholding"] as const;
 
@@ -186,7 +199,7 @@ function refusal(event: unknown): Diagnostic | null {
     const ok =
       source !== undefined &&
       accountOk(event) &&
-      IGNORED_REASONS.has(field(event, "reason"));
+      isIgnoredReason(field(event, "reason"));
     return ok ? null : diagnostic("blocking", "unknownEvent", {}, source);
   }
   if (!KINDS.some((k) => k === kind)) {

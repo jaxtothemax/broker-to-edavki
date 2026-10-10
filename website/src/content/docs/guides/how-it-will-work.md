@@ -66,7 +66,8 @@ Trading 212 exports do not say which account they come from. If you add more tha
 TaxReporter will ask whether they are from one account (it assumes so until you say otherwise),
 so that overlapping exports of one account are read once and separate accounts are all counted.
 Every Trade Republic export will be taken for your one Trade Republic account, so add only
-your own: one person's files per session.
+your own: one person's files per session. A child's (Junior) account is the child's own, so
+its export will be refused.
 
 For Doh-Div, eDavki needs the name, address and country of every company or fund that paid you
 a dividend. TaxReporter will fill in the name and the country from your export where it can,

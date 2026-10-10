@@ -10,6 +10,12 @@
 > **Superseded in part by [ADR 0017](0017-a-refused-row-withholds-only-the-returns-it-can-change.md)
 > (Proposed, 2026-10-10)** for refusals whose adapter states their reach. Trade Republic's
 > refusals state none, so a Trade Republic dividend still blocks both returns, as below.
+>
+> **Superseded in part by [ADR 0019](0019-trade-republic-export-revisions-and-row-types.md)
+> (Proposed, 2026-10-10)** in decisions 1, 2, 4, 5 and 7: a second header revision, written
+> with semicolons and dated by `date` alone; keys by the trade's date; `JUNIOR` accounts
+> refused; more cash rows, German tax rows and derivative trades set aside. Exports that look
+> real (research 07 §4.2) bear on the open questions below without settling them.
 
 ## Context
 

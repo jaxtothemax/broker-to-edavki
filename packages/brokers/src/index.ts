@@ -25,6 +25,7 @@ export {
   CSV_LIMITS,
   CsvError,
   readCsv,
+  type CsvDelimiter,
   type CsvErrorCode,
   type CsvLimits,
   type CsvRow,
@@ -35,6 +36,7 @@ export { fromUtcStamp } from "./time.js";
 export {
   TRADE_REPUBLIC,
   TRADE_REPUBLIC_COLUMNS,
+  TRADE_REPUBLIC_VALUE_DATE_COLUMNS,
   tradeRepublic,
 } from "./trade-republic.js";
 export {

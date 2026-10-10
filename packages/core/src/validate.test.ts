@@ -10,6 +10,7 @@ import { diagnostic, untrusted } from "./diagnostics.js";
 import type {
   AccountScope,
   DividendEvent,
+  IgnoredReason,
   IgnoredRow,
   LedgerEvent,
   TradeEvent,
@@ -226,6 +227,33 @@ describe("validateLedger", () => {
     expect(codes([{ ...ignored, reason: "other" } as never])).toEqual([
       "unknownEvent",
     ]);
+    // Every reason the type names is known, and no prototype key passes
+    // for one (#15).
+    const reasons = [
+      "deposit",
+      "withdrawal",
+      "interest",
+      "currencyConversion",
+      "cardSpending",
+      "fee",
+      "cashTransfer",
+      "header",
+      "pairedRow",
+      "summary",
+      "reversed",
+      "securitiesTransfer",
+      "derivative",
+      "gift",
+      "brokerTaxSettlement",
+    ] as const satisfies readonly IgnoredReason[];
+    for (const reason of reasons) {
+      expect(codes([{ ...ignored, reason }]), reason).toEqual([]);
+    }
+    for (const reason of ["constructor", "__proto__", "toString", 1]) {
+      expect(codes([{ ...ignored, reason } as never]), String(reason)).toEqual([
+        "unknownEvent",
+      ]);
+    }
     // A label is a group number or a hashed ID, never an account number.
     for (const label of ["B", "u1234567", "0", "101", "main"]) {
       const scope = `ibkr:${label}` as AccountScope;

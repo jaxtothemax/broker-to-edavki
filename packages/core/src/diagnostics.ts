@@ -72,7 +72,8 @@ export type NumberColumn =
   | "ibCommission"
   | "shares"
   | "price"
-  | "fee";
+  | "fee"
+  | "tax";
 
 /** Why a CSV export could not be read (packages/brokers/src/csv.ts). */
 export type CsvReason =
@@ -394,6 +395,14 @@ export interface DiagnosticParams {
   splitHalvesDisagree: Where;
   interestNotCovered: { readonly broker: string; readonly count: number };
   derivativesNotCovered: { readonly broker: string; readonly count: number };
+  /**
+   * Rows of a tax the broker settled under its own country's rules: left
+   * out, as they change no Slovenian figure, and counted, as they show the
+   * broker taxed the account as its own country's resident (ADR 0019).
+   */
+  brokerTaxSettled: { readonly broker: string; readonly count: number };
+  /** A child's account, another taxpayer's: never pooled (ADR 0019). */
+  juniorAccount: { readonly broker: string };
   // Interactive Brokers Flex statements (brokers)
   statementCountMismatch: {
     readonly declared: number;

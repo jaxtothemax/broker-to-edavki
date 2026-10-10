@@ -299,6 +299,10 @@ export const findingsEn: FindingMessages = {
     `${p.broker}: interest rows (${p.count}) are not on these returns. Interest is filed on Doh-Obr, which TaxReporter does not prepare yet.`,
   derivativesNotCovered: (p) =>
     `${p.broker}: option, future, CFD and warrant trades (${p.count}) are not on these returns. Derivatives are filed on D-IFI, which TaxReporter does not prepare yet.`,
+  brokerTaxSettled: (p) =>
+    `${p.broker}: rows of tax the broker settled under German rules (${p.count}), such as a tax refund, the Vorabpauschale or tax withheld on a sale, are not on these returns: no Slovenian figure depends on them. The sales themselves are on Doh-KDVP.`,
+  juniorAccount: (p) =>
+    `${p.broker}: this file is from a child's (Junior) account, which belongs to the child, another taxpayer. TaxReporter does not read Junior accounts, so the file is not read with yours: export your own account.`,
   // Interactive Brokers Flex statements
   statementCountMismatch: (p) =>
     `The file says it holds ${p.declared} statements, but ${p.found} are in it, so it was cut short or changed. Export it again from Interactive Brokers, unchanged.`,
@@ -703,6 +707,10 @@ export const findingsSl: FindingMessages = {
     `${p.broker}: vrstice z obrestmi (${p.count}) niso v teh napovedih. Obresti se prijavijo na obrazcu Doh-Obr, ki ga TaxReporter še ne pripravlja.`,
   derivativesNotCovered: (p) =>
     `${p.broker}: posli z opcijami, terminskimi pogodbami, CFD in varanti (${p.count}) niso v teh napovedih. Izvedeni finančni instrumenti se prijavijo na obrazcu D-IFI, ki ga TaxReporter še ne pripravlja.`,
+  brokerTaxSettled: (p) =>
+    `${p.broker}: vrstice z davkom, ki ga je posrednik obračunal po nemških pravilih (${p.count}), kot so vračilo davka, Vorabpauschale ali davek, odtegnjen ob prodaji, niso v teh napovedih: od njih ni odvisen noben slovenski znesek. Same prodaje so na obrazcu Doh-KDVP.`,
+  juniorAccount: (p) =>
+    `${p.broker}: datoteka je iz otrokovega računa (Junior), ki pripada otroku, drugemu davčnemu zavezancu. TaxReporter računov Junior ne bere, zato datoteka ni prebrana skupaj z vašimi: izvozite svoj račun.`,
   // Interactive Brokers Flex statements
   statementCountMismatch: (p) =>
     `Število izpiskov, ki ga navaja datoteka (${p.declared}), se ne ujema s številom izpiskov v njej (${p.found}), zato je bila odrezana ali spremenjena. Pri Interactive Brokers jo izvozite znova, nespremenjeno.`,
