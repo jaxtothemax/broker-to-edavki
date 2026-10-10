@@ -378,7 +378,8 @@ function isPreview(v: unknown): v is ReturnPreview {
       "creditEur",
       "taxDueEur",
     ) &&
-    isArrayOf(v["dividendsByMonth"], isMonth)
+    isArrayOf(v["dividendsByMonth"], isMonth) &&
+    isDecimal(v["taxToPayEur"])
   );
 }
 

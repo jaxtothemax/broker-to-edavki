@@ -401,6 +401,13 @@ export function toPreview(
       allocatedByBucket: byBucket(gains.allocatedByBucket),
       taxEur: cents(gains.tax),
     },
+    // The cents each card shows, added: the headline is their sum to the
+    // cent, never a separately rounded total that could differ by one.
+    taxToPayEur: cents(
+      Decimal.parse(cents(gains.tax)).plus(
+        Decimal.parse(cents(div.estimate.taxDueEur)),
+      ),
+    ),
     dividendsEstimate: {
       taxRate: div.estimate.taxRate.toString(),
       grossEur: cents(div.estimate.grossEur),

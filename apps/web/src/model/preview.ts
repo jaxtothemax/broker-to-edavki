@@ -218,6 +218,13 @@ export interface ReturnPreview {
   readonly gainsTotals: GainsTotals;
   readonly gainsEstimate: GainsEstimate;
   readonly dividendsEstimate: DividendsEstimate;
+  /**
+   * The two estimates together, the dashboard's headline: the gains tax
+   * plus the dividend tax still due, each as its card shows it, so the parts
+   * on screen add up to it. An estimate like its parts; eDavki computes the
+   * real tax.
+   */
+  readonly taxToPayEur: DecimalString;
   /** All twelve months, zero where nothing was paid. */
   readonly dividendsByMonth: readonly MonthlyAmount[];
 }

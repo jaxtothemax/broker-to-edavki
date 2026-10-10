@@ -656,6 +656,7 @@ export const demoPreview: ReturnPreview = {
     creditEur: "24.33",
     taxDueEur: "21.33",
   },
+  taxToPayEur: "1791.37",
   dividendsByMonth: [
     { month: "2026-01", grossEur: "2.78" },
     { month: "2026-02", grossEur: "14.76" },

@@ -320,6 +320,19 @@ describe("demo dividends", () => {
   });
 });
 
+describe("demo headline", () => {
+  it("is the gains tax and the dividend tax still due, as their cards show them", () => {
+    expect(demoPreview.taxToPayEur).toBe(
+      r2(
+        add(
+          q(demoPreview.gainsEstimate.taxEur),
+          q(demoPreview.dividendsEstimate.taxDueEur),
+        ),
+      ),
+    );
+  });
+});
+
 describe("demo findings", () => {
   it("state the excess withholding exactly as the dividend row computes it", () => {
     const note = demoPreview.findings.find(
