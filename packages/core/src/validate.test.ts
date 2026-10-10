@@ -222,6 +222,30 @@ describe("validateLedger", () => {
     ]);
   });
 
+  it("keeps an ignored row of every reason the ledger names", () => {
+    // IGNORED_REASONS is a copy of the union (#15): a reason missing there
+    // would block every row that carries it as an unknown event.
+    const reasons: Record<IgnoredRow["reason"], true> = {
+      deposit: true,
+      withdrawal: true,
+      interest: true,
+      currencyConversion: true,
+      cardSpending: true,
+      fee: true,
+      cashTransfer: true,
+      header: true,
+      pairedRow: true,
+      summary: true,
+      reversed: true,
+      securitiesTransfer: true,
+      derivative: true,
+      crypto: true,
+    };
+    for (const reason of Object.keys(reasons) as IgnoredRow["reason"][]) {
+      expect(codes([{ ...ignored, reason }]), reason).toEqual([]);
+    }
+  });
+
   it("keeps ignored rows, and refuses one without a known reason", () => {
     expect(validateLedger([ignored]).events).toEqual([ignored]);
     expect(codes([{ ...ignored, reason: "other" } as never])).toEqual([

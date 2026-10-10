@@ -119,6 +119,45 @@ describe("the findings catalog", () => {
     expect(findingsSl.formIssue(typed)).toContain("v koraku s podatki");
   });
 
+  it("words each value of an eToro finding's closed list as its own clause", () => {
+    const broker = "eToro";
+    const says = (
+      code: "statementFormat" | "historyIncomplete" | "dividendInconsistent",
+      name: string,
+      values: readonly string[],
+    ) => {
+      for (const catalog of [findingsEn, findingsSl]) {
+        const message = catalog[code] as (p: Record<string, string>) => string;
+        const texts = values.map((value) => message({ broker, [name]: value }));
+        // Each value its own clause, none of them the fallback's.
+        const fallback = message({ broker, [name]: "‹other›" });
+        expect(new Set([...texts, fallback]).size, code).toBe(
+          values.length + 1,
+        );
+      }
+    };
+    says("statementFormat", "format", [
+      "regionalDate",
+      "regionalNumber",
+      "serialDate",
+      "bracketNegative",
+    ]);
+    says("historyIncomplete", "gap", ["start", "order", "openRow"]);
+    says("dividendInconsistent", "mismatch", [
+      "rate",
+      "pairing",
+      "date",
+      "unpaired",
+      "netAmount",
+    ]);
+    expect(findingsEn.historyIncomplete({ broker, gap: "start" })).toMatch(
+      /^eToro: the statement does not start when the account was opened/,
+    );
+    expect(findingsSl.isinUnresolved({ broker, cause: "missing" })).toMatch(
+      /^Še odprta pozicija v izpisku eToro nima kode ISIN/,
+    );
+  });
+
   it("has the same closed lists in both languages", () => {
     for (const list of [
       "kinds",

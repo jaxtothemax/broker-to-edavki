@@ -85,6 +85,7 @@ const IGNORED_REASONS = {
   securitiesTransfer: true,
   derivative: true,
   gift: true,
+  crypto: true,
   brokerTaxSettlement: true,
 } as const satisfies Record<IgnoredReason, true>;
 
