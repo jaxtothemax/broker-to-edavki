@@ -13,7 +13,13 @@ import {
 import { describe, expect, it } from "vitest";
 
 import type { Finding } from "../model/preview";
-import { bounded, MAX_FINDINGS, payerPrompts, symbolsOf } from "./toPreview";
+import {
+  bounded,
+  MAX_FINDINGS,
+  payerPrompts,
+  symbolsOf,
+  taxToPay,
+} from "./toPreview";
 
 const finding = (severity: Finding["severity"], row: number): Finding => ({
   severity,
@@ -96,5 +102,18 @@ describe("symbolsOf and payerPrompts", () => {
     // A mix is named by no broker, whichever order it comes in.
     expect(brokers("trading212", "ibkr")).toEqual([""]);
     expect(brokers("ibkr", "trading212", "trading212")).toEqual([""]);
+  });
+});
+
+describe("taxToPay", () => {
+  it("adds the cents each card shows, never rounds the sum again", () => {
+    // Each half cent rounds up on its card: 0.01 + 0.01. Rounding the
+    // exact sum, 0.01, would show a headline the parts do not add up to.
+    expect(taxToPay(Decimal.parse("0.005"), Decimal.parse("0.005"))).toBe(
+      "0.02",
+    );
+    expect(taxToPay(Decimal.parse("1770.044"), Decimal.parse("21.334"))).toBe(
+      "1791.37",
+    );
   });
 });

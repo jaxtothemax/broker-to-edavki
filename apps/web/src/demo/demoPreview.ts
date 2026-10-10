@@ -580,7 +580,7 @@ export const demoPreview: ReturnPreview = {
       source: { file: "ibkr-flex-2019-2026.xml", row: 219 },
     },
   ],
-  // The engine's own findings for these files, as the review words them.
+  // The engine's own findings for these files, as the dashboard words them.
   findings: [
     {
       severity: "warning",

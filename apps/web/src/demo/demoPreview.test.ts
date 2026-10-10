@@ -301,7 +301,7 @@ describe("demo dividends", () => {
   });
 
   it("splits the 25% Slovenian tax into the credit and the tax still due", () => {
-    // The review charts the two as shares of the Slovenian tax, which only
+    // The Dividends page charts the two as shares of the Slovenian tax, which only
     // holds while no credit exceeds the tax on its own payment.
     const rows = demoPreview.dividends;
     const d = demoPreview.dividendsEstimate;

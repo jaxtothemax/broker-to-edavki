@@ -344,7 +344,9 @@ describe("App", () => {
       div: { ...prepared.div, xml: null, blocking: 1 },
     };
     const both = render(preparedState(read, withheld));
-    for (const button of downloadButtons(both, /Download Doh-(?:KDVP|Div)/)) {
+    const disabled = downloadButtons(both, /Download Doh-(?:KDVP|Div)/);
+    expect(disabled).toHaveLength(2);
+    for (const button of disabled) {
       expect(button).toContain('aria-disabled="true"');
     }
     expect(text(both)).toContain(en.dash.taxToPay("2026"));

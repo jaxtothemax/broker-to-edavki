@@ -117,7 +117,7 @@ export async function handleRequest(
     });
     const index = fileIndex(read, names);
     // The year's view of what reading found: a refusal of another year is a
-    // note, on the files step as in the review (ADR 0017).
+    // note, on the files step as on the dashboard (ADR 0017).
     const scope = scopeLedger(read.ledger, request.taxYear);
     const files = summarize(read, index, scope.view);
     if (request.kind === "read") {

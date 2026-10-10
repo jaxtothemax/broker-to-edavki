@@ -101,7 +101,7 @@ export function ownState(
   );
 }
 
-/** The fixtures read, the details entered and the review prepared. */
+/** The fixtures read, the details entered and the results prepared. */
 export function preparedState(
   read: ReadReply,
   prepared: PrepareReply,

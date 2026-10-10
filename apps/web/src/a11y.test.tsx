@@ -80,7 +80,7 @@ const SCREENS: [string, WizardState, TourState?][] = [
   ],
 ];
 
-/** The review panels on their own, as the review's tabs hold them. */
+/** The dashboard's panels on their own, as its pages hold them. */
 function panels(locale: Locale): string {
   const wrap = (node: ReactNode) =>
     renderToStaticMarkup(
@@ -166,7 +166,7 @@ for (const locale of ["sl", "en"] as const) {
       });
     }
 
-    it("the review panels name every table and leave summaries their visible names", () => {
+    it("the dashboard panels name every table and leave summaries their visible names", () => {
       const html = panels(locale);
       const tables = html.match(/<table[^>]*>/g) ?? [];
       const captions = html.match(/<table[^>]*>\s*<caption/g) ?? [];

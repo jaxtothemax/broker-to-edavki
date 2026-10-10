@@ -346,6 +346,17 @@ export function findingsOf(prepared: Prepared): readonly Diagnostic[] {
   ];
 }
 
+/**
+ * The dashboard's headline: the cents each card shows, added. Their sum to
+ * the cent, never a separately rounded total, which could differ by one
+ * from the parts shown beside it.
+ */
+export function taxToPay(gainsTax: Decimal, dividendTaxDue: Decimal): string {
+  return cents(
+    Decimal.parse(cents(gainsTax)).plus(Decimal.parse(cents(dividendTaxDue))),
+  );
+}
+
 export function toPreview(
   prepared: Prepared,
   taxYear: number,
@@ -401,13 +412,7 @@ export function toPreview(
       allocatedByBucket: byBucket(gains.allocatedByBucket),
       taxEur: cents(gains.tax),
     },
-    // The cents each card shows, added: the headline is their sum to the
-    // cent, never a separately rounded total that could differ by one.
-    taxToPayEur: cents(
-      Decimal.parse(cents(gains.tax)).plus(
-        Decimal.parse(cents(div.estimate.taxDueEur)),
-      ),
-    ),
+    taxToPayEur: taxToPay(gains.tax, div.estimate.taxDueEur),
     dividendsEstimate: {
       taxRate: div.estimate.taxRate.toString(),
       grossEur: cents(div.estimate.grossEur),

@@ -226,10 +226,28 @@ describe("DashboardShell", () => {
     expect(html).toContain(en.dash.downloadAll);
   });
 
-  it("shows each page's own rows", () => {
-    expect(text(shell({}, "dividends"))).toContain(en.review.dividendsCaption);
-    expect(text(shell({}, "notes"))).toContain(en.dash.notesLead);
-    expect(text(shell({}, "gains"))).toContain("AAPL");
+  it("shows the current page's own rows, and hides the other three", () => {
+    // What marks each page, and on no other page.
+    const own: Record<DashPage, string> = {
+      overview: 'id="returns-title"',
+      gains: en.review.estimateTitle,
+      dividends: en.review.dividendsCaption,
+      notes: en.review.severity.warning,
+    };
+    for (const page of ["overview", "gains", "dividends", "notes"] as const) {
+      const html = shell({}, page);
+      expect(html.match(/class="dash-page" hidden=""/g), page).toHaveLength(3);
+      // The one page not hidden, up to the next page's container.
+      const shown = html
+        .split('<div class="dash-page"')
+        .slice(1)
+        .find((part) => part.startsWith(">"));
+      for (const [other, marker] of Object.entries(own)) {
+        expect(shown?.includes(marker), `${page}: ${other}`).toBe(
+          other === page,
+        );
+      }
+    }
   });
 
   it("says a note stops both returns, and never hides the dashboard", () => {
@@ -245,10 +263,21 @@ describe("DashboardShell", () => {
           kdvp: { xml: null, blocking: 1, needed: true },
           div: { xml: null, blocking: 1, needed: true },
         },
+        // As the engine writes them then: both needed, neither written.
+        returns: {
+          kdvp: { ...returns.kdvp, xml: null, blocking: 1 },
+          div: { ...returns.div, xml: null, blocking: 1 },
+        },
       }),
     );
     expect(html).toContain(en.review.blocked);
     expect(html).toContain(en.dash.taxToPay("2026"));
+    // Both rows stay, each saying it is not written; nothing to download.
+    expect(
+      html.split("Not written: 1 problem in the notes must be fixed first."),
+    ).toHaveLength(3);
+    expect(html).not.toContain(en.download.nothingToFile);
+    expect(html).not.toContain(en.dash.downloadAll);
   });
 
   it("goes on with one return while a note stops only the other", () => {

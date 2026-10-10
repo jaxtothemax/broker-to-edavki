@@ -262,7 +262,7 @@ describe("handleRequest: prepare", () => {
     }
   });
 
-  it("shows the review the figures the forms hold", async () => {
+  it("shows the dashboard the figures the forms hold", async () => {
     const { preview } = await prepare();
     expect(preview.securities.map((s) => s.isin)).toEqual([
       "IE00BK5BQT80",
