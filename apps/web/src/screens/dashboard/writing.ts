@@ -17,13 +17,22 @@ export type Writing =
 /** The source of the returns: written already, or a writer to await. */
 export type ReturnsSource = BuiltReturns | (() => Promise<BuiltReturns>);
 
-export function useReturnsWriting(source: ReturnsSource): Writing {
+/**
+ * The returns as written, or being written. Null while the user's own files
+ * are still being prepared: the dashboard stays one component across that
+ * change, so the heading the user was taken to keeps its focus.
+ */
+export function useReturnsWriting(source: ReturnsSource | null): Writing {
   const [writing, setWriting] = useState<Writing>(
-    typeof source === "function"
+    source === null || typeof source === "function"
       ? { status: "preparing" }
       : { status: "ready", returns: source },
   );
   useEffect(() => {
+    if (source === null) {
+      setWriting({ status: "preparing" });
+      return;
+    }
     if (typeof source !== "function") {
       setWriting({ status: "ready", returns: source });
       return;

@@ -198,11 +198,11 @@ export function ReturnsCard({
           )}
         </ul>
         {writing.status === "preparing" ? (
-          <Note tone="neutral" id={STATUS_NOTE}>
+          <Note key="preparing" tone="neutral" role="status" id={STATUS_NOTE}>
             {t.download.preparing}
           </Note>
         ) : writing.status === "failed" ? (
-          <Note tone="danger" id={STATUS_NOTE}>
+          <Note key="failed" tone="danger" role="alert" id={STATUS_NOTE}>
             {t.download.failed}
           </Note>
         ) : demo ? (

@@ -297,4 +297,96 @@ describe("DashboardShell", () => {
     expect(html.match(/id="demo-tour"/g)).toHaveLength(1);
     expect(text(html)).toContain(en.demoBanner.title);
   });
+
+  it("keeps Back to details and Start over within reach on a phone, in every state", () => {
+    // The sidebar's actions are hidden on a phone; the row after the page
+    // takes their place, whatever the dashboard shows.
+    for (const html of [
+      shell(),
+      shell({}, "notes"),
+      shell({ preview: null, status: "preparing", returns: null }),
+      shell({ preview: null, status: "failed", returns: null }),
+      shell({ preview: null, returns: null }),
+    ]) {
+      expect(html).toMatch(/class="actions-row phone-actions"/);
+      expect(text(html).split(en.dash.backToDetails)).toHaveLength(3);
+    }
+  });
+
+  it("names the year while there is nothing yet to take it from", () => {
+    const html = text(
+      shell({ preview: null, status: "preparing", returns: null }),
+    );
+    expect(html).toContain(en.dash.eyebrowEstimate("2026"));
+  });
+
+  it("describes the waiting navigation by text that is there", () => {
+    for (const html of [
+      shell({ preview: null, status: "preparing", returns: null }),
+      shell({ preview: null, returns: null }),
+    ]) {
+      expect(html).toContain('aria-describedby="dash-status"');
+      expect(html).toContain('id="dash-status"');
+    }
+  });
+
+  it("says when own results are ready, and nothing of the kind in the demo", () => {
+    expect(text(shell())).toContain(en.dash.resultsReady);
+    expect(text(shell({ demo: true }))).not.toContain(en.dash.resultsReady);
+  });
+
+  it("says only that the one return is withheld when the year needs no other", () => {
+    const html = text(
+      shell({
+        preview: {
+          ...demoPreview,
+          dividends: [],
+          findings: [
+            { severity: "blocking", code: "unknownEvent", params: {} },
+          ],
+        },
+        forms: {
+          kdvp: { xml: null, blocking: 1, needed: true },
+          div: { xml: null, blocking: 0, needed: false },
+        },
+        returns: {
+          ...returns,
+          kdvp: { ...returns.kdvp, xml: null, blocking: 1 },
+          div: { ...returns.div, xml: null, needed: false },
+        },
+      }),
+    );
+    expect(html).toContain(en.review.blockedOnly("Doh-KDVP"));
+    expect(html).not.toContain("The other return");
+    // A headline that counts a withheld return says so beside it...
+    expect(html).toContain(en.dash.partWithheld("Doh-KDVP"));
+    // ...and no button leads to downloads there are none of.
+    expect(html).not.toContain(en.dash.downloadAll);
+  });
+
+  it("says in words, not only in color, that notes ask for attention", () => {
+    const html = render(
+      <DashboardShell
+        preview={{
+          ...demoPreview,
+          findings: [
+            { severity: "blocking", code: "unknownEvent", params: {} },
+          ],
+          omittedFindings: 0,
+        }}
+        status="ready"
+        fileNames={[]}
+        forms={null}
+        returns={returns}
+        demo={false}
+        view={initialDashboardView}
+        onViewChange={() => undefined}
+        onBack={() => undefined}
+        onRestart={() => undefined}
+        onStartDemo={() => undefined}
+      />,
+    );
+    expect(html).toMatch(/class="nav-item is-danger"/);
+    expect(text(html)).toContain(", 1 note, 1 needs your attention");
+  });
 });

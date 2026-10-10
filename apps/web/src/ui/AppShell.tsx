@@ -22,8 +22,8 @@ export interface NavEntry<Id extends string> {
   readonly count?: string;
   /** What the count means, read after the label ("9 securities sold"). */
   readonly countLabel?: string;
-  /** The count asks for attention: a note that warns or stops a return. */
-  readonly warn?: boolean;
+  /** The count asks for attention: a note that warns, or one that stops a return. */
+  readonly tone?: "warn" | "danger";
 }
 
 export function SideNav<Id extends string>({
@@ -46,7 +46,7 @@ export function SideNav<Id extends string>({
   readonly actions: ReactNode;
 }) {
   return (
-    <aside className="side">
+    <div className="side">
       <nav aria-label={label} className="side-nav">
         <ul role="list">
           {items.map((item) => {
@@ -58,7 +58,7 @@ export function SideNav<Id extends string>({
                   className={cx(
                     "nav-item",
                     isCurrent && "is-current",
-                    item.warn === true && "is-warn",
+                    item.tone === undefined ? null : `is-${item.tone}`,
                   )}
                   aria-current={isCurrent ? "page" : undefined}
                   {...(disabled
@@ -92,7 +92,7 @@ export function SideNav<Id extends string>({
         </ul>
       </nav>
       <div className="side-actions">{actions}</div>
-    </aside>
+    </div>
   );
 }
 

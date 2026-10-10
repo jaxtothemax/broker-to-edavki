@@ -74,7 +74,7 @@ const writeDemoReturns = () =>
   import("./engine/demoReturns").then((engine) => engine.buildDemoReturns());
 
 /** Where the results of the user's own files stand. */
-function reviewStatus(state: WizardState): "ready" | "preparing" | "failed" {
+function resultsStatus(state: WizardState): "ready" | "preparing" | "failed" {
   if (state.mode === "demo") return "ready";
   switch (state.preparing.status) {
     case "prepared":
@@ -383,7 +383,7 @@ function Frame({
       {inShell ? (
         <DashboardShell
           preview={preview}
-          status={reviewStatus(state)}
+          status={resultsStatus(state)}
           fileNames={fileNames}
           forms={
             prepared === null

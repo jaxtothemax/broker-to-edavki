@@ -44,6 +44,8 @@
 
   --card-pad: 24px;
   --card-pad-lg: 28px;
+  /* The sticky app header's height: what the dashboard's sidebar sits under. */
+  --header-h: 64px;
 
   /* The brand mark is the same in both themes. */
   --brand-gradient: linear-gradient(140deg, #6ee7b7, #10b981 55%, #047857);
@@ -1256,11 +1258,11 @@ input {
 
 .side {
   position: sticky;
-  top: 64px;
+  top: var(--header-h);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: calc(100dvh - 64px);
+  height: calc(100dvh - var(--header-h));
   overflow-y: auto;
   padding: 16px 12px;
   border-right: 1px solid var(--border);
@@ -1298,13 +1300,16 @@ input {
   color: var(--text);
 }
 
+/* The current page is marked by a bar, not by its fill alone (1.4.11). */
 .nav-item.is-current {
   background: var(--surface-3);
   color: var(--text);
   font-weight: var(--fw-semibold);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .nav-item[aria-disabled="true"] {
+  color: var(--text-3);
   cursor: default;
 }
 
@@ -1325,12 +1330,16 @@ input {
 .nav-count {
   margin-left: auto;
   color: var(--text-3);
-  font-family: var(--font-mono);
   font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .nav-item.is-warn .nav-count {
   color: var(--warn-text);
+}
+
+.nav-item.is-danger .nav-count {
+  color: var(--danger);
 }
 
 .side-actions {
@@ -1525,6 +1534,12 @@ input {
   margin-top: auto;
 }
 
+/* A pressed button's transform would make it the overlay's containing
+   block, and a press on the card body would miss it. */
+.drill-card .drill-open:active {
+  transform: none;
+}
+
 /* The whole card opens its page; the button stays the one control. */
 .drill-open::after {
   position: absolute;
@@ -1570,15 +1585,20 @@ input {
 
   /* The count is hidden on the rail; a note asking for attention keeps a
      mark, and its words stay in the button's name. */
-  .nav-item.is-warn .nav-icon::after {
+  .nav-item:is(.is-warn, .is-danger) .nav-icon::after {
     position: absolute;
     top: -2px;
     right: -4px;
     width: 8px;
     height: 8px;
     border-radius: var(--r-pill);
-    background: var(--warn);
+    background: var(--warn-text);
+    box-shadow: 0 0 0 2px var(--surface);
     content: "";
+  }
+
+  .nav-item.is-danger .nav-icon::after {
+    background: var(--danger);
   }
 
   .side-actions .btn {
@@ -1603,6 +1623,17 @@ input {
 @media (max-width: 720px) {
   .overview-stats {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .return-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .return-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    align-items: flex-start;
   }
 }
 
@@ -1659,15 +1690,9 @@ input {
     display: flex;
   }
 
-  .return-row {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .return-actions {
-    flex-direction: row;
-    flex-wrap: wrap;
-    grid-column: 1 / -1;
-    align-items: flex-start;
+  /* Inset, so the screen's edge never cuts the ring of an end item. */
+  .nav-item:focus-visible {
+    outline-offset: -3px;
   }
 
   .shell-page {
@@ -3483,10 +3508,21 @@ button.step-item:hover {
 /* Backgrounds are replaced by system colors there, so states that rely on a
    fill get a system color or an outline instead. */
 @media (forced-colors: active) {
-  /* The current page is marked by its frame, not its fill. */
-  .nav-item.is-current {
+  /* The current page is marked by its frame, not its fill; focus keeps
+     its own ring. */
+  .nav-item.is-current:not(:focus-visible) {
     outline: 2px solid Highlight;
     outline-offset: -2px;
+  }
+
+  .nav-item[aria-disabled="true"] {
+    color: GrayText;
+  }
+
+  .nav-item:is(.is-warn, .is-danger) .nav-icon::after {
+    forced-color-adjust: none;
+    background: CanvasText;
+    box-shadow: none;
   }
 
   /* The tour draws its own marks: no dim, a Highlight frame round the lit

@@ -309,7 +309,7 @@ export function asksAccounts(state: WizardState): boolean {
   );
 }
 
-/** The payer drafts the review is prepared with, one per payer asked about. */
+/** The payer drafts the results are prepared with, one per payer asked about. */
 export function payerDetails(state: WizardState): PayerDetails[] {
   if (state.reading.status !== "read") return [];
   return state.reading.reply.payers.flatMap((prompt) => {
@@ -497,7 +497,7 @@ export function wizardReducer(
       return { ...initialWizardState, screen: "files", mode: "own" };
     case "useDemoFiles":
       // Switching to the demo replaces the user's files and what was typed
-      // for them: mixing made-up and real data in one review would be
+      // for them: mixing made-up and real data in one set of results would be
       // meaningless.
       return {
         ...initialWizardState,
@@ -634,7 +634,7 @@ export function wizardReducer(
         ...state,
         screen: neighbor(state.screen, -1),
         showErrors: false,
-        // A failed preparation is tried again when the review next opens.
+        // A failed preparation is tried again when the dashboard next opens.
         ...(state.preparing.status === "failed" ? { preparing: IDLE } : {}),
       };
     case "goTo":

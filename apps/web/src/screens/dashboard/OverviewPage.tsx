@@ -19,7 +19,13 @@ import type { DashPage } from "./view";
 import type { Writing } from "./writing";
 
 /** The headline: both estimates together, each part named beside it. */
-function TaxCard({ preview }: { readonly preview: ReturnPreview }) {
+function TaxCard({
+  preview,
+  withheld,
+}: {
+  readonly preview: ReturnPreview;
+  readonly withheld: readonly string[];
+}) {
   const { locale, t } = useI18n();
   const gains = preview.gainsEstimate;
   const buckets = HOLDING_BUCKETS.filter(
@@ -34,6 +40,12 @@ function TaxCard({ preview }: { readonly preview: ReturnPreview }) {
         </Chip>
       </div>
       <Amount value={preview.taxToPayEur} size="xl" />
+      {/* An estimate stands without its return, but may change with it. */}
+      {withheld.map((form) => (
+        <p key={form} className="muted small">
+          {t.dash.partWithheld(form)}
+        </p>
+      ))}
       <dl className="kv">
         <div>
           <dt>{t.dash.onGains}</dt>
@@ -141,11 +153,14 @@ export function OverviewPage({
   preview,
   writing,
   demo,
+  withheld,
   onNavigate,
 }: {
   readonly preview: ReturnPreview;
   readonly writing: Writing;
   readonly demo: boolean;
+  /** The names of the returns a note withholds. */
+  readonly withheld: readonly string[];
   readonly onNavigate: (page: DashPage) => void;
 }) {
   const { locale, t } = useI18n();
@@ -153,7 +168,7 @@ export function OverviewPage({
   return (
     <>
       <div className="overview-stats">
-        <TaxCard preview={preview} />
+        <TaxCard preview={preview} withheld={withheld} />
         <GainLossCard preview={preview} />
       </div>
       <p className="with-icon muted small">

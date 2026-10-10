@@ -30,6 +30,7 @@ import { formatPercent, formatNumber, plural } from "../../i18n/format";
 import { useI18n } from "../../i18n/i18n";
 import type { Messages } from "../../i18n/messages";
 import type { ReturnPreview } from "../../model/preview";
+import { TAX_YEAR } from "../../state/wizard";
 import { AppShell, SideNav, type NavEntry } from "../../ui/AppShell";
 import { Main } from "../../ui/AppChrome";
 import { DemoBanner, Eur, TOUR_BUTTON_ID } from "../../ui/bits";
@@ -42,7 +43,7 @@ import { NotesPanel } from "../review/NotesPanel";
 import { OverviewPage } from "./OverviewPage";
 import { neededForms, RETURNS_TITLE } from "./ReturnsCard";
 import { DASH_PAGES, type DashboardView, type DashPage } from "./view";
-import { useReturnsWriting, type ReturnsSource, type Writing } from "./writing";
+import { useReturnsWriting, type ReturnsSource } from "./writing";
 
 /** The note the navigation points at while it has nothing to show. */
 const STATUS = "dash-status";
@@ -59,7 +60,9 @@ export function EmptyResults({
         <MagnifyingGlassIcon size={22} weight="bold" />
       </span>
       <h2>{t.review.emptyTitle}</h2>
-      <p className="muted">{t.review.emptyBody}</p>
+      <p className="muted" id={STATUS}>
+        {t.review.emptyBody}
+      </p>
       <Button variant="primary" size="lg" onClick={onStartDemo}>
         {t.start.primaryCta}
         <ArrowRightIcon size={18} weight="bold" aria-hidden />
@@ -68,20 +71,26 @@ export function EmptyResults({
   );
 }
 
-/** What a blocking note stops: one return while the other can be written. */
+/**
+ * What a blocking note stops. A return the year does not need is not
+ * "the other return": with one needed and withheld, there is no other to
+ * download (#54 can withhold one return alone).
+ */
 function blockedText(
   forms: { readonly kdvp: FormOutput; readonly div: FormOutput } | null,
   t: Messages,
 ): string {
   if (forms === null) return t.review.blocked;
   const withheld = (form: FormOutput) => form.needed && form.xml === null;
-  if (withheld(forms.kdvp) && !withheld(forms.div)) {
-    return t.review.blockedOne(t.download.kdvpTitle);
-  }
-  if (withheld(forms.div) && !withheld(forms.kdvp)) {
-    return t.review.blockedOne(t.download.divTitle);
-  }
-  return t.review.blocked;
+  const kdvp = withheld(forms.kdvp);
+  const div = withheld(forms.div);
+  if (kdvp === div) return t.review.blocked;
+  const [stopped, other] = kdvp
+    ? [t.download.kdvpTitle, forms.div]
+    : [t.download.divTitle, forms.kdvp];
+  return other.needed
+    ? t.review.blockedOne(stopped)
+    : t.review.blockedOnly(stopped);
 }
 
 function PageHeader({
@@ -194,32 +203,12 @@ interface ShellProps {
   readonly onStartDemo: () => void;
 }
 
-export function DashboardShell(props: ShellProps) {
-  const { preview, status, returns } = props;
-  // The writer runs here, above the pages, so a change of page never
-  // writes the returns again.
-  return preview !== null && status === "ready" && returns !== null ? (
-    <ReadyDashboard {...props} preview={preview} returns={returns} />
-  ) : (
-    <Dashboard {...props} writing={null} />
-  );
-}
-
-function ReadyDashboard(
-  props: ShellProps & {
-    readonly preview: ReturnPreview;
-    readonly returns: ReturnsSource;
-  },
-) {
-  const writing = useReturnsWriting(props.returns);
-  return <Dashboard {...props} writing={writing} />;
-}
-
-function Dashboard({
+export function DashboardShell({
   preview,
   status,
   fileNames,
   forms,
+  returns,
   demo,
   view,
   onViewChange,
@@ -227,8 +216,15 @@ function Dashboard({
   onRestart,
   onTour,
   onStartDemo,
-  writing,
-}: ShellProps & { readonly writing: Writing | null }) {
+}: ShellProps) {
+  // The writer runs here, above the pages, so a change of page never
+  // writes the returns again; and the dashboard stays one component while
+  // own files are prepared, so nothing it shows is mounted twice.
+  const written = useReturnsWriting(
+    preview !== null && status === "ready" ? returns : null,
+  );
+  const writing =
+    preview !== null && status === "ready" && returns !== null ? written : null;
   const { locale, t } = useI18n();
   // What the pages need, once there is something to show.
   const live =
@@ -236,8 +232,20 @@ function Dashboard({
       ? { preview, writing }
       : null;
   const ready = live !== null;
+  // The returns a note withholds, named under the headline it is part of.
+  const withheldForms =
+    forms === null
+      ? []
+      : [
+          ...(forms.kdvp.needed && forms.kdvp.xml === null
+            ? [t.download.kdvpTitle]
+            : []),
+          ...(forms.div.needed && forms.div.xml === null
+            ? [t.download.divTitle]
+            : []),
+        ];
   const page: DashPage = ready ? view.page : "overview";
-  const year = String(preview?.taxYear ?? "");
+  const year = String(preview?.taxYear ?? TAX_YEAR);
   const navigate = (next: DashPage) => {
     onViewChange({ ...view, page: next });
   };
@@ -287,8 +295,14 @@ function Dashboard({
       icon: <NotePencilIcon size={20} weight="bold" />,
       label: t.dash.notes,
       count: count(noteCount),
-      countLabel: plural(noteCount, locale, t.dash.countNotes),
-      warn: needAttention > 0,
+      // The mark on the rail says it in color; the name says it in words.
+      countLabel:
+        needAttention === 0
+          ? plural(noteCount, locale, t.dash.countNotes)
+          : `${plural(noteCount, locale, t.dash.countNotes)}, ${plural(needAttention, locale, t.dash.countAttention)}`,
+      ...(needAttention === 0
+        ? {}
+        : { tone: blocking > 0 ? ("danger" as const) : ("warn" as const) }),
     },
   ];
 
@@ -299,10 +313,20 @@ function Dashboard({
         {t.tour.action}
       </Button>
     ) : null;
+  // Offered while a return is being written or can be saved: not when
+  // there is nothing to file, nor when every return the year needs is
+  // withheld, as the button would lead to nothing to download.
+  const needed = live === null ? [] : neededForms(live.preview, live.writing);
   const canDownload =
     live !== null &&
     page === "overview" &&
-    neededForms(live.preview, live.writing).length > 0;
+    needed.length > 0 &&
+    (live.writing.status !== "ready" ||
+      needed.some(
+        (form) =>
+          live.writing.status === "ready" &&
+          live.writing.returns[form].xml !== null,
+      ));
   const actions =
     tourButton === null && !canDownload ? undefined : (
       <>
@@ -347,11 +371,11 @@ function Dashboard({
 
   const side = (
     <>
-      <Button variant="ghost" onClick={onBack}>
+      <Button variant="ghost" onClick={onBack} title={t.dash.backToDetails}>
         <ArrowLeftIcon size={18} weight="bold" aria-hidden />
         <span className="side-action-label">{t.dash.backToDetails}</span>
       </Button>
-      <Button variant="ghost" onClick={onRestart}>
+      <Button variant="ghost" onClick={onRestart} title={t.download.startOver}>
         <ArrowCounterClockwiseIcon size={18} weight="bold" aria-hidden />
         <span className="side-action-label">{t.download.startOver}</span>
       </Button>
@@ -417,25 +441,32 @@ function Dashboard({
               preview={at.preview}
               writing={at.writing}
               demo={demo}
+              withheld={withheldForms}
               onNavigate={navigate}
             />
-            {/* On a phone the sidebar's actions move here, below everything. */}
-            <div className="actions-row phone-actions">{side}</div>
           </>
         );
     }
   };
 
+  const crashed = (
+    <Note tone="danger" role="alert">
+      {t.app.crashed}
+    </Note>
+  );
+
+  // Keyed by state, so a failure mounts a new alert rather than turning
+  // the status into one.
   let body: ReactNode;
   if (status === "preparing") {
     body = (
-      <Note tone="neutral" role="status" id={STATUS}>
+      <Note key="preparing" tone="neutral" role="status" id={STATUS}>
         {t.review.preparing}
       </Note>
     );
   } else if (status === "failed") {
     body = (
-      <Note tone="danger" role="alert" id={STATUS}>
+      <Note key="failed" tone="danger" role="alert" id={STATUS}>
         {t.review.prepareFailed}
       </Note>
     );
@@ -444,7 +475,12 @@ function Dashboard({
   } else {
     body = DASH_PAGES.map((shown) => (
       <div key={shown} className="dash-page" hidden={shown !== page}>
-        {pageBody(shown, live)}
+        {/* One boundary a page: a page that fails to render, shown or
+            hidden, leaves the others, the downloads and the user's files
+            in place. */}
+        <ErrorBoundary resetKey={`dashboard-page:${shown}`} fallback={crashed}>
+          {pageBody(shown, live)}
+        </ErrorBoundary>
       </div>
     ));
   }
@@ -466,16 +502,17 @@ function Dashboard({
       <Main>
         <div className="shell-page">
           {demo ? <DemoBanner /> : null}
-          {/* The only boundary around the dashboard's pages: a page that
-              fails to render leaves the navigation, and the user's files,
-              in place. */}
+          {/* Said once the user's own results are ready; in the demo they
+              are ready from the start, so nothing changes to be said. */}
+          <p role="status" className="visually-hidden">
+            {ready && !demo ? t.dash.resultsReady : ""}
+          </p>
           <ErrorBoundary
             resetKey={`dashboard:${page}`}
             fallback={
               <div className="screen">
-                <Note tone="danger" role="alert">
-                  {t.app.crashed}
-                </Note>
+                {crashed}
+                <div className="actions-row phone-actions">{side}</div>
               </div>
             }
           >
@@ -483,6 +520,9 @@ function Dashboard({
               {head}
               {attention}
               {body}
+              {/* On a phone the sidebar's actions move here, below
+                  everything, in every state: a failure says to go back. */}
+              <div className="actions-row phone-actions">{side}</div>
             </div>
           </ErrorBoundary>
         </div>

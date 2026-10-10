@@ -119,12 +119,9 @@ export function BrokerName({ broker }: { readonly broker: BrokerId }) {
 export const TOUR_BUTTON_ID = "demo-tour";
 
 /**
- * Shown on every flow screen while the data on it is made up, with the
- * button that starts the guided tour again (#27).
- */
-/**
- * The demo's warning. In the wizard it carries the tour's replay button; in
- * the dashboard that button is in the page header, so there is one only.
+ * Shown on every flow screen while the data on it is made up. In the wizard
+ * it carries the button that starts the guided tour again (#27); in the
+ * dashboard that button is in the page header, so there is one only.
  */
 export function DemoBanner({ onTour }: { readonly onTour?: () => void }) {
   const { t } = useI18n();

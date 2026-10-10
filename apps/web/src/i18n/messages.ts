@@ -223,6 +223,8 @@ export interface Messages {
     readonly moreNotes: PluralForms;
     readonly blocked: string;
     readonly blockedOne: (form: string) => string;
+    /** The one return the year needs is withheld; there is no other. */
+    readonly blockedOnly: (form: string) => string;
     readonly preparing: string;
     readonly prepareFailed: string;
     readonly unnamedFile: string;
@@ -282,6 +284,11 @@ export interface Messages {
     readonly viewDividends: string;
     readonly viewNotes: string;
     readonly noNotes: string;
+    /** Read after the notes count when some ask for attention. */
+    readonly countAttention: PluralForms;
+    readonly resultsReady: string;
+    /** Under the headline, for each return a note withholds. */
+    readonly partWithheld: (form: string) => string;
   };
   readonly tour: {
     readonly action: string;
@@ -704,6 +711,8 @@ export const en: Messages = {
       "Neither return is written until the notes that stop them are fixed.",
     blockedOne: (form) =>
       `${form} is not written until the notes that stop it are fixed. The other return can still be downloaded.`,
+    blockedOnly: (form) =>
+      `${form} is not written until the notes that stop it are fixed.`,
     preparing:
       "Working out your returns from your files, at Banka Slovenije rates.",
     prepareFailed:
@@ -788,6 +797,13 @@ export const en: Messages = {
     viewDividends: "View all dividends",
     viewNotes: "View notes",
     noNotes: "Nothing to note",
+    countAttention: {
+      one: "{n} needs your attention",
+      other: "{n} need your attention",
+    },
+    resultsReady: "Your results are ready.",
+    partWithheld: (form) =>
+      `${form} is not written yet, so its part may change once its notes are fixed.`,
   },
   tour: {
     action: "Guided tour",
@@ -1264,6 +1280,8 @@ export const sl: Messages = {
       "Nobena napoved ni zapisana, dokler niso odpravljene opombe, ki ju ustavijo.",
     blockedOne: (form) =>
       `${form} ni zapisan, dokler niso odpravljene opombe, ki ga ustavijo. Drugo napoved lahko vseeno prenesete.`,
+    blockedOnly: (form) =>
+      `${form} ni zapisan, dokler niso odpravljene opombe, ki ga ustavijo.`,
     preparing:
       "Napovedi se pripravljajo iz vaših datotek, po tečajih Banke Slovenije.",
     prepareFailed:
@@ -1358,15 +1376,24 @@ export const sl: Messages = {
       "Kaj je TaxReporter našel v vaših datotekah in kako so bila uporabljena pravila, najprej to, kar ustavi napoved.",
     downloadAll: "Prenos za eDavke",
     backToDetails: "Nazaj na podatke",
-    taxToPay: (year) => `Davek za plačilo za ${year}`,
+    taxToPay: (year) => `Davek za plačilo za leto ${year}`,
     onGains: "Od dobička, Doh-KDVP",
     onDividends: "Od dividend, Doh-Div",
     returnsTitle: "Napovedi",
     drillTitle: "Podrobno",
-    viewGains: "Ves dobiček",
-    viewDividends: "Vse dividende",
-    viewNotes: "Opombe",
+    viewGains: "Pokaži ves dobiček",
+    viewDividends: "Pokaži vse dividende",
+    viewNotes: "Pokaži opombe",
     noNotes: "Ni opomb",
+    countAttention: {
+      one: "{n} zahteva vašo pozornost",
+      two: "{n} zahtevata vašo pozornost",
+      few: "{n} zahtevajo vašo pozornost",
+      other: "{n} zahteva vašo pozornost",
+    },
+    resultsReady: "Rezultati so pripravljeni.",
+    partWithheld: (form) =>
+      `${form} še ni zapisan, zato se njegov del lahko spremeni, ko bodo opombe odpravljene.`,
   },
   tour: {
     action: "Vodeni ogled",
