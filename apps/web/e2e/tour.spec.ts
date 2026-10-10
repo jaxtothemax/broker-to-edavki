@@ -44,6 +44,12 @@ async function enterDemo(page: Page): Promise<Locator> {
   return dialog;
 }
 
+/** The dashboard's navigation, and two of its pages, in either language. */
+const results = (page: Page) =>
+  page.getByRole("navigation", { name: /^(Results|Rezultati)$/ });
+const GAINS = /^(Gains|Dobiček)/;
+const DIVIDENDS = /^(Dividends|Dividende)/;
+
 /** Waits until the stop in view has been laid out by the tour. */
 async function settled(dialog: Locator): Promise<void> {
   await expect(dialog).toHaveAttribute("data-ready", "true");
@@ -62,15 +68,17 @@ const stopCount = (dialog: Locator) =>
 async function snapshot(page: Page) {
   return page.evaluate(() => ({
     heading: document.querySelector("#main h1")?.textContent ?? "",
-    tab:
-      document.querySelector('[role="tab"][aria-selected="true"]')?.id ?? null,
+    page:
+      document.querySelector('nav [aria-current="page"]')?.textContent ?? null,
     open: [...document.querySelectorAll("details.security[open]")].map(
       (d) => d.getAttribute("data-explain-key") ?? "",
     ),
     scrollY: Math.round(window.scrollY),
-    tables: [...document.querySelectorAll<HTMLElement>(".table-scroll")].map(
-      (t) => t.scrollLeft,
-    ),
+    tables: [
+      ...document.querySelectorAll<HTMLElement>(
+        ".dash-page:not([hidden]) .table-scroll",
+      ),
+    ].map((t) => t.scrollLeft),
     focused:
       document.activeElement?.id ?? document.activeElement?.tagName ?? "",
   }));
@@ -130,22 +138,29 @@ for (const exit of ["Escape", "Skip", "Finish"] as const) {
     const dialog = await enterDemo(page);
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
-    // The user's own view: the review, on the dividends tab, scrolled.
+    // The user's own view: the dashboard, on its dividends page, scrolled.
     for (let step = 0; step < 2; step += 1) {
       await page.locator(".actions-row .btn-primary").click();
     }
-    await expect(page.locator("#review-tab-dividends")).toBeVisible();
-    await page.locator("#review-tab-dividends").click();
+    await results(page).getByRole("button", { name: DIVIDENDS }).click();
+    await expect(page.locator("#main h1")).toHaveText(DIVIDENDS);
+    // The shown page's table, scrolled sideways, and the window scrolled
+    // down; the tour starts from the keyboard, which scrolls nothing.
     await page.evaluate(() => {
       window.scrollTo({ top: 420, behavior: "instant" });
       const table = document.querySelector<HTMLElement>(
-        '[role="tabpanel"]:not([hidden]) .table-scroll',
+        ".dash-page:not([hidden]) .table-scroll",
       );
       if (table !== null) table.scrollLeft = 30;
+      document
+        .querySelector<HTMLElement>("#demo-tour")
+        ?.focus({ preventScroll: true });
     });
-    await page.locator("#demo-tour").focus();
     const before = await snapshot(page);
-    await page.locator("#demo-tour").click();
+    // Proves the check below can fail: something was scrolled to give back.
+    expect(before.scrollY).toBeGreaterThan(0);
+    expect(before.tables).toContain(30);
+    await page.keyboard.press("Enter");
     await expect(dialog).toBeVisible();
     // Go to the stop that opens Apple's row on the gains tab.
     const apple = page.locator('details[data-explain-key="US0378331005"]');
@@ -346,28 +361,31 @@ test("outside the tour, a new screen still takes focus to its heading", async ({
   await expect(page.locator("#main h1")).toBeFocused();
 });
 
-test("leaving the review and coming back opens it as new", async ({ page }) => {
+test("a page of the dashboard takes focus to its heading, and leaving the dashboard opens it as new", async ({
+  page,
+}) => {
   const dialog = await enterDemo(page);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   for (let step = 0; step < 2; step += 1) {
     await page.locator(".actions-row .btn-primary").click();
   }
-  await page.locator("#review-tab-dividends").click();
-  await page.locator("#review-tab-gains").click();
+  await results(page).getByRole("button", { name: GAINS }).click();
+  await expect(page.locator("#main h1")).toHaveText(GAINS);
+  await expect(page.locator("#main h1")).toBeFocused();
   await page
     .locator('details[data-explain-key="US0378331005"] > summary')
     .click();
-  await page.locator("#review-tab-dividends").click();
+  await results(page).getByRole("button", { name: DIVIDENDS }).click();
   await page
-    .getByRole("button", { name: /^(Back|Nazaj)$/ })
-    .last()
+    .getByRole("button", { name: /^(Back to details|Nazaj na podatke)$/ })
+    .first()
     .click();
   await page.locator(".actions-row .btn-primary").click();
-  await expect(page.locator("#review-tab-gains")).toHaveAttribute(
-    "aria-selected",
-    "true",
+  await expect(results(page).locator('[aria-current="page"]')).toHaveText(
+    /Overview|Pregled/,
   );
+  await results(page).getByRole("button", { name: GAINS }).click();
   await expect(page.locator("details.security[open]")).toHaveCount(0);
 });
 

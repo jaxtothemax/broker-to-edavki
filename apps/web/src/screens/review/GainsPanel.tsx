@@ -2,7 +2,7 @@
  * Doh-KDVP: one disclosure per security, holding its inventory list (what the
  * XML will contain) and the FIFO-matched lots behind the gain, followed by how
  * the estimate is built. Native <details> keeps the disclosure accessible;
- * which ones are open is held by the caller, as part of the review's view.
+ * which ones are open is held by the caller, as part of the dashboard's view.
  */
 import { CaretDownIcon } from "@phosphor-icons/react";
 
@@ -259,9 +259,9 @@ function SecurityItem({
         />
       </summary>
       <div className="security-body">
-        <h3 className="sub-title">{t.review.rowsTitle}</h3>
+        <h2 className="sub-title">{t.review.rowsTitle}</h2>
         <InventoryTable security={security} />
-        <h3 className="sub-title">{t.review.lotsTitle}</h3>
+        <h2 className="sub-title">{t.review.lotsTitle}</h2>
         <LotsTable security={security} />
       </div>
     </details>
@@ -289,7 +289,7 @@ function EstimateBreakdown({ estimate }: { readonly estimate: GainsEstimate }) {
   return (
     <div className="card ledger-card">
       <div className="ledger-head">
-        <h3>{t.review.estimateTitle}</h3>
+        <h2>{t.review.estimateTitle}</h2>
         <Chip>{t.review.estimateChip}</Chip>
       </div>
       <dl className="ledger">

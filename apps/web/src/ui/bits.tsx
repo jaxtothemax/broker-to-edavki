@@ -1,4 +1,4 @@
-/** Small presentational pieces shared by the start screen, the flow and the review. */
+/** Small presentational pieces shared by the start screen, the flow and the dashboard. */
 import { ArrowsLeftRightIcon, SignpostIcon } from "@phosphor-icons/react";
 
 import {
@@ -119,19 +119,27 @@ export function BrokerName({ broker }: { readonly broker: BrokerId }) {
 export const TOUR_BUTTON_ID = "demo-tour";
 
 /**
- * Shown on every flow screen while the data on it is made up, with the
- * button that starts the guided tour again (#27).
+ * Shown on every flow screen while the data on it is made up. In the wizard
+ * it carries the button that starts the guided tour again (#27); in the
+ * dashboard that button is in the page header, so there is one only.
  */
-export function DemoBanner({ onTour }: { readonly onTour: () => void }) {
+export function DemoBanner({ onTour }: { readonly onTour?: () => void }) {
   const { t } = useI18n();
   return (
     <Note
       tone="warn"
       action={
-        <Button id={TOUR_BUTTON_ID} variant="ghost" size="sm" onClick={onTour}>
-          <SignpostIcon size={16} weight="bold" aria-hidden />
-          {t.tour.action}
-        </Button>
+        onTour === undefined ? undefined : (
+          <Button
+            id={TOUR_BUTTON_ID}
+            variant="ghost"
+            size="sm"
+            onClick={onTour}
+          >
+            <SignpostIcon size={16} weight="bold" aria-hidden />
+            {t.tour.action}
+          </Button>
+        )
       }
     >
       <strong>{t.demoBanner.title}</strong> {t.demoBanner.body}

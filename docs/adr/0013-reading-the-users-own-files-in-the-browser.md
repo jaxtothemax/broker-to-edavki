@@ -69,8 +69,8 @@ and are open to review.
 5. **Two requests, one at a time.** `read` runs on every change to the file set or the account
    answer and returns, per file, its broker and the days it covers, or why it was refused,
    plus the ledger's findings and the dividend payers to ask about. `prepare` runs when the
-   review opens, with the taxpayer and payer details, and returns the review's figures and
-   both forms' XML. Each request carries every file's bytes: the worker keeps nothing between
+   review opens (the results dashboard since ADR 0018 §6), with the taxpayer and payer details,
+   and returns the review's figures and both forms' XML. Each request carries every file's bytes: the worker keeps nothing between
    requests, so there is no cache to go stale and a reply is a function of its request. A
    newer request makes any older one stale: one still waiting for its files' bytes is never
    sent, and the worker still busy with one is ended rather than left to hold a second copy
@@ -108,6 +108,10 @@ and are open to review.
    withholds Doh-Div and leaves Doh-KDVP ready; a finding from reading the files, which can
    bear on either, withholds both. The review lets the user continue while either form can be
    written, and the download step names each withheld form and why.
+
+   > **Amended by ADR 0018 §6 (2026-10-10):** the review and download steps are now one
+   > results dashboard. Its overview names each withheld form and why, and offers the other
+   > for download; the rule above stands.
 10. **Findings reach the page as codes, and become sentences there.** A finding crosses as its
     code, severity and parameters: a file as its position in the request, never its name;
     file text only inside `UntrustedText`. The page names files and words the parameters in

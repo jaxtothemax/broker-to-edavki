@@ -1,7 +1,7 @@
 /**
  * The demo's returns, built the way every return is: the demo's ledger
  * through `validateLedger`, the Doh-KDVP and Doh-Div builders and the XML
- * writers, at Banka Slovenije rates (ADR 0011). The download step loads this
+ * writers, at Banka Slovenije rates (ADR 0011). The dashboard loads this
  * module, and the rate snapshot with it, only when it opens, so the first
  * screens stay light.
  */
@@ -28,7 +28,7 @@ import {
 import { formFileName } from "../model/preview";
 import { loadRates } from "./rates";
 
-/** One return as the download step offers it. */
+/** One return as the dashboard's overview offers it. */
 export interface BuiltForm {
   /** The name it is saved under, the one the command line writes too. */
   readonly fileName: string;
@@ -38,8 +38,8 @@ export interface BuiltForm {
   readonly blocking: number;
   /**
    * Whether the year has anything to file on it: rows, or a finding that
-   * withholds it. A needed form is named on the download step even when it
-   * has no rows to show (ADR 0013 §9).
+   * withholds it. A needed form is named on the dashboard even when it has
+   * no rows to show (ADR 0013 §9).
    */
   readonly needed: boolean;
 }
@@ -89,7 +89,7 @@ export function demoReturns(rates: RateTable): BuiltReturns {
   };
 }
 
-/** What the download step awaits: the snapshot, then both returns. */
+/** What the dashboard awaits: the snapshot, then both returns. */
 export async function buildDemoReturns(): Promise<BuiltReturns> {
   return demoReturns(await loadRates());
 }

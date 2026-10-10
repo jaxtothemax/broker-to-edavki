@@ -24,8 +24,9 @@ follows, the 30-day rule for losses, the credit for tax withheld abroad, and how
 imported into eDavki without filing it.
 
 You will be able to leave the tour at any point with Escape or **Skip tour**, and the demo
-will be just as you left it. The demo's banner starts the tour again. Nothing records that
-you have seen it.
+will be just as you left it. The **Guided tour** button starts it again: on the demo's banner
+in the first steps, and at the top of each page of your results. Nothing records that you have
+seen it.
 
 ## 1. Export your history from your broker
 
@@ -74,32 +75,36 @@ Trading 212 as the payer (its name, address and country), which you can change. 
 server which securities you own. Until a payer's details are complete, Doh-Div will wait, while
 Doh-KDVP will still be ready to download.
 
-## 3. Review what TaxReporter found
+## 3. Check your results
 
-Before you download anything, TaxReporter will show you what it read and how it arrived at
-each figure:
+Once your details are in, TaxReporter will open your results: a dashboard with a sidebar, like
+a banking app's. On a phone the sidebar will be a bar along the bottom of the screen. It will
+lead to:
 
-- **Sales, per security:** each sale with the purchases it was matched to, and their dates,
-  quantities and euro values.
-- **Dividends:** each payment, with the tax already withheld abroad.
-- **Exchange rates:** for every converted amount, the rate used and the date of the Banka
-  Slovenije list it came from. [Exchange rates](/reference/exchange-rates/) explains how the
-  rate is chosen.
-- **Problems:** anything TaxReporter could not handle, with an explanation. Every row of your
+- **Overview:** the tax to pay for the year, as an estimate, with the two returns it comes from
+  beside it, and the returns to download. FURS calculates the actual tax after you submit.
+- **Gains:** each security you sold, with the purchases each sale was matched to, first in,
+  first out across all your brokers, and their dates, quantities and euro values.
+- **Dividends:** each payment, with the tax already withheld abroad and the part of it
+  Slovenia credits.
+- **Notes:** anything TaxReporter could not handle, with an explanation. Every row of your
   export will either be used, listed as ignored with a reason, or reported; nothing is dropped
   silently. A blocking problem, such as a corporate action TaxReporter does not support yet,
-  stops the export of the returns it can change until you resolve it. A Trading 212 takeover
-  paid in shares in an earlier year, whose export books the new shares right after the sale,
-  does not stop this year's returns when nothing it touched was sold this year; it is listed
-  as a note instead. Rights handed out free are treated the
+  stops the returns it can change until you resolve it, while the other return can still be
+  downloaded. A Trading 212 takeover paid in shares in an earlier year, whose export books the
+  new shares right after the sale, does not stop this year's returns when nothing it touched
+  was sold this year; it is listed as a note instead. Rights handed out free are treated the
   same way. Other corporate actions, and those from other brokers, still stop every return for
   now.
-- **An estimate of the tax:** clearly labeled as an estimate. FURS calculates the actual tax
-  after you submit.
+
+For every converted amount, you will see the rate used and the date of the Banka Slovenije list
+it came from. [Exchange rates](/reference/exchange-rates/) explains how the rate is chosen.
+
+Nothing on the dashboard will be saved: closing the tab, or **Start over**, clears it.
 
 ## 4. Download the XML files
 
-TaxReporter will produce one file per return:
+From the overview, TaxReporter will offer one file per return, each with its own download:
 
 - **Doh-KDVP** for your sales of shares and ETFs
 - **Doh-Div** for your dividends

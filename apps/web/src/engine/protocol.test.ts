@@ -1,3 +1,4 @@
+import { Decimal } from "@taxreporter/core";
 import { describe, expect, it } from "vitest";
 
 import { engineReplies } from "../testing/ownFiles";
@@ -172,6 +173,13 @@ describe("isReply on the review", () => {
     const { prepared } = await engineReplies();
     expect(isReply(prepared)).toBe(true);
     const { preview } = prepared;
+    // The headline is the two estimates' cents added, so the parts on
+    // screen add up to it.
+    expect(preview.taxToPayEur).toBe(
+      Decimal.parse(preview.gainsEstimate.taxEur)
+        .plus(Decimal.parse(preview.dividendsEstimate.taxDueEur))
+        .toFixed(2, "halfUp"),
+    );
     const [security] = preview.securities;
     const [dividend] = preview.dividends;
     if (security === undefined || dividend === undefined) {
@@ -208,6 +216,8 @@ describe("isReply on the review", () => {
         },
       },
       { ...preview, omittedFindings: -1 },
+      // The headline the dashboard leads with.
+      { ...preview, taxToPayEur: 1791.37 },
       // Every list and record the screens read, each checked in full.
       { ...preview, files: [{ ...file, rowsRead: -1 }] },
       { ...preview, findings: [{ severity: "fatal", code: "x", params: {} }] },

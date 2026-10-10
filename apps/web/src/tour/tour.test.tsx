@@ -88,7 +88,7 @@ describe("the script", () => {
     const sold = new Set(demoPreview.securities.map((s) => s.isin));
     for (const stop of TOUR) {
       expect(FLOW_STEPS, stop.id).toContain(stop.view.screen);
-      for (const isin of stop.view.review?.open ?? []) {
+      for (const isin of stop.view.dash?.sold ?? []) {
         expect(sold.has(isin), `${stop.id}: ${isin}`).toBe(true);
       }
     }
@@ -148,13 +148,17 @@ describe("each stop on the screen it shows", () => {
   it("shows each stop's screen in place of the user's, the dialog labelled", () => {
     TOUR.forEach((stop, index) => {
       const html = renderStop(index, "en");
-      const heading = {
-        files: en.files.title,
-        details: en.details.title,
-        review: en.review.title(String(demoPreview.taxYear)),
-        download: en.download.title,
-      }[stop.view.screen];
-      expect(text(page(html)), stop.id).toContain(heading);
+      const heading =
+        stop.view.dash === undefined
+          ? {
+              files: en.files.title,
+              details: en.details.title,
+              dashboard: en.dash.overview,
+            }[stop.view.screen]
+          : en.dash[stop.view.dash.page];
+      // The page's own heading, not the navigation that names every page.
+      const shown = /<h1[^>]*>([^<]*)<\/h1>/.exec(page(html))?.[1] ?? "";
+      expect(text(shown).trim(), stop.id).toBe(heading);
       expect(html).toMatch(/<dialog[^>]*aria-labelledby="tour-title"/);
     });
   });

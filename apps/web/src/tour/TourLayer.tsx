@@ -76,6 +76,12 @@ export interface TourRestore {
   scrollY: number | null;
   /** Each sideways scroller the tour moved, and where it was. */
   readonly scrollers: Map<HTMLElement, number>;
+  /**
+   * Each table the user had scrolled sideways when the tour started, by its
+   * name: a stop on another screen unmounts the table, so the one the user
+   * comes back to is a new element, found again by the same name.
+   */
+  readonly tables?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -229,11 +235,14 @@ async function waitFor<T>(find: () => T | null, ms: number): Promise<T | null> {
   }
 }
 
-/** Waits for the entrance animation of the screen or tab holding `elements`. */
+/**
+ * Waits for the entrance animation of the screen, tab or dashboard page
+ * holding `elements`.
+ */
 async function settle(elements: readonly Element[]): Promise<void> {
   const hosts = new Set(
     elements
-      .map((element) => element.closest(".screen, .tab-panel"))
+      .map((element) => element.closest(".dash-page, .screen, .tab-panel"))
       .filter((host): host is Element => host !== null),
   );
   const running = [...hosts].flatMap((host) => host.getAnimations());

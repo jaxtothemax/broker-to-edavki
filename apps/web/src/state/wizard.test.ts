@@ -129,23 +129,22 @@ describe("demo mode", () => {
     expect(state.files.map((f) => f.kind)).toEqual(["demo", "demo"]);
   });
 
-  it("walks to the download without personal data", () => {
+  it("walks to the dashboard without personal data", () => {
     const state = run(
       { type: "startDemo" },
       { type: "next" },
       { type: "next" },
-      { type: "next" },
     );
-    expect(state.screen).toBe("download");
+    expect(state.screen).toBe("dashboard");
     expect(state.details.taxNumber).toBe("");
   });
 
   it("lets the stepper jump to any step", () => {
     const state = run(
       { type: "startDemo" },
-      { type: "goTo", screen: "download" },
+      { type: "goTo", screen: "dashboard" },
     );
-    expect(state.screen).toBe("download");
+    expect(state.screen).toBe("dashboard");
   });
 });
 
@@ -463,10 +462,10 @@ describe("own files", () => {
     );
   });
 
-  it("requires a valid tax number before the review", () => {
+  it("requires a valid tax number before the dashboard", () => {
     const atDetails = wizardReducer(readOwn(), { type: "next" });
     expect(atDetails.screen).toBe("details");
-    expect(canEnter(atDetails, "review")).toBe(false);
+    expect(canEnter(atDetails, "dashboard")).toBe(false);
 
     const blocked = wizardReducer(atDetails, { type: "next" });
     expect(blocked.screen).toBe("details");
@@ -478,42 +477,41 @@ describe("own files", () => {
       value: "1234 5678",
     });
     const moved = wizardReducer(fixed, { type: "next" });
-    expect(moved.screen).toBe("review");
+    expect(moved.screen).toBe("dashboard");
     expect(moved.showErrors).toBe(false);
   });
 
-  it("goes on from the review while either return can be written", () => {
+  it("opens the dashboard however many returns can be written", () => {
+    // The dashboard is the flow's end: a return a note stops is withheld on
+    // its own there (ADR 0018 §6), so no step needs a gate any more.
     const atReview = run(
       { type: "startOwn" },
       { type: "addFiles", files: [file("file-1")] },
       { type: "readStarted", request: 1, fileIds: ["file-1"] },
       { type: "readDone", request: 1, reply: readReply([summary()]) },
       { type: "setDetail", field: "taxNumber", value: "12345678" },
-      { type: "goTo", screen: "review" },
+      { type: "goTo", screen: "dashboard" },
       { type: "prepareStarted", request: 2, fileIds: ["file-1"] },
     );
-    expect(blockingReason(atReview, "review")).toBe("notPrepared");
-    expect(canEnter(atReview, "download")).toBe(false);
+    expect(atReview.screen).toBe("dashboard");
+    expect(blockingReason(atReview, "dashboard")).toBeNull();
     const done = (kdvp: FormOutput, div: FormOutput) =>
       wizardReducer(atReview, {
         type: "prepareDone",
         request: 2,
         reply: prepareReply(kdvp, div),
       });
-    const oneWritten = done(form(), form({ xml: null, blocking: 1 }));
-    expect(blockingReason(oneWritten, "review")).toBeNull();
-    expect(canEnter(oneWritten, "download")).toBe(true);
-    const noneWritten = done(
-      form({ xml: null, blocking: 2 }),
-      form({ xml: null, blocking: 2 }),
-    );
-    expect(blockingReason(noneWritten, "review")).toBe("nothingWritten");
-    // Nothing to file at all goes on, to say so.
-    const nothingDue = done(
-      form({ xml: null, needed: false }),
-      form({ xml: null, needed: false }),
-    );
-    expect(blockingReason(nothingDue, "review")).toBeNull();
+    for (const [kdvp, div] of [
+      [form(), form({ xml: null, blocking: 1 })],
+      [form({ xml: null, blocking: 2 }), form({ xml: null, blocking: 2 })],
+      // Nothing to file at all, which the dashboard says.
+      [form({ xml: null, needed: false }), form({ xml: null, needed: false })],
+    ] as const) {
+      const prepared = done(kdvp, div);
+      expect(prepared.screen).toBe("dashboard");
+      expect(prepared.preparing.status).toBe("prepared");
+      expect(canEnter(prepared, "dashboard")).toBe(true);
+    }
     // A late answer to an older preparation is dropped.
     expect(
       wizardReducer(atReview, {
@@ -555,14 +553,14 @@ describe("own files", () => {
     ).toEqual({ status: "idle" });
   });
 
-  it("tries a failed preparation again when the review is next opened", () => {
+  it("tries a failed preparation again when the dashboard is next opened", () => {
     const failed = run(
       { type: "startOwn" },
       { type: "addFiles", files: [file("file-1")] },
       { type: "readStarted", request: 1, fileIds: ["file-1"] },
       { type: "readDone", request: 1, reply: readReply([summary()]) },
       { type: "setDetail", field: "taxNumber", value: "12345678" },
-      { type: "goTo", screen: "review" },
+      { type: "goTo", screen: "dashboard" },
       { type: "prepareStarted", request: 2, fileIds: ["file-1"] },
       {
         type: "prepareDone",
@@ -669,7 +667,7 @@ describe("own files", () => {
         reply: readReply([summary(), summary()]),
       },
       { type: "setDetail", field: "taxNumber", value: "12345678" },
-      { type: "goTo", screen: "review" },
+      { type: "goTo", screen: "dashboard" },
       { type: "prepareStarted", request: 2, fileIds: ["file-1", "file-2"] },
       {
         type: "prepareDone",
@@ -677,7 +675,7 @@ describe("own files", () => {
         reply: prepareReply(form(), form()),
       },
     );
-    expect(canEnter(prepared, "download")).toBe(true);
+    expect(prepared.preparing.status).toBe("prepared");
     for (const change of [
       { type: "addFiles", files: [file("file-3", "c.csv")] },
       { type: "removeFile", id: "file-2" },
@@ -686,13 +684,17 @@ describe("own files", () => {
       const changed = wizardReducer(prepared, change);
       expect(changed.preparing, change.type).toEqual({ status: "idle" });
       expect(changed.reading, change.type).toEqual({ status: "idle" });
-      // The old returns, with or without the file, are never offered.
-      expect(canEnter(changed, "download"), change.type).toBe(false);
+      // The old returns, with or without the file, are never offered: the
+      // dashboard has nothing prepared until the engine answers again.
+      expect(changed.preparing.status, change.type).toBe("idle");
     }
   });
 
   it("refuses to jump past a step that still blocks", () => {
-    const state = run({ type: "startOwn" }, { type: "goTo", screen: "review" });
+    const state = run(
+      { type: "startOwn" },
+      { type: "goTo", screen: "dashboard" },
+    );
     expect(state.screen).toBe("files");
   });
 

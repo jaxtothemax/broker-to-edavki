@@ -61,21 +61,22 @@ below 12px.
 
 ## Components (use these, do not hand-roll)
 
-| Need                          | Use                                                                                                                                                                                           |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Any button                    | `Button` (`primary` / `secondary` / `ghost`, `sm` / `md` / `lg`). One primary per area.                                                                                                       |
-| Icon-only button              | `IconButton` (label required; it is also the tooltip)                                                                                                                                         |
-| Short label or status pill    | `Chip` (`neutral` / `accent` / `warn`; `sm` in rows, `md` on its own line, icon first). In a flex column, wrap it in a `<p>` so it does not stretch.                                          |
-| Gain or loss                  | `DeltaPill` (sign and arrow, not color alone)                                                                                                                                                 |
-| Headline euro amount          | `Amount` (muted cents; one string for screen readers)                                                                                                                                         |
-| Callout                       | `Note` (`neutral` / `warn` / `danger`, optional `action`). The only callout recipe.                                                                                                           |
-| Table                         | `DataTable` (caption, named focusable scroll region)                                                                                                                                          |
-| Tabs                          | `Tabs` (WAI-ARIA, roving tabindex; all panels rendered, inactive ones `hidden`)                                                                                                               |
-| Security or payer mark        | `Ticker` (`labelled` where the symbol is not written next to it)                                                                                                                              |
-| Icon in a tile                | `.icon-tile` with `-sm` / `-lg` and `.is-danger`                                                                                                                                              |
-| Charts                        | `StackBar`, `MonthBars`, `CompareBars`: bars are `aria-hidden`, every figure is in text                                                                                                       |
-| Overlay over the page         | The guided tour's `<dialog>` (`src/tour/TourLayer.tsx`), the app's only modal layer: `showModal()`, its `close` event the one way out. Reuse it for the AI check's consent dialog (ADR 0008). |
-| Explanation beside an element | `.tour-note`, in the tour's overlay only. An in-flow callout stays `Note`.                                                                                                                    |
+| Need                          | Use                                                                                                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Any button                    | `Button` (`primary` / `secondary` / `ghost`, `sm` / `md` / `lg`). One primary per area.                                                                                                                |
+| Icon-only button              | `IconButton` (label required; it is also the tooltip)                                                                                                                                                  |
+| Short label or status pill    | `Chip` (`neutral` / `accent` / `warn`; `sm` in rows, `md` on its own line, icon first). In a flex column, wrap it in a `<p>` so it does not stretch.                                                   |
+| Gain or loss                  | `DeltaPill` (sign and arrow, not color alone)                                                                                                                                                          |
+| Headline euro amount          | `Amount` (muted cents; one string for screen readers)                                                                                                                                                  |
+| Callout                       | `Note` (`neutral` / `warn` / `danger`, optional `action`). The only callout recipe.                                                                                                                    |
+| Table                         | `DataTable` (caption, named focusable scroll region)                                                                                                                                                   |
+| Tabs                          | `Tabs` (WAI-ARIA, roving tabindex; all panels rendered, inactive ones `hidden`)                                                                                                                        |
+| Security or payer mark        | `Ticker` (`labelled` where the symbol is not written next to it)                                                                                                                                       |
+| Icon in a tile                | `.icon-tile` with `-sm` / `-lg` and `.is-danger`                                                                                                                                                       |
+| Charts                        | `StackBar`, `MonthBars`, `CompareBars`: bars are `aria-hidden`, every figure is in text                                                                                                                |
+| Dashboard navigation          | `SideNav` in `AppShell` (`src/ui/AppShell.tsx`): one `<nav>` restyled per breakpoint (sidebar, icon rail, bottom bar), buttons with `aria-current="page"`. Never a second nav hidden by a media query. |
+| Overlay over the page         | The guided tour's `<dialog>` (`src/tour/TourLayer.tsx`), the app's only modal layer: `showModal()`, its `close` event the one way out. Reuse it for the AI check's consent dialog (ADR 0008).          |
+| Explanation beside an element | `.tour-note`, in the tour's overlay only. An in-flow callout stays `Note`.                                                                                                                             |
 
 An action that is not available yet uses `aria-disabled` and an `aria-describedby`
 explanation, not `disabled`, so keyboard users can reach it and hear why.
@@ -92,7 +93,8 @@ explanation, not `disabled`, so keyboard users can reach it and hear why.
   element: the production CSP (`style-src 'self'`) blocks them, and the same test greps
   the app for them. A fixed container holding fixed children takes no `transform`,
   `filter` or `backdrop-filter`, which would make it their containing block.
-- Measure only after the `.screen` / `.tab-panel` entrance animation has finished.
+- Measure only after the `.screen` / `.tab-panel` / `.dash-page` entrance animation has
+  finished.
 - The tour's cutout is the one shape outside the radius scale: concentric with the lit
   card, its radius is the card's own (capped at `--r-lg`) plus the padding around it.
 - The tour's dock never grows past the window: it scrolls inside itself, and in the

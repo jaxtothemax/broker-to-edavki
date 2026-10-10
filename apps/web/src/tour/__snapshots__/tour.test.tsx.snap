@@ -33,7 +33,7 @@ exports[`the sentences the tour renders > en: says what was reviewed, word for w
   {
     "stop": "summary",
     "title": "Estimates, split by tax rate",
-    "intro": "The review shows every figure behind both returns. It starts with what they add up to.",
+    "intro": "The overview starts with what both returns add up to: the tax to pay, as an estimate.",
     "notes": [
       {
         "lead": "Estimate",
@@ -155,7 +155,7 @@ exports[`the sentences the tour renders > en: says what was reviewed, word for w
       },
       {
         "lead": "€18.48",
-        "body": "The treaty with Germany allows 15%: €123.20\\u00a0×\\u00a015% = €18.48. The other €14.01 withheld does not reduce the Slovenian tax."
+        "body": "The treaty with Germany allows 15%: €123.20\\u00a0×\\u00a015% = €18.48. The rest of the €32.49 withheld does not reduce the Slovenian tax."
       }
     ]
   },
@@ -190,7 +190,7 @@ exports[`the sentences the tour renders > en: says what was reviewed, word for w
       },
       {
         "lead": "Download Doh-KDVP",
-        "body": "After the import, eDavki shows the form for you to compare with this review and submit yourself. TaxReporter never files, and eDavki calculates the final tax."
+        "body": "After the import, eDavki shows the form for you to compare with these results and submit yourself. TaxReporter never files, and eDavki calculates the final tax."
       }
     ]
   }
@@ -230,7 +230,7 @@ exports[`the sentences the tour renders > sl: says what was reviewed, word for w
   {
     "stop": "summary",
     "title": "Ocene, razdeljene po stopnjah",
-    "intro": "Pregled pokaže vse številke za obe napovedi. Začne s tem, koliko skupaj znašajo.",
+    "intro": "Pregled se začne s tem, koliko skupaj znašata obe napovedi: z davkom za plačilo, kot oceno.",
     "notes": [
       {
         "lead": "Ocena",
@@ -352,7 +352,7 @@ exports[`the sentences the tour renders > sl: says what was reviewed, word for w
       },
       {
         "lead": "18,48\\u00a0€",
-        "body": "Pogodba z državo Nemčija dovoljuje 15\\u00a0%: 123,20\\u00a0€\\u00a0×\\u00a015\\u00a0% = 18,48\\u00a0€. Preostalih 14,01\\u00a0€ odtegnjenega davka ne zmanjša slovenskega davka."
+        "body": "Pogodba z državo Nemčija dovoljuje 15\\u00a0%: 123,20\\u00a0€\\u00a0×\\u00a015\\u00a0% = 18,48\\u00a0€. Preostanek od 32,49\\u00a0€ odtegnjenega davka ne zmanjša slovenskega davka."
       }
     ]
   },
@@ -387,7 +387,7 @@ exports[`the sentences the tour renders > sl: says what was reviewed, word for w
       },
       {
         "lead": "Prenesi Doh-KDVP",
-        "body": "Po uvozu eDavki prikažejo obrazec, ki ga primerjate s tem pregledom in sami oddate. TaxReporter napovedi nikoli ne odda, končni davek pa izračunajo eDavki."
+        "body": "Po uvozu eDavki prikažejo obrazec, ki ga primerjate s temi rezultati in sami oddate. TaxReporter napovedi nikoli ne odda, končni davek pa izračunajo eDavki."
       }
     ]
   }

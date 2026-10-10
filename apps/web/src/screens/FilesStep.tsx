@@ -423,7 +423,7 @@ export function FilesStep({
                     <FileDetail file={file} state={state} context={context} />
                   </div>
                   {file.kind === "demo" ? (
-                    // Demo files are fixed: removing one would not change the demo review.
+                    // Demo files are fixed: removing one would not change the demo results.
                     <Chip>
                       <BrokerName broker={file.broker} />
                     </Chip>

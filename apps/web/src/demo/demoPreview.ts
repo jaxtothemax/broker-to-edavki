@@ -580,7 +580,7 @@ export const demoPreview: ReturnPreview = {
       source: { file: "ibkr-flex-2019-2026.xml", row: 219 },
     },
   ],
-  // The engine's own findings for these files, as the review words them.
+  // The engine's own findings for these files, as the dashboard words them.
   findings: [
     {
       severity: "warning",
@@ -656,6 +656,7 @@ export const demoPreview: ReturnPreview = {
     creditEur: "24.33",
     taxDueEur: "21.33",
   },
+  taxToPayEur: "1791.37",
   dividendsByMonth: [
     { month: "2026-01", grossEur: "2.78" },
     { month: "2026-02", grossEur: "14.76" },

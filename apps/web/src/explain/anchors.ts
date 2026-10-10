@@ -3,7 +3,7 @@
  * a screen (ADR 0016). A screen spreads `explain(name, key)` onto the element,
  * and the guided tour finds it by that name, never by a class or an id, so
  * restyling a screen cannot silently move what an explanation points at. The
- * names outlive the tour: they are meant to carry "why" text on the review of
+ * names outlive the tour: they are meant to carry "why" text on the results of
  * the user's own files too.
  *
  * Each name says how its element is measured: "box" for a card, chip, button
@@ -17,7 +17,7 @@ const ANCHORS = {
   "files.text": "text",
   "details.form": "box",
   "details.taxNumber": "box",
-  "summary.gainsTax": "box",
+  "summary.tax": "box",
   "summary.estimateChip": "box",
   "summary.netBase": "box",
   "summary.buckets": "box",

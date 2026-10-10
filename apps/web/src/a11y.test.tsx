@@ -43,18 +43,21 @@ const SCREENS: [string, WizardState, TourState?][] = [
   ["files", stateAfter({ type: "startDemo" })],
   ["details", stateAfter({ type: "startDemo" }, { type: "next" })],
   [
-    "review",
-    stateAfter({ type: "startDemo" }, { type: "goTo", screen: "review" }),
-  ],
-  [
-    "download",
-    stateAfter({ type: "startDemo" }, { type: "goTo", screen: "download" }),
+    "dashboard",
+    stateAfter({ type: "startDemo" }, { type: "goTo", screen: "dashboard" }),
   ],
   ["files, own files read", ownState(read)],
   ["details, own files with dividend payers", ownState(read, { type: "next" })],
   ["details with an error", ownState(read, { type: "next" }, { type: "next" })],
-  ["review, own files", preparedState(read, prepared)],
-  ["download, own files", preparedState(read, prepared, { type: "next" })],
+  [
+    "dashboard, own files being prepared",
+    ownState(
+      read,
+      { type: "setDetail", field: "taxNumber", value: "12345678" },
+      { type: "goTo", screen: "dashboard" },
+    ),
+  ],
+  ["dashboard, own files", preparedState(read, prepared)],
   // The guided tour open over the demo: its dialog joins the page's checks.
   ["tour on the files", stateAfter({ type: "startDemo" }), touring("files")],
   [
@@ -63,6 +66,13 @@ const SCREENS: [string, WizardState, TourState?][] = [
     touring("saleRate"),
   ],
   ["tour on a dividend", stateAfter({ type: "startDemo" }), touring("holiday")],
+  // Every page of the dashboard, as the tour shows each.
+  [
+    "tour on the overview",
+    stateAfter({ type: "startDemo" }),
+    touring("summary"),
+  ],
+  ["tour on the notes", stateAfter({ type: "startDemo" }), touring("notes")],
   [
     "tour on the download",
     stateAfter({ type: "startDemo" }),
@@ -70,7 +80,7 @@ const SCREENS: [string, WizardState, TourState?][] = [
   ],
 ];
 
-/** The review panels on their own, as the review's tabs hold them. */
+/** The dashboard's panels on their own, as its pages hold them. */
 function panels(locale: Locale): string {
   const wrap = (node: ReactNode) =>
     renderToStaticMarkup(
@@ -156,7 +166,7 @@ for (const locale of ["sl", "en"] as const) {
       });
     }
 
-    it("the review panels name every table and leave summaries their visible names", () => {
+    it("the dashboard panels name every table and leave summaries their visible names", () => {
       const html = panels(locale);
       const tables = html.match(/<table[^>]*>/g) ?? [];
       const captions = html.match(/<table[^>]*>\s*<caption/g) ?? [];

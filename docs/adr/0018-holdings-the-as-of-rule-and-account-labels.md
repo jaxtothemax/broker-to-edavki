@@ -1,14 +1,13 @@
 # 18. Holdings, the as-of rule and account labels
 
 **Date:** 2026-10-10
-**Status:** Proposed
+**Status:** Accepted (2026-10-10)
 
-> **Implementation status (2026-10-10):** the engine half ships with this ADR in the
-> first pull request for #47: `holdingOutlook` and the `through` cut on `matchFifo` in
-> `packages/core/src/holding.ts` and `fifo.ts`, `accountPositions` in
-> `packages/core/src/holdings.ts`, `buildHoldings` in `packages/pipeline/src/holdings.ts`
-> (`Prepared.holdings`), and `holdings` in the CLI's `--json` report. The dashboard that
-> shows them, and the flow change in decision 6, follow in later pull requests for #47.
+> **Implementation status (2026-10-10):** decisions 1 to 5 shipped with this ADR in #53: the
+> engine computes the holdings, the CLI's `--json` report carries them. Decision 6, the
+> dashboard that replaces the review and download steps, ships in the second pull request
+> for #47. The web app shows no holdings yet: the third pull request for #47 brings them to
+> the dashboard.
 
 ## Context
 
@@ -122,7 +121,10 @@ engine, let alone reach a screen or an export.
 ## On Acceptance
 
 <!-- Complete when this ADR's Status moves to Accepted — not before. -->
-- [ ] Open issues naming this ADR re-read against the settled decision:
-      `python3 scripts/adr-accepted-issue-sweep.py --adr 0018`
-- [ ] Any issue carrying pre-ADR scope rewritten — **title and body** — led by a
-      dated correction note. Record the count here, **including zero**.
+- [x] Open issues naming this ADR re-read against the settled decision:
+      `python3 scripts/adr-accepted-issue-sweep.py --adr 0018` (2026-10-10: 37 open issues
+      scanned, 0 flagged). The script matches only "ADR-0018"; #47, #48, #49 and #50 write
+      "ADR 0018" or "ADR 0017" and were read by hand: their scope matches the decision, and
+      #47's comments record the as-of refinements and the move from top tabs to a sidebar.
+- [x] Any issue carrying pre-ADR scope rewritten — **title and body** — led by a
+      dated correction note. Count: **0**.

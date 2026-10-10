@@ -9,6 +9,11 @@
 > `script.ts`, `TourLayer.tsx`), the anchors on the five screens, the review's view held by
 > the app frame (`ReviewView`), and the browser tests in `apps/web/e2e/tour.spec.ts`.
 > Accepting it changes no code.
+>
+> **Amended by ADR 0018 §6 (2026-10-10):** the review and download steps became the results
+> dashboard. The app frame now holds the dashboard's view (`DashboardView`: its page and
+> open securities), the stops show dashboard pages, and the tour waits for a page's
+> entrance (`.dash-page`) as for a screen's.
 
 ## Context
 

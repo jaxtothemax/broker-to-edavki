@@ -1,5 +1,5 @@
 /**
- * The review panels rendered on their own, inside the provider the app gives
+ * The dashboard's panels rendered on their own, inside the provider the app gives
  * them, so each can be checked with edge-case data.
  */
 import type { ReactNode } from "react";
@@ -11,8 +11,6 @@ import type { Locale } from "../../i18n/format";
 import { I18nProvider } from "../../i18n/i18n";
 import { en, sl } from "../../i18n/messages";
 import { RateText, SourceText } from "../../ui/bits";
-import { DownloadStep, filingDeadline, FormCard } from "../DownloadStep";
-import { initialReviewView, ReviewStep } from "../ReviewStep";
 import { DividendsPanel } from "./DividendsPanel";
 import { GainsPanel } from "./GainsPanel";
 import { NotesPanel } from "./NotesPanel";
@@ -199,98 +197,11 @@ describe("empty and edge states", () => {
     expect(dividends).toContain(en.review.noDividends);
   });
 
-  it("offers no download card for a form with nothing in it", () => {
-    const html = text(
-      render(
-        <DownloadStep
-          preview={{ ...demoPreview, dividends: [] }}
-          demo
-          returns={() => new Promise(() => undefined)}
-          onBack={() => undefined}
-          onRestart={() => undefined}
-        />,
-      ),
-    );
-    expect(html).toContain("Download Doh-KDVP");
-    expect(html).not.toContain("Download Doh-Div");
-  });
-
   it("never groups the digits of a source row number", () => {
     const html = text(
       render(<SourceText source={{ file: "a.csv", row: 1234 }} />),
     );
     expect(html).toContain("a.csv, row 1234");
-  });
-
-  it("stops at the review while a note blocks both returns", () => {
-    const html = render(
-      <ReviewStep
-        preview={{
-          ...demoPreview,
-          findings: [
-            { severity: "blocking", code: "unknownEvent", params: {} },
-          ],
-        }}
-        canContinue={false}
-        view={initialReviewView}
-        onViewChange={() => undefined}
-        onBack={() => undefined}
-        onNext={() => undefined}
-        onStartDemo={() => undefined}
-      />,
-    );
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>Continue/);
-    expect(text(html)).toContain(en.review.blocked);
-  });
-
-  it("goes on with one return while a note stops only the other", () => {
-    const html = render(
-      <ReviewStep
-        preview={{
-          ...demoPreview,
-          findings: [
-            {
-              severity: "blocking",
-              code: "payerUnknown",
-              params: { isin: "US1912161007" },
-            },
-          ],
-        }}
-        forms={{
-          kdvp: { xml: "<x/>", blocking: 0, needed: true },
-          div: { xml: null, blocking: 1, needed: true },
-        }}
-        canContinue
-        view={initialReviewView}
-        onViewChange={() => undefined}
-        onBack={() => undefined}
-        onNext={() => undefined}
-        onStartDemo={() => undefined}
-      />,
-    );
-    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Continue/);
-    expect(text(html)).toContain(en.review.blockedOne("Doh-Div"));
-  });
-
-  it("says the review is being prepared, then that it failed", () => {
-    const at = (status: "preparing" | "failed") =>
-      text(
-        render(
-          <ReviewStep
-            preview={null}
-            status={status}
-            canContinue={false}
-            view={initialReviewView}
-            onViewChange={() => undefined}
-            onBack={() => undefined}
-            onNext={() => undefined}
-            onStartDemo={() => undefined}
-          />,
-        ),
-      );
-    expect(at("preparing")).toContain(en.review.preparing);
-    expect(at("failed")).toContain(en.review.prepareFailed);
-    expect(at("preparing")).not.toContain("Continue");
   });
 
   it("reminds that foreign tax needs proof, only where tax was withheld", () => {
@@ -387,106 +298,6 @@ describe("GainsPanel without a ticker", () => {
   });
 });
 
-describe("DownloadStep notes", () => {
-  const returns = {
-    kdvp: {
-      fileName: "Doh_KDVP_2026.xml",
-      xml: "<x/>",
-      blocking: 0,
-      needed: true,
-    },
-    div: {
-      fileName: "Doh_Div_2026.xml",
-      xml: "<y/>",
-      blocking: 0,
-      needed: true,
-    },
-  };
-  const step = (demo: boolean) =>
-    text(
-      render(
-        <DownloadStep
-          preview={demoPreview}
-          demo={demo}
-          returns={returns}
-          onBack={() => undefined}
-          onRestart={() => undefined}
-        />,
-      ),
-    );
-
-  it("warns never to import the demo's files", () => {
-    expect(step(true)).toContain(
-      "These files hold the demo's made-up trades".replace("'", "&#x27;"),
-    );
-  });
-
-  it("names a withheld return that has no row to show (ADR 0013 §9)", () => {
-    // A sale whose purchase is in an export not added: Doh-KDVP is needed
-    // but withheld before it has a list; Doh-Div is ready.
-    const withheld = text(
-      render(
-        <DownloadStep
-          preview={{ ...demoPreview, securities: [] }}
-          demo={false}
-          returns={{
-            ...returns,
-            kdvp: { ...returns.kdvp, xml: null, blocking: 2 },
-          }}
-          onBack={() => undefined}
-          onRestart={() => undefined}
-        />,
-      ),
-    );
-    expect(withheld).toContain("Download Doh-KDVP");
-    expect(withheld).toContain(en.download.kdvpNone);
-    expect(withheld).toContain(
-      "Not written: 2 problems in the review must be fixed first.",
-    );
-    expect(withheld).toContain("Download Doh-Div");
-    // The same for Doh-Div withheld with no payment.
-    const noPayments = text(
-      render(
-        <DownloadStep
-          preview={{ ...demoPreview, dividends: [] }}
-          demo={false}
-          returns={{
-            ...returns,
-            div: { ...returns.div, xml: null, blocking: 1 },
-          }}
-          onBack={() => undefined}
-          onRestart={() => undefined}
-        />,
-      ),
-    );
-    expect(noPayments).toContain(en.download.divNone);
-    // A form the year does not need still gets no card.
-    const unneeded = text(
-      render(
-        <DownloadStep
-          preview={{ ...demoPreview, dividends: [] }}
-          demo={false}
-          returns={{
-            ...returns,
-            div: { ...returns.div, xml: null, needed: false },
-          }}
-          onBack={() => undefined}
-          onRestart={() => undefined}
-        />,
-      ),
-    );
-    expect(unneeded).not.toContain("Download Doh-Div");
-  });
-
-  it("asks the user to check their own returns, and gives no demo warning", () => {
-    const own = step(false);
-    expect(own).toContain(en.download.ownFiles.split(";")[0] ?? "");
-    expect(own).not.toContain("made-up trades");
-    // Written already: the buttons are ready at once.
-    expect(own).toContain(en.download.readyChip);
-  });
-});
-
 describe("NotesPanel with many notes", () => {
   it("shows the first of each severity and says how many more there are", () => {
     const many = Array.from({ length: 130 }, () => ({
@@ -502,51 +313,5 @@ describe("NotesPanel with many notes", () => {
     expect(html.match(/marked as a fund/g)).toHaveLength(100);
     expect(html).toContain("30 more notes are not shown.");
     expect(html).toContain("7 more notes are not shown.");
-  });
-});
-
-describe("filingDeadline", () => {
-  it("moves 28 February to the next working day", () => {
-    expect(filingDeadline(2026)).toBe("2027-03-01"); // Sunday → Monday
-    expect(filingDeadline(2025)).toBe("2026-03-02"); // Saturday → Monday
-    expect(filingDeadline(2027)).toBe("2028-02-28"); // Monday stays
-  });
-});
-
-describe("FormCard", () => {
-  const card = (built: Parameters<typeof FormCard>[0]["built"]) =>
-    render(
-      <FormCard
-        id="kdvp"
-        form="Doh-KDVP"
-        body="4 lists"
-        fileName="Doh_KDVP_2026.xml"
-        built={built}
-      />,
-    );
-
-  it("offers a written return for saving", () => {
-    const html = card({
-      fileName: "Doh_KDVP_2026.xml",
-      xml: "<Envelope/>",
-      blocking: 0,
-      needed: true,
-    });
-    expect(html).toMatch(/<button[^>]*>[^]*?Download Doh-KDVP/);
-    expect(html).not.toContain("aria-disabled");
-    expect(text(html)).toContain(en.download.readyChip);
-  });
-
-  it("says why a return was not written, beside its disabled button", () => {
-    const html = card({
-      fileName: "Doh_KDVP_2026.xml",
-      xml: null,
-      blocking: 2,
-      needed: true,
-    });
-    expect(html).toContain('aria-describedby="kdvp-not-written"');
-    expect(text(html)).toContain(
-      "Not written: 2 problems in the review must be fixed first.",
-    );
   });
 });

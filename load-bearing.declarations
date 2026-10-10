@@ -106,7 +106,19 @@ why:  The only warning before a reload or a closed tab loses the user's files (A
 
 path: apps/web/src/App.tsx
 call: resetKey={shownScreen}
-why:  The only boundary around the screens (its reset key; the tour's own boundary is another one): without it a render error blanks the whole app, and the user's files and answers go with it. The screen tests render on the server, where a boundary never catches, so deleting it leaves every test green.
+why:  The only boundary around the wizard's screens (its reset key; the dashboard's shell and pages, and the tour, have their own): without it a render error blanks the whole app, and the user's files and answers go with it. The screen tests render on the server, where a boundary never catches, so deleting it leaves every test green.
+
+path: apps/web/src/App.tsx
+call: resetKey={`shell:${shownScreen}`}
+why:  The boundary around the dashboard's shell (#47): its navigation, the returns writer and the counts render outside the pages' own boundaries. Without it a failure there blanks the app, files and answers with it; the screen tests render on the server, where a boundary never catches, so deleting it leaves every test green.
+
+path: apps/web/src/screens/dashboard/DashboardShell.tsx
+call: resetKey={`dashboard:${page}`}
+why:  The boundary around the dashboard's page header, attention note and state notes (#47), keeping the phone's Back and Start over in its fallback. Delete it and a failure there falls to the shell's boundary, which drops the navigation; nothing in the tests catches, since they render on the server.
+
+path: apps/web/src/screens/dashboard/DashboardShell.tsx
+call: resetKey={`dashboard-page:${shown}`}
+why:  The boundary around each of the dashboard's pages (#47): a page that fails to render, shown or hidden, gives way to a message while the other pages, the downloads on the overview and the user's files stay. The screens' own boundary in App.tsx wraps the wizard steps only. The tests render on the server, where a boundary never catches, so deleting it leaves every test green.
 
 path: apps/web/src/App.tsx
 call: onError={() => {

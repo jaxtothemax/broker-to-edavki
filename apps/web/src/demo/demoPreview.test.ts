@@ -301,7 +301,7 @@ describe("demo dividends", () => {
   });
 
   it("splits the 25% Slovenian tax into the credit and the tax still due", () => {
-    // The review charts the two as shares of the Slovenian tax, which only
+    // The Dividends page charts the two as shares of the Slovenian tax, which only
     // holds while no credit exceeds the tax on its own payment.
     const rows = demoPreview.dividends;
     const d = demoPreview.dividendsEstimate;
@@ -317,6 +317,19 @@ describe("demo dividends", () => {
       ),
     );
     expect(r2(siTax)).toBe(r2(add(q(d.creditEur), q(d.taxDueEur))));
+  });
+});
+
+describe("demo headline", () => {
+  it("is the gains tax and the dividend tax still due, as their cards show them", () => {
+    expect(demoPreview.taxToPayEur).toBe(
+      r2(
+        add(
+          q(demoPreview.gainsEstimate.taxEur),
+          q(demoPreview.dividendsEstimate.taxDueEur),
+        ),
+      ),
+    );
   });
 });
 
