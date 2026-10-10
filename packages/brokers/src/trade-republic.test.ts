@@ -947,14 +947,42 @@ describe("tradeRepublic: the types and classes real exports show", () => {
     ]);
   });
 
-  it("never widens a trade's amount check for a tax", () => {
-    // Real exports give `amount` gross: 2 at 180.50 is 361.00 whatever tax
-    // stands beside it, and an amount net of a tax is not that.
+  it("takes an amount gross, or net of fee and tax to the cent, never a band a tax widens", () => {
+    // 2 at 180.50 is 361.00, with a fee of 1.00 and a tax of 1.44.
     expect(codes(rows(row({ tax: "-1.44" })))).toEqual([]);
-    expect(codes(rows(row({ amount: "-363.44", tax: "-1.44" })))).toEqual([
+    // A purchase net of both, as a netted transaction tax would show.
+    expect(codes(rows(row({ amount: "-363.44", tax: "-1.44" })))).toEqual([]);
+    expect(codes(rows(row({ amount: "-363.45", tax: "-1.44" })))).toEqual([]);
+    // Between the shapes, or past them: no amount the trade explains.
+    for (const amount of ["-362.50", "-363.46", "-359.56"]) {
+      expect(codes(rows(row({ amount, tax: "-1.44" }))), amount).toEqual([
+        "tradeInconsistent",
+      ]);
+    }
+    // A sale net of both: less cash in, never more. Its tax is German
+    // tax, counted in the warning.
+    const sale = { type: "SELL", shares: "-2.0000000000", tax: "-1.44" };
+    expect(codes(rows(row({ ...sale, amount: "358.56" })))).toEqual([
+      "brokerTaxSettled",
+    ]);
+    expect(codes(rows(row({ ...sale, amount: "363.44" })))).toEqual([
       "tradeInconsistent",
     ]);
     expect(codes(rows(row({ tax: "1,44" })))).toEqual(["invalidNumber"]);
+  });
+
+  it("reads a datetime with 0, 3 or 6 fractional digits, as the comma revision writes them", () => {
+    for (const datetime of [
+      "2026-03-10T14:05:12Z",
+      "2026-03-10T14:05:12.069Z",
+      "2026-03-10T14:05:12.069415Z",
+    ]) {
+      const result = rows(row({ datetime }));
+      expect(codes(result), datetime).toEqual([]);
+      expect(trades(result)[0]?.at.instant, datetime).toBe(
+        "2026-03-10T14:05:12Z",
+      );
+    }
   });
 
   it("refuses a child's account once per file, reading none of its rows", () => {

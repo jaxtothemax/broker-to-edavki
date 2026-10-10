@@ -13,7 +13,9 @@
 >
 > **Supersedes in part [ADR 0015](0015-trade-republic-transaction-export.md):** decision 1
 > (one exact header), decision 2 (every row dated by its instant), decision 4 (only `DEFAULT`
-> known), decision 5 (the cash rows read) and decision 7 (keys with the instant). The rest of
+> known), decision 5 (the cash rows read), decision 6 in part (Saveback paid as cash is set
+> aside, not refused, and trades of derivatives are left out, not refused) and decision 7 (keys
+> with the instant). The rest of
 > 0015 stands.
 
 ## Context
@@ -106,20 +108,24 @@ they show five gaps (research 07 §4.2, issue #55):
    ignored as `brokerTaxSettlement` (new) only when `amount` is exactly 0 and `tax` a non-zero
    number. In any other shape they could move money, and are refused (`unconfirmedAction`). A
    sale with a non-zero `tax` is read as any sale. Both are counted in one warning,
-   `brokerTaxSettled`, which says what they are and that no Slovenian figure depends on them.
-   A fund's `shares` on these rows is the holding the tax was reckoned on, not a movement: no
-   lot changes.
-   The reason's name says whose tax it is: never the foreign tax of Doh-Div, never a row's
-   withholding.
+   `brokerTaxSettled`, which says what they are, and that TaxReporter enters none of that tax
+   as tax paid abroad: whether German tax withheld on a sale may go on Doh-KDVP as such is
+   open (below). A fund's `shares` on these rows is the holding the tax was reckoned on, not a
+   movement: no lot changes. The reason's name says whose tax it is: never the foreign tax of
+   Doh-Div, never a row's withholding.
 9. **A `JUNIOR` account is refused once per file** (`juniorAccount`, new), at its first row,
-   with the count of its rows, and none of them is read: a child's account is the child's, another taxpayer. A
-   separate account scope would not keep it apart, since FIFO pools every account of the
-   ledger. The taxpayer's own rows in the same file are still read.
-10. **The amount check does not widen for a tax.** Every share, fund and crypto trade of the
-   exports (174 of 179 in export 01) gives `amount` gross, quantity times price within a cent,
-   with the fee and tax beside it; only bond purchases differ, by their accrued interest, and
-   bonds are refused. The check stays quantity times price within the fee and a cent. Only a
-   parser's documentation reports `tax` on purchases, with no shape.
+   with the count of its rows, and none of them is read: a child's account is the child's,
+   another taxpayer. A separate account scope would not keep it apart, since FIFO pools every
+   account of the ledger. The taxpayer's own rows in the same file are still read.
+10. **The amount check takes two shapes, and a tax never widens a band.** Every share, fund
+    and crypto trade of the exports (174 of 179 in export 01) gives `amount` gross, quantity
+    times price within a cent, with the fee and tax beside it; only bond purchases differ, by
+    their accrued interest, and bonds are refused. The check keeps quantity times price within
+    the fee and a cent, and takes one shape more, exactly: the amount net of fee and tax to
+    the cent (more cash out on a purchase, less in on a sale). That is how a financial
+    transaction tax netted into a purchase would show, which only a parser's documentation
+    reports, with no shape; refusing it would withhold every return of every year. The amount
+    is never a value either way.
 11. **The ignored reasons are a typed record** (`IGNORED_REASONS satisfies
     Record<IgnoredReason, true>`), so a reason added to the union and missing from the check
     does not compile (#15).
@@ -128,6 +134,13 @@ File text reaches a finding only as an unknown type, category, class or account 
 wrapped as untrusted; descriptions, counterparty names and IBANs never do.
 
 ## Open questions
+
+- **German tax withheld on a sale.** Doh-KDVP can carry tax paid abroad on a gain
+  (`HasForeignTax`, `ForeignTax`; ZDavP-2 art. 328(1), research 04 §3), and with a treaty only
+  tax at the treaty's rate is creditable (ZDoh-2 art. 137(2), research 04 §7.2). What the
+  Slovenia–Germany treaty allows Germany on a resident's gains from shares, and so whether
+  any of it is creditable or only reclaimable from Germany, is not yet in the research.
+  TaxReporter enters none, and the warning says so (#58).
 
 - **What `tax` holds on a Slovenian resident's dividend.** The exports confirm that `amount`
   is the gross in euros at Trade Republic's rate (`original_amount` × `fx_rate`, e.g.

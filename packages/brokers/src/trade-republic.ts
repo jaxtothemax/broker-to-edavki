@@ -547,13 +547,19 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
     // The cash moved is the quantity at the price, with or without the
     // fee: a price in another unit, or another trade's amount, shows here.
     // Real exports give `amount` gross with the tax beside it (ADR 0019),
-    // so a tax never widens the check.
+    // so a tax never widens that band. One other shape is taken, exactly:
+    // the amount net of fee and tax, as a financial transaction tax netted
+    // into a purchase would show, to the cent. It is never a value.
+    const gross = quantity.times(price);
+    const amount = Decimal.parse(amountText).abs();
     const fee = feeText === "" ? Decimal.ZERO : Decimal.parse(feeText).abs();
-    const off = quantity
-      .times(price)
-      .minus(Decimal.parse(amountText).abs())
-      .abs();
-    if (off.greaterThan(fee.plus(CENT))) {
+    const tax = taxText === "" ? Decimal.ZERO : Decimal.parse(taxText).abs();
+    const charges = fee.plus(tax);
+    const netted = side === "buy" ? gross.plus(charges) : gross.minus(charges);
+    if (
+      gross.minus(amount).abs().greaterThan(fee.plus(CENT)) &&
+      netted.minus(amount).abs().greaterThan(CENT)
+    ) {
       block("tradeInconsistent", { isin, date, check: "amount" });
       continue;
     }

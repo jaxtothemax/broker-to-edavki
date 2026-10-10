@@ -213,7 +213,7 @@ Position ID	Action	Long / Short	Amount	Units / Contracts	Open Date	Close Date	Le
 - Dot decimals; `shares` has 10 decimal places (fractional savings plans); sells carry negative `shares`. `amount` has 2 or 6 decimals, `price` 6 or 10.
 - `amount` is the signed cash flow and `fee` is negative. On every share, fund and crypto trade of the exports `amount` is gross, quantity times price within a cent, with the fee and tax beside it (174 of 179 trades in export 01; the other 5 are bond purchases with accrued interest) [H].
 - `tax` on a trade appears on five fund sales of export 01 (German capital-gains tax) [H]; libtraderepublic reports it on some purchases too [M].
-- In the comma revision `datetime` is UTC (`…Z`, with 0, 3 or 6 fractional digits) and `date` the local Berlin date: `2024-02-14T23:19:02Z` belongs to `2024-02-15`. **Not always:** dividend corrections in export 04 were booked at 12:17 UTC on 28 March and carry `date` 27 March [H].
+- In the comma revision `datetime` is UTC (`…Z`, with 0, 3 or 6 fractional digits) and `date` the local Berlin date: `2024-02-14T23:19:02Z` belongs to `2024-02-15`. **Not always:** dividend corrections in export 04 were booked at 12:17 UTC on 28 March and carry `date` 27 March [H]. Some cash rows of the comma revision also carry a bare midnight (`2026-03-13T00:00:00Z`, exports 02 and 06) [H].
 
 **Dividends** [H for the arithmetic, from exports 01, 04 and 05]:
 
@@ -224,7 +224,8 @@ Position ID	Action	Long / Short	Amount	Units / Contracts	Open Date	Close Date	Le
 **Pitfalls:**
 
 - `MIGRATION` comes as a −n/+n pair; it is not a disposal.
-- Saveback and stockperk acquisitions are free shares. Their cost basis is a tax question.
+- Saveback paid as cash is a cash row with no security, followed by an ordinary purchase of the same amount (export 01: +0.09 on 1 March, a 0.09 `BUY` the next day) [H]: card cashback, then a purchase at market price. A Saveback or stock-perk row that names a security is a free share, whose cost basis is a tax question.
+- `tax` on a sale in German residents' exports is German tax. Whether any of it could be credited on Doh-KDVP (`HasForeignTax`, research 04 §3; ZDoh-2 art. 137(2) limits a credit to the treaty's rate) depends on what the Slovenia–Germany treaty allows Germany on gains from shares, which this research has not yet read (#58).
 - A Slovenian resident's dividend `tax` is unconfirmed: see above. Verify against TR's dividend PDF.
 - Filter out card and transfer noise by `category`, and take a cash type only on a row with no security.
 - Descriptions and counterparty columns hold names and IBANs (`Outgoing transfer for <name> (<IBAN>)`).

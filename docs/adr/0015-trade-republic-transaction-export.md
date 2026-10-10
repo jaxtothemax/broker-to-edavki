@@ -12,9 +12,10 @@
 > refusals state none, so a Trade Republic dividend still blocks both returns, as below.
 >
 > **Superseded in part by [ADR 0019](0019-trade-republic-export-revisions-and-row-types.md)
-> (Proposed, 2026-10-10)** in decisions 1, 2, 4, 5 and 7: a second header revision, written
-> with semicolons and dated by `date` alone; keys by the trade's date; `JUNIOR` accounts
-> refused; more cash rows, German tax rows and derivative trades set aside. Exports that look
+> (Proposed, 2026-10-10)** in decisions 1, 2, 4, 5 and 7, and 6 in part: a second header
+> revision, written with semicolons and dated by `date` alone; keys by the trade's side and
+> date; `JUNIOR` accounts refused; more cash rows, Saveback paid as cash, German tax rows and
+> derivative trades set aside. Exports that look
 > real (research 07 §4.2) bear on the open questions below without settling them.
 
 ## Context
