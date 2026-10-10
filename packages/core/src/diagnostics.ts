@@ -401,8 +401,13 @@ export interface DiagnosticParams {
    * broker taxed the account as its own country's resident (ADR 0019).
    */
   brokerTaxSettled: { readonly broker: string; readonly count: number };
-  /** A child's account, another taxpayer's: never pooled (ADR 0019). */
-  juniorAccount: { readonly broker: string };
+  /**
+   * A child's account, another taxpayer's: never pooled, and none of its
+   * `count` rows read (ADR 0019).
+   */
+  juniorAccount: { readonly broker: string; readonly count: number };
+  /** A trade with no transaction ID, which keys it (ADR 0019). */
+  missingTransactionId: { readonly broker: string };
   // Interactive Brokers Flex statements (brokers)
   statementCountMismatch: {
     readonly declared: number;

@@ -303,6 +303,16 @@ describe("tradeRepublic: what it checks", () => {
     expect(validateLedger(result.events).diagnostics).toEqual([]);
   });
 
+  it("refuses a trade without a transaction ID, which keys it", () => {
+    expect(rows(row({ transaction_id: "" })).diagnostics).toEqual([
+      expect.objectContaining({
+        severity: "blocking",
+        code: "missingTransactionId",
+        params: { broker: "traderepublic" },
+      }),
+    ]);
+  });
+
   it("refuses a fee that is no number", () => {
     expect(codes(rows(row({ fee: "1,00" })))).toEqual(["invalidNumber"]);
   });
@@ -634,6 +644,75 @@ describe("tradeRepublic: the semicolon revision with value_date", () => {
   });
 });
 
+describe("tradeRepublic: two exports of one account, one of each revision", () => {
+  // The same savings-plan purchase: the comma revision writes its type as
+  // SAVINGS_PLAN_EXECUTED, the semicolon revision as BUY.
+  const plan = {
+    transaction_id: "00000000-0000-4000-8000-000000000501",
+    asset_class: "FUND",
+    name: "Core MSCI World USD (Acc)",
+    symbol: "IE00B4L5Y983",
+    shares: "1.4000000000",
+    price: "107.150000",
+    amount: "-150.01",
+    fee: "",
+  };
+  const older = (id = plan.transaction_id) =>
+    valueDateRows(
+      valueDateRow({
+        datetime: "2026-03-01T00:00:00.000000Z",
+        date: "2026-03-01",
+        transaction_id: "00000000-0000-4000-8000-000000000500",
+      }),
+      valueDateRow({
+        ...plan,
+        datetime: "2026-03-10T00:00:00.000000Z",
+        date: "2026-03-10",
+        type: "BUY",
+        transaction_id: id,
+      }),
+    );
+  const newer = () =>
+    rows(
+      row({
+        ...plan,
+        datetime: "2026-03-10T09:15:00.000Z",
+        date: "2026-03-10",
+        type: "SAVINGS_PLAN_EXECUTED",
+      }),
+      row({
+        ...plan,
+        datetime: "2026-03-20T09:15:00.000Z",
+        date: "2026-03-20",
+        type: "SAVINGS_PLAN_EXECUTED",
+        transaction_id: "00000000-0000-4000-8000-000000000502",
+      }),
+    );
+
+  it("read a savings plan they share once, whatever its type is called", () => {
+    const ledger = validateLedger([...older().events, ...newer().events]);
+    expect(ledger.diagnostics).toEqual([
+      { severity: "info", code: "duplicatesRemoved", params: { count: 1 } },
+    ]);
+    expect(ledger.events.filter((e) => e.kind === "trade")).toHaveLength(3);
+  });
+
+  it("block, never count twice, a day both hold under different IDs, in either order", () => {
+    // Were Trade Republic to give a booking a new ID in a new export, the
+    // shared last day of the older file must still be compared.
+    const drifted = older("00000000-0000-4000-8000-000000000599");
+    for (const events of [
+      [...drifted.events, ...newer().events],
+      [...newer().events, ...drifted.events],
+    ]) {
+      const ledger = validateLedger(events);
+      expect(ledger.diagnostics.map((d) => [d.severity, d.code])).toEqual([
+        ["blocking", "overlapMismatch"],
+      ]);
+    }
+  });
+});
+
 describe("tradeRepublic: each header, with its own delimiter", () => {
   it("reads the comma revision unquoted as it reads it quoted", () => {
     const unquoted = read(fixture.replaceAll('"', ""));
@@ -891,7 +970,7 @@ describe("tradeRepublic: the types and classes real exports show", () => {
       {
         severity: "blocking",
         code: "juniorAccount",
-        params: { broker: "traderepublic" },
+        params: { broker: "traderepublic", count: 3 },
         source: { fileId: result.diagnostics[0]?.source?.fileId, row: 2 },
       },
     ]);

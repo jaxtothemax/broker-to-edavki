@@ -437,6 +437,76 @@ describe("validateLedger's reconciliation of overlapping files", () => {
     ]);
   });
 
+  it("compares by whole days where a file has no time of day, in either order", () => {
+    // File u has only dates; file t has times. Both hold 10 March, the
+    // last day of u and the first of t, each under a key of its own: the
+    // same purchase read twice, which must block and never count twice.
+    const timed = (time: string) => ({
+      at: { instant: `2025-03-10T${time}Z`, brokerDate: null },
+    });
+    const early = trade("buy", "2025-03-01", "1", "100", at("u", 1));
+    const lastDay = trade("buy", "2025-03-10", "1", "100", at("u", 2));
+    const again = trade("buy", "2025-03-10", "1", "100", {
+      ...timed("09:15:00"),
+      ...at("t", 1),
+    });
+    const later = trade("buy", "2025-03-20", "1", "100", {
+      at: { instant: "2025-03-20T09:15:00Z", brokerDate: null },
+      ...at("t", 2),
+    });
+    const mismatch = {
+      severity: "blocking",
+      code: "overlapMismatch",
+      params: {
+        kind: "trade",
+        from: "2025-03-10",
+        to: "2025-03-10",
+        first: { file: fileId("t") },
+        second: { file: fileId("u") },
+      },
+    };
+    expect(validateLedger([early, lastDay, again, later]).diagnostics).toEqual([
+      mismatch,
+    ]);
+    // The other way round: the dated file is the later one.
+    const timedFirst = trade("buy", "2025-03-01", "1", "100", {
+      at: { instant: "2025-03-01T09:15:00Z", brokerDate: null },
+      ...at("t", 1),
+    });
+    const timedLast = trade("buy", "2025-03-10", "1", "100", {
+      ...timed("09:15:00"),
+      ...at("t", 2),
+    });
+    const datedSame = trade("buy", "2025-03-10", "1", "100", at("u", 1));
+    const datedLater = trade("buy", "2025-03-20", "1", "100", at("u", 2));
+    expect(
+      validateLedger([timedFirst, timedLast, datedSame, datedLater])
+        .diagnostics,
+    ).toEqual([mismatch]);
+  });
+
+  it("reads a trade both files hold under one key once, over one day or several", () => {
+    const dated = trade("buy", "2025-03-09", "1", "100", at("u", 1));
+    const shared = trade("buy", "2025-03-10", "1", "100", at("u", 2));
+    const timed = {
+      ...from(shared, "t", 1),
+      at: { instant: "2025-03-10T09:15:00Z", brokerDate: null },
+    };
+    const next = trade("buy", "2025-03-11", "1", "100", {
+      at: { instant: "2025-03-11T09:15:00Z", brokerDate: null },
+      ...at("t", 2),
+    });
+    expect(codes([dated, shared, timed, next])).toEqual(["duplicatesRemoved"]);
+    // Two days both files hold, alike: no disagreement.
+    const nextDated = {
+      ...from(next, "u", 3),
+      at: { instant: null, brokerDate: "2025-03-11" },
+    };
+    expect(codes([dated, shared, nextDated, timed, next])).toEqual([
+      "duplicatesRemoved",
+    ]);
+  });
+
   it("never compares two accounts, nor files of one account that do not overlap", () => {
     expect(
       codes([

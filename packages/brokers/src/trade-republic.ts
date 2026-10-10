@@ -183,13 +183,13 @@ const DERIVATIVE = "DERIVATIVE";
  * private markets, crypto, gold certificates (`SYNTHETIC`, reported by a
  * parser of real exports, 07 §4.2), and the cash of derivatives.
  */
-const REFUSED_CLASSES = new Set([
+const REFUSED_CLASSES = [
   "BOND",
   "PRIVATE_FUND",
   "CRYPTO",
   "SYNTHETIC",
   DERIVATIVE,
-]);
+] as const;
 
 /** Cash movements, part of neither return. */
 const CASH: ReadonlyMap<string, IgnoredReason> = new Map([
@@ -219,8 +219,8 @@ const INTEREST = "INTEREST_PAYMENT";
  * of 0 and a tax: a tax refund or charge on the cash account, and the
  * Vorabpauschale (InvStG §18) or its tax base on a fund.
  */
-const GERMAN_TAX_CASH = new Set(["TAX_OPTIMIZATION"]);
-const GERMAN_TAX_FUND = new Set(["EARNINGS", "PRE_DETERMINED_TAX_BASE"]);
+const GERMAN_TAX_CASH = ["TAX_OPTIMIZATION"] as const;
+const GERMAN_TAX_FUND = ["EARNINGS", "PRE_DETERMINED_TAX_BASE"] as const;
 
 /**
  * Rows known and refused, each named by this list, never by the file:
@@ -229,7 +229,7 @@ const GERMAN_TAX_FUND = new Set(["EARNINGS", "PRE_DETERMINED_TAX_BASE"]);
  * the cash of bonds and derivatives, which are not read on a guess (07
  * §4.2).
  */
-const UNSETTLED = new Set([
+const UNSETTLED = [
   "DIVIDEND_EQUIVALENT_PAYMENT",
   "BENEFITS_SAVEBACK",
   "STOCKPERK",
@@ -241,17 +241,37 @@ const UNSETTLED = new Set([
   "PRIVATE_MARKET_BUY",
   "SEC_ACCOUNT",
   "TILG",
-]);
+] as const;
 
 /** Categories whose every row is a corporate action or a delivery. */
-const UNSETTLED_CATEGORIES = new Set(["CORPORATE_ACTION", "DELIVERY"]);
+const UNSETTLED_CATEGORIES = ["CORPORATE_ACTION", "DELIVERY"] as const;
 
 /**
  * Dividends and fund distributions: their treatment is settled, but not
  * what `tax` holds on them for a Slovenian resident, which no source
  * confirms yet (07 §4.2).
  */
-const UNCONFIRMED = new Set(["DIVIDEND", "DISTRIBUTION"]);
+const UNCONFIRMED = ["DIVIDEND", "DISTRIBUTION"] as const;
+
+/**
+ * The words a refusal may name: the lists above, never file text, so a
+ * finding's action is one of them whatever the file holds.
+ */
+type RefusedAction =
+  | (typeof REFUSED_CLASSES)[number]
+  | (typeof GERMAN_TAX_CASH)[number]
+  | (typeof GERMAN_TAX_FUND)[number]
+  | (typeof UNSETTLED)[number]
+  | (typeof UNSETTLED_CATEGORIES)[number]
+  | (typeof UNCONFIRMED)[number];
+
+/** Whether `value` is one of `list`'s words, narrowed to them. */
+function oneOf<T extends string>(
+  list: readonly T[],
+  value: string,
+): value is T {
+  return (list as readonly string[]).includes(value);
+}
 
 /** A plain decimal, an optional minus, as Trade Republic writes them. */
 const NUMBER = new RegExp(
@@ -276,8 +296,7 @@ type Verdict =
   | {
       readonly kind: "refuse";
       readonly code: "unsupportedAction" | "unconfirmedAction";
-      /** From this adapter's own lists, or a known export token. */
-      readonly action: string;
+      readonly action: RefusedAction;
     }
   /** Unknown file text, which a finding carries only wrapped. */
   | { readonly kind: "unknown"; readonly text: string };
@@ -290,7 +309,7 @@ function classify(cell: (column: Column) => string): Verdict {
   const isCash =
     category === "CASH" && cell("symbol") === "" && cell("shares") === "";
 
-  if (UNSETTLED_CATEGORIES.has(category)) {
+  if (oneOf(UNSETTLED_CATEGORIES, category)) {
     return { kind: "refuse", code: "unsupportedAction", action: category };
   }
   if (category === "CASH") {
@@ -299,14 +318,15 @@ function classify(cell: (column: Column) => string): Verdict {
     if (type === INTEREST && isCash) {
       return { kind: "ignore", reason: "interest", counted: "interest" };
     }
-    if (GERMAN_TAX_CASH.has(type) || GERMAN_TAX_FUND.has(type)) {
+    if (oneOf(GERMAN_TAX_CASH, type) || oneOf(GERMAN_TAX_FUND, type)) {
       // By shape, never by name or description: an amount of 0 and a tax.
       // Anything else under these types could move money, and is not
-      // guessed at.
+      // guessed at. A fund's `shares` is the holding the tax was reckoned
+      // on, not a movement: no lot changes.
       const shaped =
         isZero(cell("amount")) &&
         isNonZero(cell("tax")) &&
-        (GERMAN_TAX_CASH.has(type)
+        (oneOf(GERMAN_TAX_CASH, type)
           ? isCash
           : assetClass === "FUND" && isIsin(cell("symbol")));
       return shaped
@@ -317,20 +337,20 @@ function classify(cell: (column: Column) => string): Verdict {
           }
         : { kind: "refuse", code: "unconfirmedAction", action: type };
     }
-    if (UNCONFIRMED.has(type)) {
+    if (oneOf(UNCONFIRMED, type)) {
       return { kind: "refuse", code: "unconfirmedAction", action: type };
     }
-    if (UNSETTLED.has(type)) {
+    if (oneOf(UNSETTLED, type)) {
       return { kind: "refuse", code: "unsupportedAction", action: type };
     }
     // A bond's coupon, or other cash of a refused class: its class says
     // why.
-    if (REFUSED_CLASSES.has(assetClass)) {
+    if (oneOf(REFUSED_CLASSES, assetClass)) {
       return { kind: "refuse", code: "unsupportedAction", action: assetClass };
     }
     return { kind: "unknown", text: type };
   }
-  if (UNSETTLED.has(type)) {
+  if (oneOf(UNSETTLED, type)) {
     return { kind: "refuse", code: "unsupportedAction", action: type };
   }
   if (category !== "TRADING") return { kind: "unknown", text: category };
@@ -340,7 +360,7 @@ function classify(cell: (column: Column) => string): Verdict {
   if (assetClass === DERIVATIVE) {
     return { kind: "ignore", reason: "derivative", counted: "derivative" };
   }
-  if (REFUSED_CLASSES.has(assetClass)) {
+  if (oneOf(REFUSED_CLASSES, assetClass)) {
     return { kind: "refuse", code: "unsupportedAction", action: assetClass };
   }
   return { kind: "unknown", text: assetClass };
@@ -386,7 +406,8 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
     return index === undefined ? "" : (row.cells[index] ?? "");
   };
   const counts = { interest: 0, derivative: 0, brokerTax: 0 };
-  let junior: SourceRef | null = null;
+  // A child's account: where its first row is, and how many rows it has.
+  let junior: { source: SourceRef; rows: number } | null = null;
   // Widened, not narrowed to null: `reached` assigns it from a closure.
   let lastDate = null as IsoDate | null;
   const reached = (date: IsoDate) => {
@@ -405,8 +426,10 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
 
     const accountType = cell("account_type");
     if (accountType === JUNIOR) {
-      // Another taxpayer's rows: one finding for the file, at the first.
-      junior ??= source;
+      // Another taxpayer's rows: one finding for the file, at the first,
+      // that counts them all.
+      junior ??= { source, rows: 0 };
+      junior.rows += 1;
       continue;
     }
     // The date, where the rule gives one. A row refused for what it is
@@ -454,6 +477,13 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
     }
 
     const side = verdict.side;
+    // The ID keys the trade (ADR 0015): without one, two trades of a day
+    // alike in all else could be taken for one.
+    const id = cell("transaction_id");
+    if (id === "") {
+      block("missingTransactionId", { broker: TRADE_REPUBLIC });
+      continue;
+    }
     const isin = cell("symbol");
     if (!isIsin(isin)) {
       block("invalidIsin", {});
@@ -538,15 +568,9 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
     };
     events.push({
       kind: "trade",
-      key: keyOf("trade", [
-        cell("transaction_id"),
-        cell("type"),
-        date,
-        isin,
-        quantity,
-        price,
-        currency,
-      ]),
+      // The side, not the type: one revision writes a savings plan's
+      // purchase as `BUY`, the other as `SAVINGS_PLAN_EXECUTED` (ADR 0019).
+      key: keyOf("trade", [id, side, date, isin, quantity, price, currency]),
       broker: TRADE_REPUBLIC,
       account,
       source,
@@ -564,8 +588,8 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
       diagnostic(
         "blocking",
         "juniorAccount",
-        { broker: TRADE_REPUBLIC },
-        junior,
+        { broker: TRADE_REPUBLIC, count: junior.rows },
+        junior.source,
       ),
     );
   }

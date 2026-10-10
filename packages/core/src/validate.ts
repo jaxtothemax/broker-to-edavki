@@ -8,7 +8,7 @@
  * in a fixed order, nothing after it depends on the order files were loaded.
  */
 import { compareText } from "./compare.js";
-import { isIsoDate, ljubljanaDate, taxDate } from "./dates.js";
+import { isIsoDate, ljubljanaDate, taxDate, type IsoDate } from "./dates.js";
 import { Decimal } from "./decimal.js";
 import {
   diagnostic,
@@ -376,6 +376,8 @@ const dayOf = (clock: string) => ljubljanaDate(clock) ?? clock.slice(0, 10);
 interface Entry {
   readonly clock: string;
   readonly key: string;
+  /** The event's date, which a file without a time of day is compared by. */
+  readonly day: IsoDate;
 }
 
 /** What one file of an account recorded, and over which time. */
@@ -383,6 +385,10 @@ interface Span {
   readonly fileId: FileId;
   readonly from: string;
   readonly to: string;
+  readonly fromDay: IsoDate;
+  readonly toDay: IsoDate;
+  /** Whether any event of the file has no time of day. */
+  readonly untimed: boolean;
   /** Per kind, each key once, in clock order. */
   readonly kinds: ReadonlyMap<string, readonly Entry[]>;
 }
@@ -393,20 +399,48 @@ function spanOf(fileId: FileId, events: readonly KeyedEvent[]): Span {
   const seen = new Set<string>();
   let from = "";
   let to = "";
+  let fromDay = "";
+  let toDay = "";
+  let untimed = false;
   for (const event of events) {
     const clock = clockOf(event);
     if (from === "" || compareText(clock, from) < 0) from = clock;
     if (compareText(clock, to) > 0) to = clock;
+    if (fromDay === "" || compareText(event.date, fromDay) < 0) {
+      fromDay = event.date;
+    }
+    if (compareText(event.date, toDay) > 0) toDay = event.date;
+    if (event.at.instant === null) untimed = true;
     if (seen.has(event.key)) continue;
     seen.add(event.key);
     const list = kinds.get(event.kind) ?? [];
-    list.push({ clock, key: event.key });
+    list.push({ clock, key: event.key, day: event.date });
     kinds.set(event.kind, list);
   }
   for (const list of kinds.values()) {
     list.sort((a, b) => compareText(a.clock, b.clock));
   }
-  return { fileId, from, to, kinds };
+  return {
+    fileId,
+    from,
+    to,
+    fromDay,
+    toDay,
+    untimed,
+    kinds,
+  };
+}
+
+/** The entries dated from `from` through `to`, both included. */
+function onDays(
+  list: readonly Entry[] | undefined,
+  from: IsoDate,
+  to: IsoDate,
+): readonly Entry[] {
+  return (list ?? []).filter(
+    (entry) =>
+      compareText(entry.day, from) >= 0 && compareText(entry.day, to) <= 0,
+  );
 }
 
 /** The first index whose clock is not before `clock`, or not after it. */
@@ -448,6 +482,15 @@ function sameKeys(a: readonly Entry[], b: readonly Entry[]): boolean {
  * missing kind cannot count twice. Two accounts taken for one disagree the
  * same way, which is how a wrong "same account" answer surfaces. The time a
  * file recorded is read from its events, as no export states it.
+ *
+ * Where either file has an event without a time of day, the two are
+ * compared by whole days (ADR 0019): such an event's clock is midnight,
+ * which would put a file's last day before the other file's first event
+ * that day, and leave a day both recorded out of the comparison. By whole
+ * days the shared day is in it, so a trade both files hold under different
+ * keys blocks rather than counting twice; the cost is that a file exported
+ * partway through a day disagrees with one that has the rest of that day,
+ * which blocks too.
  */
 function reconcile(events: readonly KeyedEvent[]): Diagnostic[] {
   const accounts = new Map<string, Map<FileId, KeyedEvent[]>>();
@@ -468,18 +511,29 @@ function reconcile(events: readonly KeyedEvent[]): Diagnostic[] {
       for (let j = i + 1; j < spans.length; j += 1) {
         const first = spans[i] as Span;
         const second = spans[j] as Span;
-        const from =
-          compareText(first.from, second.from) > 0 ? first.from : second.from;
-        const to = compareText(first.to, second.to) < 0 ? first.to : second.to;
+        const byDay = first.untimed || second.untimed;
+        const later = (x: string, y: string) => (compareText(x, y) > 0 ? x : y);
+        const earlier = (x: string, y: string) =>
+          compareText(x, y) < 0 ? x : y;
+        const from = byDay
+          ? later(first.fromDay, second.fromDay)
+          : later(first.from, second.from);
+        const to = byDay
+          ? earlier(first.toDay, second.toDay)
+          : earlier(first.to, second.to);
         if (compareText(from, to) > 0) continue;
         for (const kind of KINDS) {
-          const a = within(first.kinds.get(kind), from, to);
-          const b = within(second.kinds.get(kind), from, to);
+          const pick = (span: Span) =>
+            byDay
+              ? onDays(span.kinds.get(kind), from, to)
+              : within(span.kinds.get(kind), from, to);
+          const a = pick(first);
+          const b = pick(second);
           if (a.length === 0 && b.length === 0) continue;
           const params = {
             kind,
-            from: dayOf(from),
-            to: dayOf(to),
+            from: byDay ? from : dayOf(from),
+            to: byDay ? to : dayOf(to),
             first: fileRef(first.fileId),
             second: fileRef(second.fileId),
           };

@@ -7,8 +7,9 @@
 > implementation lands with it in the pull request for #55: `packages/brokers/src/csv.ts`
 > (`CsvTable.delimiter`), `packages/brokers/src/adapter.ts` (`CsvAdapter.matches`),
 > `packages/brokers/src/trade-republic.ts`, `packages/brokers/src/trading212.ts` (tied to the
-> comma), and in `packages/core` two ignored reasons, two findings and the reason record of
-> `validate.ts`. Accepting it changes no code.
+> comma), and in `packages/core` two ignored reasons, three findings, the reason record of
+> `validate.ts` and its comparison of overlapping files by whole days. Accepting it changes no
+> code.
 >
 > **Supersedes in part [ADR 0015](0015-trade-republic-transaction-export.md):** decision 1
 > (one exact header), decision 2 (every row dated by its instant), decision 4 (only `DEFAULT`
@@ -67,13 +68,24 @@ they show five gaps (research 07 §4.2, issue #55):
    midnight UTC, exactly as the revision writes it, or the row cannot be dated; the ledger
    keeps no instant for it. `value_date` is never read: it is a settlement date, and the tax
    date is the trade date (ADR 0011 §7). The comma revision keeps ADR 0015's rule.
-4. **Trades are keyed by `transaction_id` and the trade's date**, not its instant, so the same
-   trade keys alike in both revisions and overlapping exports of either read it once.
-5. **What a row is comes before its date.** A row refused for its type, category, class or
+4. **Trades are keyed by `transaction_id`, their side and the trade's date**, not the type
+   and instant, so the same trade keys alike in both revisions and overlapping exports of
+   either read it once: the semicolon revision writes a savings plan's purchase as `BUY`, the
+   comma revision as `SAVINGS_PLAN_EXECUTED`, and only the first has no time. A trade without
+   a `transaction_id` is refused (`missingTransactionId`, new): two trades of one day alike in
+   all else would otherwise be taken for one.
+5. **Overlapping files are compared by whole days where either has an event without a time**
+   (`reconcile` in `packages/core/src/validate.ts`). Such an event's clock is midnight, so a
+   semicolon file ending on a day and a comma file starting at 09:15 that day had no time in
+   common, and a trade both held under different keys (were Trade Republic ever to give a
+   booking a new ID) counted twice with no finding. By whole days the shared day is compared,
+   and a disagreement blocks (`overlapMismatch`). It applies to every broker whose files hold
+   untimed events, Interactive Brokers' included.
+6. **What a row is comes before its date.** A row refused for its type, category, class or
    account type gives that reason even when it cannot be dated; it moves the file's reach only
    when it can be, since a reach no row vouches for would weaken the check of the 30-day rule.
    Every row read as an event, an ignored one included, must still be dated.
-6. **The new rows are classified explicitly:**
+7. **The new rows are classified explicitly:**
 
    | Rows | Outcome |
    |---|---|
@@ -89,24 +101,26 @@ they show five gaps (research 07 §4.2, issue #55):
    | A trade of `SYNTHETIC` (gold) | refused, `unsupportedAction` |
    | Every cash type, only on a row with no security and no shares | otherwise `unknownAction`, as before |
 
-7. **German tax rows are ignored by their shape, never by name alone.** `TAX_OPTIMIZATION` on
+8. **German tax rows are ignored by their shape, never by name alone.** `TAX_OPTIMIZATION` on
    a cash row, and `EARNINGS` or `PRE_DETERMINED_TAX_BASE` on a fund with a valid ISIN, are
    ignored as `brokerTaxSettlement` (new) only when `amount` is exactly 0 and `tax` a non-zero
    number. In any other shape they could move money, and are refused (`unconfirmedAction`). A
    sale with a non-zero `tax` is read as any sale. Both are counted in one warning,
    `brokerTaxSettled`, which says what they are and that no Slovenian figure depends on them.
+   A fund's `shares` on these rows is the holding the tax was reckoned on, not a movement: no
+   lot changes.
    The reason's name says whose tax it is: never the foreign tax of Doh-Div, never a row's
    withholding.
-8. **A `JUNIOR` account is refused once per file** (`juniorAccount`, new), at its first row,
-   and none of its rows is read: a child's account is the child's, another taxpayer. A
+9. **A `JUNIOR` account is refused once per file** (`juniorAccount`, new), at its first row,
+   with the count of its rows, and none of them is read: a child's account is the child's, another taxpayer. A
    separate account scope would not keep it apart, since FIFO pools every account of the
    ledger. The taxpayer's own rows in the same file are still read.
-9. **The amount check does not widen for a tax.** Every share, fund and crypto trade of the
+10. **The amount check does not widen for a tax.** Every share, fund and crypto trade of the
    exports (174 of 179 in export 01) gives `amount` gross, quantity times price within a cent,
    with the fee and tax beside it; only bond purchases differ, by their accrued interest, and
    bonds are refused. The check stays quantity times price within the fee and a cent. Only a
    parser's documentation reports `tax` on purchases, with no shape.
-10. **The ignored reasons are a typed record** (`IGNORED_REASONS satisfies
+11. **The ignored reasons are a typed record** (`IGNORED_REASONS satisfies
     Record<IgnoredReason, true>`), so a reason added to the union and missing from the check
     does not compile (#15).
 
@@ -138,6 +152,10 @@ wrapped as untrusted; descriptions, counterparty names and IBANs never do.
   untimed trade: purchases before sales, then by key. Where a day has purchases at different
   prices and a sale ends partway through them, the engine warns that the order decided which
   shares the sale used (`sameDayLotOrder`); nothing blocks.
+- **Comparing by whole days fails closed.** Where a file without times was exported partway
+  through a day and another file holds the rest of that day, the two disagree about that day
+  and the import blocks (`overlapMismatch`), for Interactive Brokers' untimed events too. The
+  user removes the overlap by exporting again; nothing counts twice.
 - **A spreadsheet re-save** of a Trade Republic or Trading 212 export with semicolons is no
   export either adapter knows, as it was not before semicolons were read: it fails whole.
 - **The format strings** are `traderepublic-csv-2026` and `traderepublic-csv-value-date`; the

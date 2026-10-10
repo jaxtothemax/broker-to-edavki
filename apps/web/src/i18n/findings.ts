@@ -302,7 +302,9 @@ export const findingsEn: FindingMessages = {
   brokerTaxSettled: (p) =>
     `${p.broker}: rows of tax the broker settled under German rules (${p.count}), such as a tax refund, the Vorabpauschale or tax withheld on a sale, are not on these returns: no Slovenian figure depends on them. The sales themselves are on Doh-KDVP.`,
   juniorAccount: (p) =>
-    `${p.broker}: this file is from a child's (Junior) account, which belongs to the child, another taxpayer. TaxReporter does not read Junior accounts, so the file is not read with yours: export your own account.`,
+    `${p.broker}: this file holds rows of a child's (Junior) account (${p.count}), which belongs to the child, another taxpayer. TaxReporter does not read Junior accounts, so those rows are not read with yours: export your own account.`,
+  missingTransactionId: (p) =>
+    `${p.broker}: a trade has no transaction ID, which TaxReporter needs to tell it apart from a trade alike in all else. Export the file again from the broker, unchanged.`,
   // Interactive Brokers Flex statements
   statementCountMismatch: (p) =>
     `The file says it holds ${p.declared} statements, but ${p.found} are in it, so it was cut short or changed. Export it again from Interactive Brokers, unchanged.`,
@@ -710,7 +712,9 @@ export const findingsSl: FindingMessages = {
   brokerTaxSettled: (p) =>
     `${p.broker}: vrstice z davkom, ki ga je posrednik obračunal po nemških pravilih (${p.count}), kot so vračilo davka, Vorabpauschale ali davek, odtegnjen ob prodaji, niso v teh napovedih: od njih ni odvisen noben slovenski znesek. Same prodaje so na obrazcu Doh-KDVP.`,
   juniorAccount: (p) =>
-    `${p.broker}: datoteka je iz otrokovega računa (Junior), ki pripada otroku, drugemu davčnemu zavezancu. TaxReporter računov Junior ne bere, zato datoteka ni prebrana skupaj z vašimi: izvozite svoj račun.`,
+    `${p.broker}: datoteka vsebuje vrstice otrokovega računa (Junior) (${p.count}), ki pripada otroku, drugemu davčnemu zavezancu. TaxReporter računov Junior ne bere, zato te vrstice niso prebrane skupaj z vašimi: izvozite svoj račun.`,
+  missingTransactionId: (p) =>
+    `${p.broker}: posel nima oznake transakcije, ki jo TaxReporter potrebuje, da ga loči od posla, ki je v vsem drugem enak. Datoteko znova izvozite pri posredniku, nespremenjeno.`,
   // Interactive Brokers Flex statements
   statementCountMismatch: (p) =>
     `Število izpiskov, ki ga navaja datoteka (${p.declared}), se ne ujema s številom izpiskov v njej (${p.found}), zato je bila odrezana ali spremenjena. Pri Interactive Brokers jo izvozite znova, nespremenjeno.`,
