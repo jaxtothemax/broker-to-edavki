@@ -76,6 +76,14 @@ path: scripts/check-stale-references.sh
 call: drop_ignored_lines
 why:  The only filter between this gate's tree-wide grep and gitignored scratch output. Removing it makes downloaded fixtures and local reports look like tracked debt.
 
+path: .github/workflows/governance.yml
+call: - name: Scan every tracked file for invisible characters
+why:  The only CI run of the invisible-character gate. Its --self-test is a separate step, and check-gate-selftest-parity only asks for a self-test beside a scan, never for the scan: delete this step, or the whole job, and every parity gate stays green while a bidirectional control or zero-width character can land in source and nobody sees it.
+
+path: Makefile
+call: pre-push-checks: check-invisible-chars
+why:  The only thing that runs the invisible-character gate before a push. check-prepush-parity matches the script's name anywhere in the Makefile, and the target's recipe and the gate-self-tests line both contain it, so deleting this one line leaves the parity gate green while make pre-push stops checking.
+
 path: .gitattributes
 call: packages/furs/schemas/*.xsd -text
 why:  The only thing stopping `* text=auto` from normalizing the vendored FURS schemas' CRLF line endings on commit. Delete it and the furs SHA-256 test stays green (the working tree keeps its bytes); the next re-vendored schema is then committed normalized, CI's checkout no longer matches its pin, and the easy "fix" pins bytes FURS never published.
