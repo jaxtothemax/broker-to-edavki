@@ -6,6 +6,13 @@
 *.ts    text eol=lf
 *.tsx   text eol=lf
 *.jsx   text eol=lf
+# ESM/CJS/TS-module variants. Left to `* text=auto`, a planted NUL byte makes git
+# call the file binary, and the NUL gate (scripts/check-nul-bytes.sh) only looks
+# at files declared text, so it would never open it.
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+*.mts   text eol=lf
+*.cts   text eol=lf
 *.json  text eol=lf
 *.yaml  text eol=lf
 *.yml   text eol=lf
@@ -21,6 +28,11 @@
 *.cfg   text eol=lf
 *.ini   text eol=lf
 *.env   text eol=lf
+# Shell and Make with no extension to match. Same blind spot as the module
+# variants above: at `* text=auto` a planted NUL makes git call them binary.
+scripts/wt  text eol=lf
+hooks/*     text eol=lf
+Makefile    text
 
 # Lock files — generated, use union merge to reduce conflicts
 package-lock.json   merge=union

@@ -246,11 +246,13 @@ check-load-bearing:  ## Every call site declared load-bearing is still present
 	@# load-bearing.declarations for when a call site earns a declaration.
 	@bash scripts/check-load-bearing.sh
 
-# A hand mirror, not a derived one: scripts/check-prepush-parity.sh only sees
-# gates directly under the top-level scripts/ folder (#63), so it cannot tell that
-# this gate under apps/web/scripts/ needs one. Self-test only: the real scan reads
-# a Vite build of apps/web made for the Pages base, which the pre-push set does not
-# produce. CI's website-build job (.github/workflows/docs.yml) runs both.
+# The mirror scripts/check-prepush-parity.sh demands for this gate: it finds gates
+# below any scripts/ directory that CI names (#63), including this one under
+# apps/web/scripts/, and wants a target on the pre-push-checks list that runs it.
+# Self-test only: the real scan reads a Vite build of apps/web made for the Pages
+# base, which the pre-push set does not produce. The parity check accepts a
+# self-test-only mirror without asking why, so this comment is the reason. CI's
+# website-build job (.github/workflows/docs.yml) runs both.
 .PHONY: check-pages-build
 check-pages-build:  ## The web app's Pages build check proves it can still fail (self-test only)
 	@node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
