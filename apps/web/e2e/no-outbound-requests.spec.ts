@@ -9,10 +9,16 @@
  * Every request is recorded from the browser context, not the page, so the
  * engine worker's are counted too: `context.on("request")` reports requests
  * from dedicated workers as well, and a probe below proves it, in each browser
- * the suite runs in. The policy is injected only by the production build, so
- * these run against `vite preview`, as playwright.config.ts does.
+ * the suite runs in. WebSockets are not requests to that event, so they are
+ * recorded through `context.routeWebSocket`, which also answers every socket
+ * itself: none ever connects. A foreign request is aborted in the main test,
+ * so were the policy ever lost the synthetic data would still reach no host,
+ * while the recorder still lists it and the check still fails. The policy is
+ * injected only by the production build, so these run against `vite preview`,
+ * as playwright.config.ts does.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
@@ -23,6 +29,9 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
  * the app legitimately requests (its asset names are hashes).
  */
 const SENTINELS = {
+  // Fails the Slovenian mod-11 check digit, so it cannot be a real tax number:
+  // weights 8 to 2 over the first seven digits give sum 171, 171 mod 11 = 6,
+  // expected check digit 5, but the number ends in 3.
   taxNumber: "90817263",
   firstName: "Zxqfirst",
   lastName: "Zxqlast",
@@ -43,7 +52,9 @@ const PERMITTED_FETCH_PATHS: readonly string[] = [];
 
 /**
  * Requests a script starts itself, as opposed to the page's own assets
- * (documents, modules, styles, fonts, images), which the origin check covers.
+ * (documents, modules, styles, fonts, images). Firefox and WebKit give
+ * sendBeacon its own type. Only the message differs: every own-origin request
+ * is path-checked.
  */
 const FETCH_TYPES: ReadonlySet<string> = new Set([
   "fetch",
@@ -51,16 +62,32 @@ const FETCH_TYPES: ReadonlySet<string> = new Set([
   "eventsource",
   "websocket",
   "ping",
+  "beacon",
 ]);
 
+/** Where `vite preview` serves the production build from. */
+const DIST = fileURLToPath(new URL("../dist/", import.meta.url));
+
 /**
- * The app's own built script chunks: the engine worker, and the bundled rate
- * tables it imports on first use (ADR 0005, ADR 0013 section 3). WebKit
- * reports a module a worker imports as an xhr, so the resource type cannot
- * tell such a load from a fetch of data; the address can. One folder, a .js
- * name with no further slash, anchored, so the pattern is linear.
+ * The paths the built app may be asked for from its own origin: the files that
+ * really are in the build output, the root and /index.html. Read at test time,
+ * so a filename shape is never what lets a request through. WebKit reports a
+ * module a worker imports as an xhr, so the resource type cannot tell a chunk
+ * load from a fetch of data; the exact file can.
  */
-const BUILT_CHUNK_PATH = /^\/assets\/[\w.-]+\.js$/;
+function builtPaths(dist: string = DIST): Set<string> {
+  let files: string[];
+  try {
+    files = readdirSync(dist, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(dist, `${entry.parentPath}${sep}${entry.name}`));
+  } catch {
+    throw new Error("apps/web/dist is missing: build the web app first");
+  }
+  const paths = new Set(["/", "/index.html"]);
+  for (const file of files) paths.add(`/${file.split(sep).join("/")}`);
+  return paths;
+}
 
 /** The engine worker's bundle: only the worker's own import asks for it. */
 const ENGINE_BUNDLE = /\/engine\.worker[^/]*\.js/;
@@ -76,9 +103,22 @@ interface Seen {
   readonly carried: string;
 }
 
-/** Records every request the context makes, from pages and workers alike. */
-function record(context: BrowserContext): Seen[] {
+/**
+ * Records every request the context makes, from pages and workers alike, and
+ * every WebSocket (which `context.on("request")` does not report). A socket is
+ * answered here and never connected, so it cannot reach a server.
+ */
+async function record(context: BrowserContext): Promise<Seen[]> {
   const seen: Seen[] = [];
+  await context.routeWebSocket(/.*/, async (socket) => {
+    seen.push({
+      url: socket.url(),
+      method: "GET",
+      resourceType: "websocket",
+      carried: "",
+    });
+    await socket.close();
+  });
   context.on("request", (request) => {
     seen.push({
       url: request.url(),
@@ -139,40 +179,34 @@ function isPermittedFetch(
   );
 }
 
-/**
- * A plain GET of one of the app's own built chunks, from its own origin and
- * without a query: code the app ships, not data it fetches. A POST, a query
- * or any other folder or origin is not one, whatever type the browser gives.
- */
-function isBuiltChunk(request: Seen, origin: string): boolean {
-  const parsed = new URL(request.url);
-  return (
-    request.method === "GET" &&
-    parsed.origin === origin &&
-    parsed.search === "" &&
-    BUILT_CHUNK_PATH.test(parsed.pathname)
-  );
-}
-
-/** Every request that leaves the origin, or fetches what it may not. */
+/** Every request that leaves the origin, or asks for what the build lacks. */
 function offenders(
   seen: readonly Seen[],
   origin: string,
+  built: ReadonlySet<string>,
   permitted: readonly string[],
 ): string[] {
   return seen.flatMap((request) => {
     const where = destination(request.url, origin);
     const label = `${request.method} ${request.url} (${request.resourceType})`;
     if (where === "foreign") return [`${label} leaves the app's origin`];
-    if (
-      where === "own-origin" &&
-      FETCH_TYPES.has(request.resourceType) &&
-      !isBuiltChunk(request, origin) &&
-      !isPermittedFetch(request.url, origin, permitted)
-    ) {
-      return [`${label} is a fetch other than the rate snapshot`];
+    if (where === "local") return [];
+    // A plain GET of a file the build holds is code the app ships, not data it
+    // sends; anything else from the own origin (a third party's host in
+    // production, whose logs would hold the path) must be a permitted fetch.
+    const parsed = new URL(request.url);
+    const isBuiltFile =
+      request.method === "GET" &&
+      parsed.search === "" &&
+      built.has(parsed.pathname);
+    if (isBuiltFile || isPermittedFetch(request.url, origin, permitted)) {
+      return [];
     }
-    return [];
+    return [
+      FETCH_TYPES.has(request.resourceType)
+        ? `${label} is a fetch other than the rate snapshot`
+        : `${label} is not a file of the build`,
+    ];
   });
 }
 
@@ -229,6 +263,23 @@ async function answerForeign(context: BrowserContext): Promise<void> {
       headers: { "access-control-allow-origin": "*" },
     });
   });
+}
+
+/**
+ * Aborts every request to another origin, so were the policy ever lost the
+ * synthetic data would reach no real host. The recorder (context.on("request"))
+ * still lists the request, so the offender check still fails the test.
+ */
+async function abortForeign(
+  context: BrowserContext,
+  origin: string,
+): Promise<void> {
+  await context.route(
+    (url) => destination(url.href, origin) === "foreign",
+    async (route) => {
+      await route.abort();
+    },
+  );
 }
 
 /** A `fetch` the page makes to the foreign host; whether it was sent. */
@@ -300,7 +351,8 @@ test("an import to the results makes no outbound request", async ({
   page,
 }) => {
   const origin = originOf(baseURL);
-  const seen = record(context);
+  const seen = await record(context);
+  await abortForeign(context, origin);
   const name = `${SENTINELS.firstName} ${SENTINELS.lastName}`;
   const older = `${SENTINELS.fileStem}-2025.csv`;
   const newer = `${SENTINELS.fileStem}-2026.csv`;
@@ -355,7 +407,9 @@ test("an import to the results makes no outbound request", async ({
     })
     .toBe(true);
 
-  expect(offenders(seen, origin, PERMITTED_FETCH_PATHS)).toEqual([]);
+  expect(offenders(seen, origin, builtPaths(), PERMITTED_FETCH_PATHS)).toEqual(
+    [],
+  );
   expect(leaks(seen, ALL_SENTINELS)).toEqual([]);
 });
 
@@ -363,10 +417,11 @@ test("the built page's policy keeps connections to its own origin", async ({
   page,
 }) => {
   await page.goto("/");
-  const sources = await connectSources(page);
-  expect(sources).toContain("'self'");
-  // No wildcard and no whole scheme (https:, wss:) beside it.
-  expect(sources.filter((s) => s === "*" || s.endsWith(":"))).toEqual([]);
+  // Exactly the page's own origin: no wildcard, no scheme, no host beside it.
+  // The day the opt-in LLM check's origin lands (ADR 0008, docs/adr), it goes
+  // here in the same PR, as the rate snapshot's path does in
+  // PERMITTED_FETCH_PATHS.
+  expect(await connectSources(page)).toEqual(["'self'"]);
 });
 
 test("the policy refuses a fetch to another origin", async ({
@@ -392,7 +447,7 @@ test("the recorder counts a request a worker makes", async ({
   // The check behind the main test: were the recorder blind to workers, a
   // worker that sent data out would go unseen and that test would still pass.
   const origin = originOf(baseURL);
-  const seen = record(context);
+  const seen = await record(context);
   await page.goto("/");
   const probe = new URL("/probe-made-by-a-worker", origin).href;
   await fetchFromWorker(page, probe);
@@ -402,14 +457,16 @@ test("the recorder counts a request a worker makes", async ({
     })
     .toContain(probe);
   // And a worker's fetch is not the rate snapshot, so the check fails on it.
-  const outside = offenders(seen, origin, PERMITTED_FETCH_PATHS);
+  const outside = offenders(seen, origin, builtPaths(), PERMITTED_FETCH_PATHS);
   expect(outside.join("\n")).toContain(probe);
 });
 
 test.describe("with the page's policy bypassed", () => {
   // A control: were the policy ever lost, the recorder is what would still
-  // catch a leak. The policy is off here, so the browser sends the request
-  // and every engine reports it; the foreign host is answered by the test.
+  // catch a leak, a fetch through context.on("request"), a WebSocket through
+  // context.routeWebSocket. The policy is off here, so the browser makes the
+  // request and the recorder reports it; the foreign host is answered by the
+  // test and a socket is never connected.
   test.use({ bypassCSP: true });
 
   test("the recorder sees a cross-origin fetch, and the checks fail on it", async ({
@@ -418,7 +475,7 @@ test.describe("with the page's policy bypassed", () => {
     page,
   }) => {
     const origin = originOf(baseURL);
-    const seen = record(context);
+    const seen = await record(context);
     await answerForeign(context);
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -432,9 +489,51 @@ test.describe("with the page's policy bypassed", () => {
         message: "the recorder missed a cross-origin fetch",
       })
       .toContain(target);
-    const outside = offenders(seen, origin, PERMITTED_FETCH_PATHS);
+    const outside = offenders(
+      seen,
+      origin,
+      builtPaths(),
+      PERMITTED_FETCH_PATHS,
+    );
     expect(outside.join("\n")).toContain(target);
     expect(leaks(seen, ALL_SENTINELS).join("\n")).toContain(target);
+  });
+
+  test("the recorder sees a cross-origin WebSocket, and the check fails on it", async ({
+    baseURL,
+    context,
+    page,
+  }) => {
+    const origin = originOf(baseURL);
+    const seen = await record(context);
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+    const target = "ws://cross-origin.invalid/ws";
+    await page.evaluate(async (url) => {
+      const socket = new WebSocket(url);
+      await new Promise<void>((resolve) => {
+        socket.onclose = () => {
+          resolve();
+        };
+        socket.onerror = () => {
+          resolve();
+        };
+      });
+    }, target);
+
+    await expect
+      .poll(() => seen.map((request) => request.url), {
+        message: "the recorder missed a cross-origin WebSocket",
+      })
+      .toContain(target);
+    const outside = offenders(
+      seen,
+      origin,
+      builtPaths(),
+      PERMITTED_FETCH_PATHS,
+    );
+    expect(outside.join("\n")).toContain(target);
   });
 });
 
@@ -463,26 +562,46 @@ test("requests are judged by origin, and a fetch by its exact path", () => {
   expect(isPermittedFetch(`${origin}${path}`, origin, [])).toBe(false);
 });
 
-test("a built script chunk is not a data fetch, whatever its type", () => {
+test("a built file is not a data fetch, whatever its type", () => {
   const origin = "http://127.0.0.1:4174";
+  const built = builtPaths();
   const flagged = (url: string, method = "GET", type = "xhr") =>
-    offenders([{ url, method, resourceType: type, carried: "" }], origin, []);
-  const file = "engine.worker-AbC123_x.js";
-  const chunk = `${origin}/assets/${file}`;
+    offenders(
+      [{ url, method, resourceType: type, carried: "" }],
+      origin,
+      built,
+      [],
+    );
+  const file = [...built].find((path) => /^\/assets\/.+\.js$/.test(path));
+  if (file === undefined) throw new Error("the build holds no script chunk");
+  const chunk = `${origin}${file}`;
+
+  expect(built.has("/")).toBe(true);
+  expect([...built].some((path) => ENGINE_BUNDLE.test(path))).toBe(true);
 
   // The shape WebKit reports for the worker's imports: a GET, typed xhr.
   expect(flagged(chunk)).toEqual([]);
   expect(flagged(chunk, "GET", "fetch")).toEqual([]);
-  expect(flagged(`${origin}/assets/bsi-daily-q9Z-0aB.js`)).toEqual([]);
+  expect(flagged(chunk, "GET", "script")).toEqual([]);
+  expect(flagged(`${origin}/`, "GET", "document")).toEqual([]);
 
-  // Anything else a script starts still fails.
+  // Anything else, of any type, still fails.
+  expect(flagged(`${origin}/assets/engine.worker-NoSuchHash.js`)).toHaveLength(
+    1,
+  );
+  expect(
+    flagged(`${origin}/assets/engine.worker-NoSuchHash.js`, "GET", "script"),
+  ).toHaveLength(1);
   expect(flagged(`${origin}/api/rates`)).toHaveLength(1);
-  expect(flagged(`${origin}/assets/data.json`)).toHaveLength(1);
+  expect(flagged(`${origin}/api/rates`, "GET", "image")).toHaveLength(1);
+  expect(flagged(`${origin}/api/rates`, "POST", "beacon")).toHaveLength(1);
   expect(flagged(`${chunk}.map`)).toHaveLength(1);
-  expect(flagged(`${origin}/other/${file}`)).toHaveLength(1);
-  expect(flagged(`${origin}/assets/sub/${file}`)).toHaveLength(1);
+  expect(flagged(`${origin}/other${file}`)).toHaveLength(1);
   expect(flagged(`${chunk}?isin=US0000000000`)).toHaveLength(1);
   expect(flagged(chunk, "POST")).toHaveLength(1);
-  const foreign = flagged(`https://example.invalid/assets/${file}`);
+  const foreign = flagged(`https://example.invalid${file}`);
   expect(foreign.join("\n")).toContain("leaves the app's origin");
+  expect(
+    flagged(`ws://127.0.0.1:4174${file}`, "GET", "websocket"),
+  ).toHaveLength(1);
 });
