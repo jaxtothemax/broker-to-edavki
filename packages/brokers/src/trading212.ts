@@ -448,10 +448,11 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
     // What a row is comes before its date (ADR 0019 §6, #56). A row refused
     // for its action gives that reason even when it cannot be dated, and
     // moves the file's reach only when it can be: a reach no row vouches for
-    // would weaken the check of the 30-day rule. One that cannot be dated
-    // names no date, so it is never scoped to a year (ADR 0017) and withholds
-    // both returns of every year, as every unscoped refusal does. Every row
-    // read as an event, an ignored one included, must still be dated.
+    // would weaken the check of the 30-day rule (ZDoh-2 art. 97(5), research
+    // 04 §5.3). One that cannot be dated names no date, so it is never scoped
+    // to a year (ADR 0017) and withholds both returns of every year, as every
+    // unscoped refusal does. Every row read as an event, an ignored one
+    // included, must still be dated.
     const stamp = fromUtcStamp(text(row, timeColumn));
     const dated = stamp === null ? null : taxDate(stamp);
     const when =

@@ -710,6 +710,14 @@ describe("what a row is comes before its date (ADR 0019 §6, #56)", () => {
     }
   });
 
+  it("gives an empty row the unknown action it has", () => {
+    // 17 empty cells: no action and no time. Blocking either way; the cause
+    // is now the action's, as for every row (#56), not the date's.
+    expect(findings(v4(",".repeat(16)))).toEqual([
+      ["unknownAction", { broker: "trading212", action: { untrusted: "" } }, 2],
+    ]);
+  });
+
   it("still dates every row it reads, an ignored one included", () => {
     for (const time of UNDATABLE) {
       const result = v4(
