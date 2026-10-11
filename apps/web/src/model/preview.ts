@@ -19,7 +19,12 @@ export function formFileName(form: "kdvp" | "div", taxYear: number): string {
 }
 
 /** Brokers the dashboard can show, in display order. */
-export const BROKERS = ["trading212", "ibkr", "traderepublic"] as const;
+export const BROKERS = [
+  "trading212",
+  "ibkr",
+  "traderepublic",
+  "etoro",
+] as const;
 export type BrokerId = (typeof BROKERS)[number];
 
 /** ISO 8601 calendar date, e.g. "2026-03-12". */

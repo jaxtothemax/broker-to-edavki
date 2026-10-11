@@ -29,8 +29,9 @@ import {
 } from "../i18n/format";
 import { useI18n } from "../i18n/i18n";
 import { findingText, type FindingContext } from "../i18n/present";
-import type { Finding } from "../model/preview";
+import type { BrokerId, Finding } from "../model/preview";
 import {
+  accountsAsked,
   asksAccounts,
   blockingReason,
   isSupportedFile,
@@ -171,21 +172,26 @@ function FileDetail({
 }
 
 function AccountQuestion({
+  brokers,
   accounts,
   onChange,
 }: {
+  readonly brokers: readonly BrokerId[];
   readonly accounts: AccountChoice;
   readonly onChange: (accounts: AccountChoice) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const names = new Intl.ListFormat(locale, { type: "conjunction" }).format(
+    brokers.map((broker) => t.brokers[broker]),
+  );
   const options: readonly (readonly [AccountChoice, string])[] = [
     ["same", t.files.accountsSame],
     ["separate", t.files.accountsSeparate],
   ];
   return (
     <fieldset className="card question-card">
-      <legend className="question-title">{t.files.accountsTitle}</legend>
-      <p className="muted small">{t.files.accountsBody}</p>
+      <legend className="question-title">{t.files.accountsTitle(names)}</legend>
+      <p className="muted small">{t.files.accountsBody(names)}</p>
       <div className="choices">
         {options.map(([value, label]) => (
           <label key={value} className="choice">
@@ -372,7 +378,7 @@ export function FilesStep({
           ref={input}
           type="file"
           multiple
-          accept=".csv,.xml,text/csv,application/xml,text/xml"
+          accept=".csv,.xml,.xlsx,text/csv,application/xml,text/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="visually-hidden"
           tabIndex={-1}
           aria-hidden
@@ -461,7 +467,11 @@ export function FilesStep({
       )}
 
       {asksAccounts(state) ? (
-        <AccountQuestion accounts={state.accounts} onChange={onSetAccounts} />
+        <AccountQuestion
+          brokers={accountsAsked(state)}
+          accounts={state.accounts}
+          onChange={onSetAccounts}
+        />
       ) : null}
 
       {together.length === 0 ? null : (

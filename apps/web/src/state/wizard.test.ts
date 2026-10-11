@@ -10,6 +10,7 @@ import { demoPreview } from "../demo/demoPreview";
 import { LIMITS } from "@taxreporter/core";
 
 import {
+  accountsAsked,
   asksAccounts,
   blockingReason,
   canEnter,
@@ -244,8 +245,17 @@ describe("own files", () => {
     ).toBeNull();
   });
 
-  it("asks about accounts only with two Trading 212 files", () => {
+  it("asks about accounts only with two files of one unnamed broker", () => {
     expect(asksAccounts(readOwn([summary()]))).toBe(false);
+    // One Trading 212 file and one eToro statement: two accounts already.
+    const mixed = readOwn([summary(), summary({ broker: "etoro" })]);
+    expect(asksAccounts(mixed)).toBe(false);
+    const etoro = readOwn([
+      summary(),
+      summary({ broker: "etoro" }),
+      summary({ broker: "etoro" }),
+    ]);
+    expect(accountsAsked(etoro)).toEqual(["etoro"]);
     expect(
       asksAccounts(readOwn([summary(), summary({ unnamedAccount: false })])),
     ).toBe(false);
@@ -578,7 +588,7 @@ describe("own files", () => {
       { type: "startOwn" },
       {
         type: "addFiles",
-        files: [file("file-1", "a.csv", 1), file("file-2", "b.xlsx", 1)],
+        files: [file("file-1", "a.csv", 1), file("file-2", "b.pdf", 1)],
       },
     );
     expect(state.files.map((f) => f.kind === "own" && f.refusal)).toEqual([

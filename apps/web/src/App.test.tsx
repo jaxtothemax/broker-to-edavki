@@ -207,7 +207,7 @@ describe("App", () => {
 
   it("asks whether the Trading 212 files are one account, preset to one", () => {
     const html = render(ownState(read));
-    expect(text(html)).toContain(en.files.accountsTitle);
+    expect(text(html)).toContain(en.files.accountsTitle("Trading 212"));
     const radios =
       html.match(/<input type="radio" name="trading212-accounts"[^>]*>/g) ?? [];
     expect(radios).toHaveLength(2);

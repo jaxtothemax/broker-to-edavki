@@ -25,7 +25,7 @@ import type {
   PrepareReply,
   ReadReply,
 } from "../engine/protocol";
-import type { BrokerId, IsoDate } from "../model/preview";
+import { BROKERS, type BrokerId, type IsoDate } from "../model/preview";
 
 /** The tax year v0.1 prepares returns for (filed by 1 March 2027). */
 export const TAX_YEAR = 2026;
@@ -56,7 +56,7 @@ export type AddedFile =
 
 /**
  * Why a file is refused before a byte of it is read (ADR 0013 §6): it is
- * not a CSV or XML export, it is larger than any broker export, or it would
+ * not a CSV, XML or XLSX export, it is larger than any broker export, or it would
  * take the session past the bytes the tab holds.
  */
 export type OwnRefusal = "type" | "tooLarge" | "tooMuch";
@@ -222,11 +222,11 @@ export function isValidTaxNumber(value: string): boolean {
 }
 
 /**
- * Trading 212 and Trade Republic export CSV, IBKR Flex Queries XML; nothing
- * else is read.
+ * Trading 212 and Trade Republic export CSV, IBKR Flex Queries XML, eToro
+ * an XLSX statement; nothing else is read.
  */
 export function isSupportedFile(name: string): boolean {
-  return /\.(csv|xml)$/i.test(name);
+  return /\.(csv|xml|xlsx)$/i.test(name);
 }
 
 /**
@@ -299,14 +299,26 @@ export function summaryOf(
   return position < 0 ? undefined : shown.reply.files[position];
 }
 
-/** Whether to ask if the Trading 212 files are one account: two or more. */
-export function asksAccounts(state: WizardState): boolean {
+/**
+ * The brokers the account question is about: those whose files do not name
+ * their account (Trading 212, eToro) with two or more files read. One
+ * file of each of two brokers is two accounts already, and asks nothing.
+ */
+export function accountsAsked(state: WizardState): readonly BrokerId[] {
   const shown = shownRead(state);
-  if (shown === null) return false;
-  return (
-    shown.reply.files.filter((f) => f.status === "read" && f.unnamedAccount)
-      .length >= 2
-  );
+  if (shown === null) return [];
+  const counts = new Map<BrokerId, number>();
+  for (const file of shown.reply.files) {
+    if (file.status !== "read" || !file.unnamedAccount) continue;
+    if (file.broker === null) continue;
+    counts.set(file.broker, (counts.get(file.broker) ?? 0) + 1);
+  }
+  return BROKERS.filter((broker) => (counts.get(broker) ?? 0) >= 2);
+}
+
+/** Whether to ask if a broker's files are one account. */
+export function asksAccounts(state: WizardState): boolean {
+  return accountsAsked(state).length > 0;
 }
 
 /** The payer drafts the results are prepared with, one per payer asked about. */

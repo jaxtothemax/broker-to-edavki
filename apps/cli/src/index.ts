@@ -69,8 +69,8 @@ const USAGE = `Usage: taxreporter <exports...> --year <YYYY> --tax-number <8 dig
                    [--accounts same|separate] [--json]
 
 Reads broker exports (Trading 212 history CSV, Trade Republic transaction
-export CSV, Interactive Brokers Activity Flex Query XML) and writes the eDavki
-returns
+export CSV, Interactive Brokers Activity Flex Query XML, the eToro account
+statement XLSX) and writes the eDavki returns
 Doh_KDVP_<year>.xml and Doh_Div_<year>.xml into --out. Nothing leaves this
 computer and nothing is filed: review the files, then import them in eDavki.
 
@@ -78,9 +78,9 @@ computer and nothing is filed: review the files, then import them in eDavki.
                   {"US0378331005": {"name": "...", "address": "...", "country": "US"}}
   --coverage-end  the last day all your exports cover, for the 30-day rule;
                   worked out from the exports when left out
-  --accounts      whether Trading 212 exports, which do not name their
-                  account, come from one account (same, the default) or
-                  each from its own (separate)
+  --accounts      whether Trading 212 exports and eToro statements, which
+                  do not name their account, come from one account (same,
+                  the default) or each from its own (separate)
   --json          print a machine-readable report instead of text
 
 Exit codes: 0 written with nothing blocking, 1 something blocks, 2 usage.
@@ -325,6 +325,11 @@ function accountHints(
 ): string[] {
   const has = (code: Diagnostic["code"]) =>
     diagnostics.some((d) => d.code === code);
+  if (accounts === "same" && has("secondStatement")) {
+    return [
+      "  Two statements of one account each cover it from its opening: keep the latest. If they come from different accounts, run again with --accounts separate.",
+    ];
+  }
   if (accounts === "same" && has("overlapMismatch")) {
     return [
       "  Two files of one account disagree about the days both cover. If they come from different accounts, run again with --accounts separate.",
