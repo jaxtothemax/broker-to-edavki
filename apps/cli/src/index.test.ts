@@ -488,6 +488,87 @@ describe("taxreporter", () => {
     expect(existsSync(out)).toBe(false);
   });
 
+  describe("what became of each return", () => {
+    type Report = {
+      written: string[];
+      returns: { kdvp: string; div: string };
+      estimates: Record<string, string>;
+    };
+    const json = (dir: string, files: string[], year: string, ...x: string[]) =>
+      run([
+        ...files,
+        "--year",
+        year,
+        "--tax-number",
+        "12345678",
+        "--out",
+        join(dir, "out"),
+        "--json",
+        ...x,
+      ]);
+
+    it("says written for a return that is, with its estimate", () => {
+      const dir = scratch();
+      const result = json(dir, history, "2026", "--payers", payersFile(dir));
+      const report = JSON.parse(result.stdout) as Report;
+      expect(report.returns).toEqual({ kdvp: "written", div: "written" });
+      expect(report.estimates.gainsTaxEur).toMatch(/^\d+\.\d{2}$/);
+    });
+
+    it("says withheld, with the estimate and that it may change, when a finding blocks", () => {
+      const dir = scratch();
+      const takeover = fixture("t212-invest-v4-history-takeover.csv");
+      const report = JSON.parse(
+        json(dir, [takeover], "2025", "--payers", payersFile(dir)).stdout,
+      ) as Report;
+      expect(report.written).toEqual([]);
+      expect(report.returns).toEqual({ kdvp: "withheld", div: "withheld" });
+      // The figure stays, as in the web app, and the text says what it is.
+      expect(report.estimates.gainsTaxEur).toMatch(/^\d+\.\d{2}$/);
+      const text = run([
+        takeover,
+        "--year",
+        "2025",
+        "--tax-number",
+        "12345678",
+        "--out",
+        join(dir, "text"),
+        "--payers",
+        payersFile(dir),
+      ]).stdout;
+      expect(text).toContain("Doh-KDVP 2025: not written. estimated tax");
+      expect(text).toContain("so it may change");
+    });
+
+    it("says withheld in both outputs when a file is refused before the ledger", () => {
+      const dir = scratch();
+      const missing = join(dir, "nope.csv");
+      const files = [...history, missing];
+      const report = JSON.parse(
+        json(dir, files, "2026", "--payers", payersFile(dir)).stdout,
+      ) as Report;
+      expect(report.written).toEqual([]);
+      expect(report.returns).toEqual({ kdvp: "withheld", div: "withheld" });
+      const text = run([
+        ...files,
+        ...args2026(join(dir, "text"), "--payers", payersFile(dir)),
+      ]).stdout;
+      expect(text).toContain("Doh-KDVP 2026: not written.");
+      expect(text).not.toContain("3 securities");
+    });
+
+    it("says nothing to file for a year with no sales and no payments", () => {
+      const dir = scratch();
+      const result = json(dir, history, "2024", "--payers", payersFile(dir));
+      const report = JSON.parse(result.stdout) as Report;
+      expect(report.returns).toEqual({
+        kdvp: "nothingToFile",
+        div: "nothingToFile",
+      });
+      expect(result.code).toBe(0);
+    });
+  });
+
   it("writes a year's returns that another year's refused rows cannot change (ADR 0017)", () => {
     const dir = scratch();
     const takeover = fixture("t212-invest-v4-history-takeover.csv");
