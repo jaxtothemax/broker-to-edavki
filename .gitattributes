@@ -28,6 +28,11 @@
 *.cfg   text eol=lf
 *.ini   text eol=lf
 *.env   text eol=lf
+# Shell and Make with no extension to match. Same blind spot as the module
+# variants above: at `* text=auto` a planted NUL makes git call them binary.
+scripts/wt  text eol=lf
+hooks/*     text eol=lf
+Makefile    text
 
 # Lock files — generated, use union merge to reduce conflicts
 package-lock.json   merge=union

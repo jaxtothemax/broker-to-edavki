@@ -80,10 +80,6 @@ path: .github/workflows/governance.yml
 call: - name: Scan every tracked file for invisible characters
 why:  The only CI run of the invisible-character gate. check-gate-selftest-parity now fails when this step goes but the job keeps its --self-test step, yet delete the whole job and every parity gate stays green (neither can see a job that is gone) while a bidirectional control or zero-width character can land in source and nobody sees it.
 
-path: Makefile
-call: pre-push-checks: check-invisible-chars
-why:  The only thing that runs the invisible-character gate before a push. check-prepush-parity now fails when this line goes, because it wants a target on the pre-push-checks list to run the script and the gate-self-tests recipe no longer counts, so this is a second net and no longer the only one.
-
 path: .gitattributes
 call: packages/furs/schemas/*.xsd -text
 why:  The only thing stopping `* text=auto` from normalizing the vendored FURS schemas' CRLF line endings on commit. Delete it and the furs SHA-256 test stays green (the working tree keeps its bytes); the next re-vendored schema is then committed normalized, CI's checkout no longer matches its pin, and the easy "fix" pins bytes FURS never published.
@@ -142,7 +138,7 @@ why:  The only place CI runs the browser tests: the guided tour's keyboard path,
 
 path: .github/workflows/docs.yml
 call: node apps/web/scripts/pages-build/check-pages-build.mjs apps/web/dist "$WEB_BASE"
-why:  The only run of the Pages build check on the real build output. Delete it and the step runs only the self-test, which keeps check-gate-selftest-parity green, while a wrong base, a lost Content Security Policy tag or an inline script reaches the artifact with every gate green.
+why:  The only run of the Pages build check on the real build output. check-gate-selftest-parity now fails when this line goes but the step keeps its --self-test line, yet delete the whole step and every parity gate stays green (neither can see a step that is gone) while a wrong base, a lost Content Security Policy tag or an inline script reaches the artifact.
 
 path: .github/workflows/docs.yml
 call: if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then

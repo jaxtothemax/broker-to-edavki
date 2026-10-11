@@ -28,7 +28,8 @@
 # and never `check-x.sh` itself proves the gate CAN fail while nothing asks it to:
 # delete the scan step, or comment it out, and the job, its self-test and this
 # check all stay green with the gate switched off. So the SAME job must also run
-# the scan, and the self-test comes first. The few gates whose real run cannot be
+# the scan; the self-test should run first, but nothing here checks the order
+# (see "What this cannot do"). The few gates whose real run cannot be
 # in CI (its input is a forge, a release tag or a directory outside the repository)
 # are recorded in SELF_TEST_ONLY below with the reason; a gate with no scan and no
 # entry there is a failure.
@@ -53,8 +54,22 @@
 # path passes this check while proving nothing. This removes the silence, not the
 # possibility of a wrong answer.
 #
+# An invocation is the gate's path in command position: the first word of a
+# command (at the start of a line, after `;`, `&&`, `||`, `|`, `(`, `!`, `if`,
+# `then`, `do` and the like, with backslash-continued lines joined), optionally
+# after VAR=value words, after `bash`, `sh`, `python3` or `node` with their
+# options, and with a path glued in front (`./`, `apps/web/`,
+# `"$GITHUB_WORKSPACE/`). `test -x scripts/check-x.sh` or `shellcheck
+# scripts/check-x.sh` names the gate and is neither the scan nor the self-test. A
+# gate run through any other wrapper (`timeout 60 bash ...`, `xargs`) is not seen
+# as run, so its job reads as unproven or unscanned and fails loudly.
+#
 # "The scan" is any invocation of the gate that is not `--self-test`, so
 # `check-x.sh --list` counts as one; that is a hole this does not close.
+#
+# A step is read whatever its `if:` says, so a scan step disabled with `if: false`
+# still counts as the scan. The order inside a job is not checked either: a job
+# that runs the scan before its self-test passes.
 #
 # It sees only gates invoked DIRECTLY from a `run:` step (`bash scripts/check-x.sh`).
 # A gate reached through `make <target>`, a local composite action
@@ -162,6 +177,33 @@ except ImportError:
 SCRIPT = re.compile(r"scripts/[A-Za-z0-9_./-]+\.(?:sh|py|mjs)")
 GATE = re.compile(r"^check[-_]|-check\.(?:sh|py|mjs)$")
 TEST = re.compile(r"\.test\.(?:sh|py|mjs)$")
+# A GitHub expression, so `${{ github.workspace }}/scripts/x.sh` is one word.
+EXPR = re.compile(r"\$\{\{(?:[^}]|\}(?!\}))*\}\}")
+# The text before a path that RUNS it: where a command starts (the line start, a
+# shell separator, or a keyword that takes a command), any VAR=value words, an
+# optional interpreter with its options, then whatever is glued to the path in
+# the same word (`./`, `apps/web/`, `"$GITHUB_WORKSPACE/`). `test -x scripts/x.sh`
+# and `shellcheck scripts/x.sh` name the gate as an argument and do not match.
+CMD_POS = re.compile(
+    r"(?:^|[;&|(`]|[{!]\s|(?<![\w-])(?:then|do|else|elif|if|while|until|time|exec|env|command)\s)\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"(?:(?:\S*/)?(?:bash|sh|python3|node)(?:\s+-\S+)*\s+)?"
+    r"[^\s=;&|()`<>]*$"
+)
+
+
+def logical_lines(text):
+    """The run: text with every backslash-continued line joined to the next."""
+    buf = ""
+    for raw in text.splitlines():
+        if raw.endswith("\\"):
+            buf += raw[:-1] + " "
+            continue
+        yield buf + raw
+        buf = ""
+    if buf:
+        yield buf
+
 
 invoked, selftest = set(), set()
 for path in sys.argv[1:]:
@@ -186,18 +228,24 @@ for path in sys.argv[1:]:
         for step in job.get("steps") or []:
             if not isinstance(step, dict) or not isinstance(step.get("run"), str):
                 continue
-            for line in step["run"].splitlines():
+            for line in logical_lines(step["run"]):
                 # A path named in a shell comment is prose, not an invocation.
                 if line.lstrip().startswith("#"):
                     continue
-                line = re.sub(r"\s#.*$", "", line)
+                line = re.sub(r"\s#.*$", "", EXPR.sub("EXPR", line))
                 for m in SCRIPT.finditer(line):
                     base = m.group(0).rsplit("/", 1)[-1]
                     # scripts/tests/*.test.sh are test files, not gates.
                     if TEST.search(base) or not GATE.search(base):
                         continue
+                    # An argument to another command names the gate; it does not
+                    # run it, so it is neither the scan nor the self-test.
+                    if not CMD_POS.search(line[:m.start()]):
+                        continue
                     rest = line[m.end():]
-                    if re.match(r"\s*--self-test", rest):
+                    # The quote closing `"$GITHUB_WORKSPACE/scripts/x.sh"` may sit
+                    # between the path and the flag.
+                    if re.match(r"[\"']?\s*--self-test", rest):
                         selftest.add((key, base))
                     else:
                         invoked.add((key, base))
@@ -360,6 +408,75 @@ jobs:
 Y
     _case "scan commented out of a run block" 1 "$tmp/commented-scan.yml"
     _has "scan commented out of a run block" "never runs the scan itself"
+
+    # A step that names the gate as an argument does not run it, so it is not the
+    # scan: without the command-position test each of these passed as one.
+    printf 'name: ci\non: [pull_request]\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: bash scripts/check-zz-probe.sh --self-test\n      - run: test -x scripts/check-zz-probe.sh\n' >"$tmp/arg-test.yml"
+    _case "test -x on the gate is not its scan" 1 "$tmp/arg-test.yml"
+    _has "test -x on the gate is not its scan" "never runs the scan itself"
+    printf 'name: ci\non: [pull_request]\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: bash scripts/check-zz-probe.sh --self-test\n      - run: shellcheck scripts/check-zz-probe.sh\n' >"$tmp/arg-shellcheck.yml"
+    _case "shellcheck on the gate is not its scan" 1 "$tmp/arg-shellcheck.yml"
+    _has "shellcheck on the gate is not its scan" "never runs the scan itself"
+    cat >"$tmp/arg-continued.yml" <<'Y'
+name: ci
+on: [pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          bash scripts/check-zz-probe.sh --self-test
+          shellcheck \
+            scripts/check-zz-probe.sh
+Y
+    _case "an argument on a continuation line is not the scan" 1 "$tmp/arg-continued.yml"
+    _has "an argument on a continuation line is not the scan" "never runs the scan itself"
+    printf 'name: ci\non: [pull_request]\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo "scripts/check-zz-probe.sh --self-test"\n      - run: bash scripts/check-zz-probe.sh\n' >"$tmp/arg-selftest.yml"
+    _case "an echoed --self-test is not the self-test" 1 "$tmp/arg-selftest.yml"
+    _has "an echoed --self-test is not the self-test" "never runs it with --self-test"
+
+    # The forms a real scan takes, one job each, all accepted.
+    cat >"$tmp/forms.yml" <<'Y'
+name: ci
+on: [pull_request]
+jobs:
+  direct:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./scripts/check-zz-probe.sh --self-test
+      - run: ./scripts/check-zz-probe.sh
+  conditional:
+    runs-on: ubuntu-latest
+    steps:
+      - run: bash scripts/check-zz-probe.sh --self-test
+      - run: if ! bash scripts/check-zz-probe.sh; then exit 1; fi
+  exit-code:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sh scripts/check-zz-probe.sh --self-test
+      - run: |
+          rc=0; sh scripts/check-zz-probe.sh report.json || rc=$?
+  env-prefix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: bash scripts/check-zz-probe.sh --self-test
+      - run: test -n "$X" && env FOO=1 bash scripts/check-zz-probe.sh
+  workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - run: bash "$GITHUB_WORKSPACE/scripts/check-zz-probe.sh" --self-test
+      - run: bash ${{ github.workspace }}/scripts/check-zz-probe.sh
+  continued:
+    runs-on: ubuntu-latest
+    steps:
+      - run: bash scripts/check-zz-probe.sh --self-test
+      - run: |
+          bash \
+            scripts/check-zz-probe.sh \
+            --strict
+Y
+    _case "every command-position form of the scan" 0 "$tmp/forms.yml"
+    _has "every command-position form of the scan" "6 self-tested in-job"
 
     # A gate named the way the nested pages-build gate is: by its path from the
     # root, where the directory is not scripts/. Attribution is by basename, so the

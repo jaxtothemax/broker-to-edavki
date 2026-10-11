@@ -86,6 +86,15 @@ oracle is the OSV.dev advisory database, not the working tree.
   Makefile target deliberately kept out of `pre-push-checks`. Each still proves
   it can fail in its own CI job, self-test first. The opt-out only covers the
   pre-push mirror, never `check-gate-selftest-parity`.
+
+  A target kept off the list says so in its recipe: a comment starting
+  `NOT in pre-push-checks`, then the reason. `check-prepush-parity.sh` reads that
+  marker as the recorded reason, but only on a target that runs the gate;
+  without it, the target reads as a missing mirror. A job that runs a gate's
+  `--self-test` and never the gate itself fails `check-gate-selftest-parity`
+  unless `SELF_TEST_ONLY` in that script names the gate, with why its real run
+  cannot be in CI (the forge's open-PR list, a release tag, a per-user
+  directory) and where it runs instead.
 - **A lookup failure is a real FAILURE, never a skip.** Each has one named
   override, visible in the diff that sets it (`ALLOW_UNRESOLVED=1`,
   `PR_FOLLOWUPS_ALLOW_UNRESOLVED=1`).
@@ -105,7 +114,9 @@ when PyYAML is missing. That means "could not check", not a pass.
 `check-gate-selftest-parity.sh` reads only the `run:` text of steps. A script
 named in a step `name:`, an `env:` value, a `paths:` filter or a shell comment is
 a mention, not an invocation. That is why the scope steps keep their watched
-paths in `env: WATCH`.
+paths in `env: WATCH`. A path handed to another command (`test -x`,
+`shellcheck`) is a mention too: only the gate's path in command position counts
+as a run.
 
 Gate scripts are discovered by extension (`.sh`, `.py`, `.mjs`) in both
 `check-prepush-parity.sh` and `check-gate-selftest-parity.sh`. A gate written in

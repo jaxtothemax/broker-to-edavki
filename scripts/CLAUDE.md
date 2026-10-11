@@ -179,6 +179,16 @@ character apart will hide the hole from anyone reading either.
 and fails when a gate script has neither a Makefile mirror nor a recorded reason.
 Add new gates to the Makefile, not to a list inside the parity check.
 
+A mirror is a target on the `pre-push-checks` list, or one it depends on, whose
+recipe runs the gate, wherever the gate lives (`apps/web/scripts/...` counts,
+by its path from the root). A target kept off that list on purpose records why
+in its own recipe: a comment starting `NOT in pre-push-checks`, then the reason.
+The parity check reads that marker as the reason, and only on a target whose
+recipe runs the gate. The CI side has the matching list: a job may run a gate's
+`--self-test` without its real scan only if `SELF_TEST_ONLY` in
+`scripts/check-gate-selftest-parity.sh` names the gate, with why the real run
+cannot be in CI and where it runs instead.
+
 ## Prefer a marker that means one thing
 
 When a gate hunts for annotations in source, make the marker **opt-in and

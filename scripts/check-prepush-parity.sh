@@ -61,13 +61,27 @@
 #
 # ## Limits
 #
-# A path is resolved from the repository root. A workflow that reaches a nested
-# gate through `working-directory:` and a relative path (`node scripts/x.mjs`
-# under `working-directory: apps/web`) names a file that is not at the root, and
-# that reference is skipped like any other absent one. Write the path from the
-# root, as docs.yml does. A recipe that runs a gate through a Make variable, or
+# A path is resolved from the repository root. A match cannot hold a `$`, a quote
+# or a brace, so `"$GITHUB_WORKSPACE/scripts/x.sh"` reads as GITHUB_WORKSPACE/scripts/x.sh
+# and `${{ github.workspace }}/scripts/x.sh` as /scripts/x.sh. A path that is not
+# a file loses its leading components one at a time, for as long as what is left
+# still has a scripts/ component, and the first file found (the longest suffix)
+# is the one checked. A gate that still names no file FAILS when a workflow line
+# that is not a comment names it: a deleted gate, a prefix this cannot strip, or a
+# path relative to `working-directory:` (`node scripts/x.mjs` under
+# `working-directory: apps/web`). Write the path from the root, as docs.yml does.
+# A gate named only in a comment and absent is listed and skipped, because prose
+# names placeholders (governance.yml's header does). A `#` inside a string on a
+# run: line reads as a comment here too, so a missing gate after one is listed,
+# not failed. A recipe that runs a gate through a Make variable, or
 # through `$(MAKE) <other target>`, is not followed either; that reads as
 # unmirrored and fails loudly, which is the safe direction.
+#
+# A target that runs only `<gate> --self-test` counts as that gate's mirror, for
+# any gate. check-pages-build needs exactly that (its real scan reads a Vite build
+# the push does not make), and it is also a hole: cut any other mirror's recipe
+# down to its self-test and this stays green while the push stops running the
+# scan. Nothing here asks why a mirror is self-test only; review has to.
 #
 # ## Usage
 #
@@ -109,6 +123,12 @@ if [ "${1:-}" = "--self-test" ]; then
     {
       printf 'name: ci\non: [pull_request]\njobs:\n  example-job:\n    runs-on: ubuntu-latest\n    steps:\n'
       for _p in "$@"; do printf '      - run: bash %s\n' "$_p"; done
+    } > "$tmp/.github/workflows/ci.yml"
+  }
+  _ci_lines() { # <line>...: a workflow whose steps are these lines, verbatim
+    {
+      printf 'name: ci\non: [pull_request]\njobs:\n  example-job:\n    runs-on: ubuntu-latest\n    steps:\n'
+      for _p in "$@"; do printf '      %s\n' "$_p"; done
     } > "$tmp/.github/workflows/ci.yml"
   }
   _make() { # <Makefile text, printf-escaped>
@@ -160,8 +180,9 @@ if [ "${1:-}" = "--self-test" ]; then
   _make 'pre-push-checks: check-example\ncheck-example:\n\t@# bash scripts/check-example.sh\n\t@true\n'
   _case "a recipe comment that only names the gate is rejected" 1 "no target that pre-push-checks depends on"
 
-  # A mirror that runs only the self-test is a mirror: the real scan may need an
-  # artifact the push does not build (the nested pages-build gate is one).
+  # A mirror that runs only the self-test is a mirror, for every gate: the real scan
+  # may need an artifact the push does not build (the nested pages-build gate is
+  # one). That it is accepted for every other gate too is a hole ("Limits").
   _make 'pre-push-checks: check-example\ncheck-example:\n\t@bash scripts/check-example.sh --self-test\n'
   _case "a mirror that runs only the gate's self-test is accepted" 0 "OK:"
 
@@ -174,6 +195,30 @@ if [ "${1:-}" = "--self-test" ]; then
   _case "a target marked NOT in pre-push-checks records the reason" 0 "1 opted out"
   _make 'pre-push-checks: other\nother:\n\t@true\ncheck-example:\n\t@# NOT in pre-push-checks: its oracle is the issue tracker.\n\t@true\n'
   _case "the marker on a target that does not run the gate excuses nothing" 1 "no target that pre-push-checks depends on"
+
+  # ── A path written behind a variable ──
+  # A match cannot hold `$` or a brace, so these read as GITHUB_WORKSPACE/scripts/...
+  # and /scripts/...; neither is a file. Skipping them as absent let an unmirrored
+  # gate pass. The needle's two leading spaces are the list's indent, so only the
+  # resolved path matches it.
+  # shellcheck disable=SC2016  # workflow text, not shell to expand
+  _ci_lines '- run: bash "$GITHUB_WORKSPACE/scripts/check-example.sh"'
+  _make 'all:\n\t@true\n'
+  _case "a gate behind \$GITHUB_WORKSPACE/ with no mirror is rejected" 1 "  scripts/check-example.sh"
+  _make 'pre-push-checks: check-example\ncheck-example:\n\t@bash scripts/check-example.sh\n'
+  _case "a gate behind \$GITHUB_WORKSPACE/ resolves to its mirror" 0 "OK: 1 CI gate script(s) mirrored"
+  # shellcheck disable=SC2016  # workflow text, not shell to expand
+  _ci_lines '- run: bash ${{ github.workspace }}/scripts/check-example.sh'
+  _make 'all:\n\t@true\n'
+  _case "a gate behind \${{ github.workspace }}/ with no mirror is rejected" 1 "  scripts/check-example.sh"
+
+  # A gate CI names on a live line that is no file anywhere is a failure; one
+  # named only in a comment is listed and skipped.
+  _ci_lines '- run: bash scripts/check-gone.sh'
+  _case "a gate a run: line names that does not exist is rejected" 1 "named on a workflow line that is not a comment"
+  # shellcheck disable=SC2016  # workflow text, not shell to expand
+  _ci_lines '# Gates run as `bash scripts/check-gone.sh`.' '- run: echo hi'
+  _case "a missing gate named only in a comment is listed, not failed" 0 "named only in a workflow comment, and no such file: scripts/check-gone.sh"
 
   # ── Nested gates ──
   nested=apps/web/scripts/pages-build/check-nested.mjs
@@ -193,6 +238,13 @@ if [ "${1:-}" = "--self-test" ]; then
 
   _make 'check-nested:\n\t@node apps/web/scripts/pages-build/check-nested.mjs --self-test\npre-push-checks: other\nother:\n\t@true\n'
   _case "a nested gate whose pre-push-checks line was deleted is rejected" 1 "$nested"
+
+  # Behind a variable, a nested gate resolves to its whole path, not to scripts/...
+  # shellcheck disable=SC2016  # workflow text, not shell to expand
+  _ci_lines '- run: node "$GITHUB_WORKSPACE/apps/web/scripts/pages-build/check-nested.mjs"'
+  _case "a nested gate behind \$GITHUB_WORKSPACE/ with no mirror is rejected" 1 "  $nested"
+  _make 'pre-push-checks: check-nested\ncheck-nested:\n\t@node apps/web/scripts/pages-build/check-nested.mjs --self-test\n'
+  _case "a nested gate behind \$GITHUB_WORKSPACE/ resolves to its mirror" 0 "OK: 1 CI gate script(s) mirrored"
 
   # What is not a gate is out of scope below the top level: sourced helpers, test
   # suites and build helpers were never this script's concern.
@@ -391,6 +443,9 @@ fi
 # anything at any depth (apps/web/scripts/pages-build/...) is, if it is a gate.
 ci_text="$(cat "${CI_FILES[@]}")"
 ci_scripts="$(script_paths <<< "$ci_text")"
+# The same scan with YAML and shell comments removed: only a path named here makes
+# a missing file a failure (see "Limits").
+ci_live_scripts="$(script_paths <<< "$(sed -e 's/^[[:space:]]*#.*$//' -e 's/[[:space:]]#.*$//' <<< "$ci_text")")"
 
 if [ -z "$ci_scripts" ]; then
   echo "OK: CI invokes no scripts/ gates yet — nothing to mirror."
@@ -409,12 +464,26 @@ declined_paths="$(script_paths <<< "$declined_recipes")"        # run by a targe
 
 missing_gates=""
 missing_others=""
+absent_gates=""
+commented_gates=""
+seen=""
 mirrored=0
 optedout=0
 
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   case "$p" in scripts/* | */scripts/*) ;; *) continue ;; esac   # `scripts` is a whole path component
+  named="$p"
+  # Strip what a variable left in front of the path (see "Limits") BEFORE judging
+  # top-level or nested: GITHUB_WORKSPACE/scripts/x.sh is the top-level x.sh.
+  q="$p"
+  while [ ! -f "$q" ]; do
+    q="${q#*/}"
+    case "$q" in scripts/* | */scripts/*) ;; *) q="$p"; break ;; esac
+  done
+  p="$q"
+  if grep -qxF -- "$p" <<< "$seen"; then continue; fi
+  seen="${seen}${p}"$'\n'
   base="${p##*/}"
   rest="${p#scripts/}"
   top=0
@@ -422,7 +491,18 @@ while IFS= read -r p; do
   gate=0
   if is_gate_name "$base"; then gate=1; fi
   if [ "$top" -eq 0 ] && [ "$gate" -eq 0 ]; then continue; fi    # a nested helper or test, not a gate
-  [ -f "$p" ] || continue                  # referenced but absent: a different bug
+  if [ ! -f "$p" ]; then
+    # Skipping a gate CI runs is how a mangled path once passed unseen; only a
+    # gate named in prose alone may be skipped, and it is listed.
+    if [ "$gate" -eq 1 ]; then
+      if grep -qxF -- "$named" <<< "$ci_live_scripts"; then
+        absent_gates="${absent_gates}${p}"$'\n'
+      else
+        commented_gates="${commented_gates}${p}"$'\n'
+      fi
+    fi
+    continue
+  fi
 
   if [ "$gate" -eq 1 ]; then
     if grep -qxF -- "$p" <<< "$reach_paths"; then
@@ -453,8 +533,22 @@ while IFS= read -r p; do
   fi
 done <<< "$ci_scripts"
 
-if [ -n "$missing_gates$missing_others" ]; then
+if [ -n "$commented_gates" ]; then
+  printf '%s' "$commented_gates" | sed '/^$/d;s/^/NOTE: named only in a workflow comment, and no such file: /'
+fi
+
+if [ -n "$missing_gates$missing_others$absent_gates" ]; then
   echo "PRE-PUSH PARITY GAP"
+  if [ -n "$absent_gates" ]; then
+    echo ""
+    echo "These gate scripts are named on a workflow line that is not a comment, but no"
+    echo "such file exists from the repository root, even with a leading variable such"
+    echo "as \$GITHUB_WORKSPACE/ removed, so nothing can say whether pushing runs them."
+    echo "Write the path from the repository root (not relative to working-directory:),"
+    echo "or drop the reference to a gate that is gone:"
+    printf '%s' "$absent_gates" | sed '/^$/d;s/^/  /'
+  fi
+  if [ -z "$missing_gates$missing_others" ]; then exit 1; fi
   if [ -n "$missing_gates" ]; then
     echo ""
     echo "These gate scripts run in CI but no target that pre-push-checks depends on"

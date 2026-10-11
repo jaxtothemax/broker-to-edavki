@@ -90,10 +90,12 @@
 #   - Binary files (a NUL in the first 8000 bytes, git's rule), which includes any
 #     UTF-16 or UTF-32 file and so its byte-order mark. A hostile change can
 #     plant a NUL in a source file to make git, and this gate, treat it as binary;
-#     check-nul-bytes.sh catches that for the extensions .gitattributes declares
-#     `text` (the JS and TS family, .mjs .cjs .mts .cts included, and its
-#     --self-test proves that against the real .gitattributes), and nothing
-#     catches it for an extension left at `* text=auto`, such as .svg.
+#     check-nul-bytes.sh catches that for the paths .gitattributes declares
+#     `text` (the JS and TS family with .mjs .cjs .mts .cts, scripts/wt, the git
+#     hooks and the Makefile, and its --self-test proves those against the real
+#     .gitattributes), and nothing catches it for a path left at `* text=auto`:
+#     .svg, .snap and .example files, extensionless files such as LICENSE and the
+#     dotfiles, and load-bearing.declarations.
 #   - Submodules (no blob to read) and files outside the index.
 #   - The commits a push carries. The index is the checked-out commit in CI, so
 #     there the scan is exact; locally it is HEAD plus whatever is staged, so a
