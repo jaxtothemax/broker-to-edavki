@@ -1,6 +1,6 @@
 # Broker export formats: Interactive Brokers, Trading 212, Revolut
 
-> Researched: 2026-10-07 · Verification: not independently verified · Updated: 2026-10-09 (one real Trading 212 export inspected: the `0E-10` zero, dividend prices to 6 decimals, the V4 header and a takeover's rows, §4.2–§4.4; the tax rule for takeovers and mergers paid in shares linked from §3.5 and §4.3; `Dividend (Bonus)` and `Dividend (Demerger)` rows from a second, full-history export, §4.3)
+> Researched: 2026-10-07 · Verification: not independently verified · Updated: 2026-10-11 (the open question on trades after midnight, and the date rule in §2, point to 04 §4.3.1) and 2026-10-09 (one real Trading 212 export inspected: the `0E-10` zero, dividend prices to 6 decimals, the V4 header and a takeover's rows, §4.2–§4.4; the tax rule for takeovers and mergers paid in shares linked from §3.5 and §4.3; `Dividend (Bonus)` and `Dividend (Demerger)` rows from a second, full-history export, §4.3)
 >
 > Research for building TaxReporter. It is not tax advice, and FURS publications and the law win over anything written here. Where this page overlaps a verified doc (01–03), the verified doc wins; such places are cross-referenced inline. See the [README](README.md#confidence-and-verification-legend) for the legend.
 
@@ -29,6 +29,7 @@ The research produced synthetic fixtures for every format described here, with t
 2. **Dates.**
    - IBKR's `tradeDate` (and the date part of `dateTime`) is the exchange business date in ET. Use it as is. Converting `20260401;202000` ET to Ljubljana time would move a dividend to the next day.
    - T212 and Revolut give UTC instants. Convert them to `Europe/Ljubljana` before taking the date. This only matters near midnight: extended-hours trades and 31 Dec.
+   - These two rules are a design default, which the app follows for IBKR and Trading 212 (ADR 0011 §7, ADR 0012 item 8), not a sourced tax rule. The primary-source reading lives in [04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone): the trade date, not the settlement date, is settled, but which time zone dates a trade near midnight is an open question, with a draft written question to FURS (#13).
 3. **Fail closed.** Abort on any unknown `Action`/`Type`/`type` value and on any unknown column that carries a value. Every mature parser does this (cgt-calc, jal). Silently skipping rows was the most common bug in the tools surveyed.
 4. **Identify columns by header name**, never by position. T212 has reordered its columns at least twice.
 5. **Deduplicate overlapping exports.**
@@ -476,7 +477,7 @@ The researcher rated these critical claims below high confidence:
 - Precise semantics of Trading 212 `Currency conversion` rows (`Total` vs `Currency conversion from/to amount`) in multi-currency accounts; no real sample row was found.
 - Whether IBKR `CashTransaction@actionID` reliably links a dividend to its Withholding Tax row in current Flex output (would replace ib-edavki's heuristic matching).
 - How IBKR represented the IBCE→IBIE (2024) and IBUK→IBCE (2021) position migrations in Flex (Transfers type INTERNAL vs re-booked trades), and whether original acquisition dates are preserved; needs a real migrated-account export.
-- Correct Slovenian date for US extended-hours trades executed after 00:00 Ljubljana time (exchange trade date vs local calendar date). This is a tax-rule question to confirm with FURS guidance.
+- Correct Slovenian date for US extended-hours trades executed after 00:00 Ljubljana time (exchange trade date vs local calendar date). This is a tax-rule question to confirm with FURS guidance. Primary sources searched on 2026-10-11 do not answer it. [04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone) records the search and a draft written question to FURS (#13).
 - Tax classification of Revolut RETURN OF CAPITAL, POSITION CLOSURE (warrants), BOND COUPON and REWARD rows, and of T212 `Dividend (Tax exempted)`/`Stock distribution`/`Spin off` events (out of scope here; parsers should block until classified).
 
 ## Sources

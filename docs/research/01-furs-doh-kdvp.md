@@ -1,6 +1,6 @@
 # Doh-KDVP: eDavki XML import format (`Doh_KDVP_9.xsd`)
 
-> Researched: 2026-10-06 · Verification: adversarially verified (21 claims: 20 confirmed, 0 refuted, 1 uncertain) · Updated: 2026-10-07 (F10 polarity settled from the navodila and the display XSLT, §5.2)
+> Researched: 2026-10-06 · Verification: adversarially verified (21 claims: 20 confirmed, 0 refuted, 1 uncertain) · Updated: 2026-10-11 (§8: where the opis states the settlement-date rule, and a pointer to 04 §4.3.1 on trades near midnight, not independently verified) and 2026-10-07 (F10 polarity settled from the navodila and the display XSLT, §5.2)
 >
 > Research for building TaxReporter. It is not tax advice, and FURS publications and the law win over anything written here. Inline markers are explained in the [README](README.md#confidence-and-verification-legend).
 
@@ -230,7 +230,7 @@ The XSD allows exactly **A B C D E F G H I J K** (case-sensitive; `b` is rejecte
 - **Gifts and inheritances received.** Use F2 = G or F. F4 is the value on which gift/inheritance tax was assessed, or the market price if none was assessed. F5 is the tax paid. Giving shares away is itself a disposal, unless a deferral ("odlog") is claimed for a gift to a spouse or child. In that case the recipient later uses the donor's date and cost. The deferral must be notified separately by 28 February, and inheritance is not a disposal (corrected after verification).
 - **Transfers between brokers** are not disposals. Keep the original acquisition dates and costs.
 - **Fees.** Actual commissions are not added. eDavki deducts the flat costs ("normirani stroški") of 1% of cost + 1% of proceeds, capped at the gain, and only when there is a gain. So F4/F9 should be the per-unit trade price **excluding commission** (FURS opis).
-- **Currency and date** (corrected after verification). Convert at the Banka Slovenije rate valid on the acquisition or disposal date; that rate rule is in the navodila. The time of acquisition or disposal is the date the contract is concluded, i.e. the **trade date, not the settlement date**. That rule comes from ZDoh-2 Articles 101 and 102 as restated in the FURS opis ("Za čas pridobitve kapitala se šteje datum sklenitve pogodbe"; "…ni relevantno, kdaj dejansko pride do plačila kupnine"), not from the navodila. **Exception:** securities moved from an INR to a trading account count as acquired on the date of the transfer to the trading account, not the original purchase date (code K, §6). See [03](03-bsi-exchange-rates.md#9-weekends-holidays-and-target-closing-days) for which rate list applies on days without one.
+- **Currency and date** (corrected after verification). Convert at the Banka Slovenije rate valid on the acquisition or disposal date; that rate rule is in the navodila. The time of acquisition or disposal is the date the contract is concluded, i.e. the **trade date, not the settlement date**. That rule comes from ZDoh-2 Articles 101 and 102 as restated in the FURS opis ("Za čas pridobitve kapitala se šteje datum sklenitve pogodbe"; "…ni relevantno, kdaj dejansko pride do plačila kupnine", the latter in Q&A 6.2 Q17), not from the navodila. The navodila's column 6 takes the date "razviden iz prodajne ali druge pogodbe oziroma iz drugih dokazil". No primary source says which calendar dates a trade near midnight when the broker writes UTC or US Eastern time ([04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone), searched 2026-10-11). **Exception:** securities moved from an INR to a trading account count as acquired on the date of the transfer to the trading account, not the original purchase date (code K, §6). See [03](03-bsi-exchange-rates.md#9-weekends-holidays-and-target-closing-days) for which rate list applies on days without one.
 - **Rates** (eDavki computes them per lot): 25%; 20% after 5 years; 15% after 10 years; 0% after 15 years (FURS opis, August 2026 edition).
 
 ## 9. Importing into eDavki
@@ -369,6 +369,14 @@ These were **valid**: `F2=K`, `F8=-3`, boolean `1`, F10 omitted, all F8 omitted,
 
 An independent verifier re-checked the 21 critical claims against the live XSDs, the XSLT, the 2025 navodila and form, the FURS opis and usmeritve, the eDavki help pages and the Wayback snapshots. 20 were confirmed. None was refuted.
 
+**Added after verification (2026-10-11):** for #13, the §8 bullet "Currency and date", which is marked (corrected after verification), gained three additions. Its corrected fact, the trade date and not the settlement date, is unchanged:
+
+- where the opis states the settlement quote: Q&A 6.2 Q17;
+- the navodila's column 6 wording, *"razviden iz prodajne ali druge pogodbe oziroma iz drugih dokazil"* (the Slovenian edition for tax years 2025+, the file pinned in §5.2);
+- a sentence, with a link to [04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone), saying that no primary source was found on which calendar date a trade near midnight takes.
+
+The same day, an Open questions entry on that question was added. These rest on the sources that 04 §4.3.1 lists, the FURS opis (15th edition, August 2026) and the Doh-KDVP navodila, and were not independently verified beyond them.
+
 **Claims not confirmed:**
 
 | Claim | Verdict | Correction / note | Evidence |
@@ -407,6 +415,7 @@ An independent verifier re-checked the 21 critical claims against the live XSDs,
 
 ## Open questions
 
+- Which date goes in F1 or F6 for a trade concluded near midnight, when the broker writes the exchange's date in US Eastern time or only a UTC timestamp? No primary source found answers it. A draft written question to FURS is in [04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone) (#13).
 - Which key does eDavki use to merge an imported PLVP list with an existing one: ISIN, Code, Name, or a combination? (The help page does not say; §9.)
 - Does eDavki reject an import when `edp:taxpayer/edp:taxNumber` differs from the logged-in user's tax number?
 - Which `DocumentWorkflowID` values besides `O` does Doh-KDVP accept? The generic eDavki list is O, B, R, P, I, V, Z, S, and ib-edavki suggests `I` for test calculations.

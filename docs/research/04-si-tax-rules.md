@@ -1,6 +1,6 @@
 # Slovenian personal income tax on capital gains and dividends (tax years 2025 and 2026)
 
-> Researched: 2026-10-07 · Verification: adversarially verified (25 claims: 25 confirmed, 0 refuted, 0 uncertain; 3 minor corrections) · Updated: 2026-10-10 (rights handed out free to holders, §9.2, from primary sources, not independently verified) and 2026-10-09 (open question on rights handed out free to holders; takeovers and mergers paid in shares, §9.1, from primary sources, not independently verified; cash for a fraction of a spin-off share counted as a dividend, §9)
+> Researched: 2026-10-07 · Verification: adversarially verified (25 claims: 25 confirmed, 0 refuted, 0 uncertain; 3 minor corrections) · Updated: 2026-10-11 (which date a trade near midnight takes, and trade versus settlement date, §4.3.1, from primary sources, not independently verified: the time-zone half was not found), 2026-10-10 (rights handed out free to holders, §9.2, from primary sources, not independently verified) and 2026-10-09 (open question on rights handed out free to holders; takeovers and mergers paid in shares, §9.1, from primary sources, not independently verified; cash for a fraction of a spin-off share counted as a dividend, §9)
 >
 > Research for building TaxReporter. It is not tax advice, and FURS publications and the law win over anything written here. Inline markers are explained in the [README](README.md#confidence-and-verification-legend).
 
@@ -168,12 +168,167 @@ eDavki computes this itself. Implement it identically only for previews. Apply i
 
 ### 4.3 Dates: trade date, not settlement date
 
-- Time of acquisition and time of disposal = *"datum sklenitve pogodbe ali drugega pravnega posla"*, the date the contract or other legal transaction was concluded (arts. 101(1), 102). For exchange trades this is the **trade date**. Settlement date is not used. For shares exchanged in a takeover or merger, see §9.1.
+- Time of acquisition and time of disposal = *"datum sklenitve pogodbe ali drugega pravnega posla"*, the date the contract or other legal transaction was concluded (arts. 101(1), 102). For exchange trades this is the **trade date**. Settlement date is not used. For shares exchanged in a takeover or merger, see §9.1. For a trade near midnight, or a broker that writes UTC or US Eastern time, see §4.3.1: no primary source settles which calendar dates it.
 - Gains are realized in the tax year of the disposal (art. 104).
 - Bonus shares from a capital increase out of company funds: the acquisition date is the date of the shareholder resolution (art. 101(6)).
 - Inheritance: the acquisition date is the date the inheritance decision became final (*pravnomočnost sklepa o dedovanju*), not the date of death (art. 101(1); FURS Q&A 6.3).
 - INR transfers: the acquisition date is the transfer date (art. 101(7), from 5 Mar 2026; §2.3).
 - **Moving to Slovenia** (corrected after verification). Becoming a Slovenian resident does **not** reset the acquisition **date** (FURS Q&A 6.1 Q13). The acquisition **value** can change, however: where Germany charged exit tax, the acquisition value is the fair market value used for the German exit tax (SI–DE treaty art. 13(5)), plus any unclaimed art. 98(7) costs. The tool therefore needs a per-lot basis override for such cases. (The original report stated that there is no step-up on immigration at all.)
+
+#### 4.3.1 Trades near midnight and the broker's time zone
+
+Added on 2026-10-11 for #13, from the primary sources listed at the end of this subsection, all retrieved that day. It is not part of the independent verification above.
+
+**The question.** ADR 0011 §7 dates a trade by the Ljubljana calendar date of the broker's timestamp. Which date is the acquisition or disposal date on Doh-KDVP when the trade date and the settlement date differ, when a trade falls near midnight, or when the broker writes UTC or US Eastern time? The question has two halves. The first is settled; the second is not.
+
+**Trade date, not settlement date: settled (high confidence).**
+
+- ZDoh-2 art. 101(1): *"Za čas pridobitve kapitala se šteje datum sklenitve pogodbe ali drugega pravnega posla oziroma datum pravnomočnosti sodne odločbe ali dokončnosti odločbe upravnega organa, na podlagi katerih je fizična oseba pridobila kapital. V drugih primerih pridobitve se za čas pridobitve kapitala šteje datum, ki je razviden iz drugih dokazil."*
+- Art. 102 says the same for a disposal: *"Za čas odsvojitve kapitala se šteje datum sklenitve pogodbe ali drugega pravnega posla …"*, and *"V drugih primerih odsvojitve se za čas odsvojitve kapitala šteje datum, ki je razviden iz drugih dokazil."*
+- That one date also decides four other things:
+  - the tax year: art. 104, *"Šteje se, da je dobiček dosežen ali izguba realizirana v času odsvojitve kapitala."*;
+  - the exchange rate: the BSI rate *"ki velja na dan pridobitve kapitala"* (art. 98(9)) and *"na dan odsvojitve kapitala"* (art. 99(3), which spells the bank "Banka Slovenija");
+  - the holding period (§4.5);
+  - the 30-day window (§5.3).
+- **FURS opis, Q&A 6.2 Q17:** *"Za čas odsvojitve kapitala se po 102. členu ZDoh-2 šteje datum sklenitve pogodbe, na dan sklenitve pogodbe pa se ugotavlja vrednost kapitala ob odsvojitvi. […] Za ugotovitev davčne osnove od dobička iz kapitala tako ni relevantno, kdaj dejansko pride do plačila kupnine."* The question is about late-payment interest on a sale price, but this sentence states the rule for every disposal.
+- **FURS opis, Q&A 6.3 Q13**, which is about real estate, asks *"Ali je to trenutek sklenitve pogodbe ali trenutek vpisa v zemljiško knjigo?"* FURS answers with the contract date. Entry in the land register is the transfer of ownership, much as settlement is for a security, so this answer points the same way for securities *(inference, by analogy)*.
+- **Doh-KDVP navodila, tax years 2025+, column 6:** *"V stolpec 6 se vpiše datum odsvojitve vrednostnega papirja oziroma investicijskega kupona, razviden iz prodajne ali druge pogodbe oziroma iz drugih dokazil."* Column 7 takes the quantity *"razvidna iz obračuna o opravljenem poslu"*. The English edition says *"the date of disposal of security or fund unit shown in the sales or other contract"*.
+- None of ZDoh-2, the opis or the navodila uses a settlement date (*datum poravnave*) as a tax date. The opis mentions settlement only among a custodian's services (Q&A 6.2 Q18). In ZDoh-2 the word *poravnava* appears only in the unrelated sense of a court or out-of-court settlement.
+
+For an exchange trade the date is therefore the day the trade was concluded, which brokers call the trade date. This confirms §4.3 and the trade-date choice in ADR 0011 §7.
+
+**Trades near midnight, UTC and US Eastern time: not found.** No primary source found says which time zone or calendar to read *"datum sklenitve pogodbe"* in. None says what applies when the date the broker prints differs from the date in Ljubljana. Searched on 2026-10-11:
+
+- **ZDoh-2 NPB 36 and ZDavP-2 NPB 32, full texts (PISRS).** Searched for *časovn*, *srednjeevrop*, *lokalni čas*, *polnoč*, *poravnav*, *datum posla*, *trgovalni dan* and *UTC*. No hit concerns the time of a trade.
+- **The FURS opis (15th edition, August 2026)**, searched in full, including Q&A 6.1–6.3.
+- **The Doh-KDVP navodila, tax years 2025+, in Slovenian and English.**
+- **Doh-KDVP's own date fields.** In `Doh_KDVP_9.xsd`, `F1` and `F6` are `xs:date`, documented only as "Datum pridobitve" and "Datum odsvojitve".
+- **The schema Slovenian brokers report trades in.** `KP_KDVP_2.xsd` carries what Slovenian brokers report to FURS for pre-filling Doh-KDVP. Its `Date` attributes are `xs:date`, documented as "Datum pridobitve" and "Datum odsvojitve". The KP-KDVP usmeritve name the field only "Datum". Both the return and the brokers' report to FURS take a calendar date, no time of day (`xs:date` allows an optional time-zone designator after the date, but no time).
+- **Not counted as checked.** The annex to the regulation on brokers' reports (*Pravilnik o dostavi podatkov …*; the annex in Uradni list RS 107/2025, and PISRS publication 1409/2026 of 9 Sep 2026) was downloaded, but its text did not extract readably.
+- **Web searches** limited to fu.gov.si, gov.si, edavki.durs.si, pisrs.si and uradni-list.si, plus an open-web search. They found nothing beyond the above, and no secondary source on the time-zone question either.
+
+**What the primary texts suggest, kept apart from the rule:**
+
+- The navodila tie the disposal date to the evidence. Column 6 takes the date *"razviden iz prodajne ali druge pogodbe oziroma iz drugih dokazil"*, and columns 3 and 7 take quantities *"razvidna iz obračuna o opravljenem poslu"*. The acquisition date has no such clause. Column 1 reads only *"V stolpec 1 se vpiše datum pridobitve vrednostnega papirja oziroma investicijskega kupona po kronološkem zaporedju"*. The navodila's other lists word their date columns the same way. For a sale through a broker, that evidence is the broker's confirmation or statement, so the disposal date leans toward the date the broker prints *(inference)*. For an acquisition, the navodila name no evidence for the date.
+- Brokers print different things:
+  - IBKR prints the exchange's business date in US Eastern time ([06](06-brokers-ibkr-t212-revolut.md) summary table).
+  - Trading 212 prints only a UTC timestamp (the same table).
+  - Trade Republic prints a UTC timestamp and a date, usually the local Berlin date, in its comma revision. In its semicolon revision it prints only the date ([07 §4.2](07-brokers-eu-and-others.md#42-trade-republic)).
+- A UTC timestamp has no "printed date" apart from its UTC date. If that UTC date counts as the date the evidence shows, the lean points Trading 212's disposal dates to the UTC date, away from today's Ljubljana rule *(inference)*. Whether it counts, the navodila do not say, so they do not settle that case, even on this reading.
+- Column 6 names the document the disposal date is read from, not the clock it is read on. The lean is therefore an inference from wording about evidence. It neither rules out today's Ljubljana default nor amounts to support for a different rule.
+
+**What the app does today** (a fact; no change is proposed here):
+
+- `taxDate` (`packages/core/src/dates.ts`) takes the Ljubljana calendar date of the event's instant where there is one. It flags `moved` when that differs from the broker's date (ADR 0011 §7).
+- IBKR events carry no instant (`at: { instant: null, brokerDate: date }` in `packages/brokers/src/ibkr.ts`; ADR 0012 item 8, following [06](06-brokers-ibkr-t212-revolut.md)). Their date is therefore IBKR's exchange date.
+- Trading 212 events carry a UTC instant, so they take the Ljubljana date. Where that differs from the UTC date the file shows, the adapter adds the warning `dateMovedToLjubljana`.
+- Trade Republic events are dated by `dateOf` in `packages/brokers/src/trade-republic.ts`, which reads the two revisions differently ([07 §4.2](07-brokers-eu-and-others.md#42-trade-republic)):
+  - **Comma revision.** A row carries a UTC instant and the printed `date`, which is usually the local Berlin date. It is not always: [07 §4.2](07-brokers-eu-and-others.md#42-trade-republic) records dividend corrections booked at 12:17 UTC on 28 March that carry `date` 27 March. `dateOf` keeps the Ljubljana date only when `taxDate` does not report `moved`, that is, only when it equals the printed date. Otherwise the row is not moved but refused, with the blocking diagnostic `invalidTime` (pinned by the test "refuses a row it cannot date, or whose date and time disagree" in `trade-republic.test.ts`). That check comes last. Rows of a child's account (`account_type` `JUNIOR`) are set aside before any date is read, under one blocking `juniorAccount` finding for the file. A row with any other unknown account type is refused with `unknownAction`, and a row refused for its type keeps that refusal. Only a row past those checks can get `invalidTime`. Berlin and Ljubljana keep the same clock, so under today's rule this refuses only a row whose own two fields disagree.
+  - **Semicolon revision.** `datetime` is the date at midnight UTC on every row, so the row carries no instant, and `date` alone dates it, as IBKR's date does. A row whose `datetime` is not that midnight is refused with `invalidTime`.
+- So the same trade can get two tax dates, depending on the broker. Take a trade at 23:30 UTC on 31 December. That is 18:30 in New York and 00:30 on 1 January in Ljubljana and in Berlin.
+  - From IBKR it is dated 31 December.
+  - From Trading 212 it is dated 1 January, which is a different tax year (art. 104) and holding period.
+  - From Trade Republic's comma revision it is dated 1 January too, because its printed Berlin date would be 1 January and agrees with the Ljubljana date.
+  - The BSI rate changes only when the later day has its own list. 1 January has none, so that example still takes the 31 December list ([03 §9](03-bsi-exchange-rates.md#9-weekends-holidays-and-target-closing-days)).
+- **A change to the date rule also changes Trade Republic's refusal check.** `dateOf` refuses whatever `taxDate` reports as `moved`. The rule therefore decides which Trade Republic rows are refused, not only how rows are dated. Two examples, worked from the code as it stands *(inference; nothing tests a rule other than today's)*:
+  - Under a rule that took the UTC date, the trade above would be dated 31 December from IBKR and Trading 212. From Trade Republic, whose printed date is 1 January, it would be `moved`, so it would be refused.
+  - Under a rule that took the broker's printed date, it would be dated 31 December from IBKR and Trading 212 (Trading 212's printed date is its UTC date), and 1 January from Trade Republic.
+  - So under each of the three rules (today's and these two), the same trade gets two tax dates, or is refused, depending on the broker.
+- Only trades late in the day are affected. A New York trade takes a different date in Ljubljana from 18:00 New York time. In the weeks when only one of the US and the EU has changed its clocks, that starts at 19:00. A UTC timestamp takes a different date from 23:00 UTC in winter, and from 22:00 UTC in summer.
+- [06](06-brokers-ibkr-t212-revolut.md#open-questions) lists the same question among its open questions.
+
+**Confidence.**
+
+- Trade date, not settlement date: **high** (statute, FURS opis and navodila).
+- Which calendar dates a trade near midnight: **no primary source.** The Ljubljana-date policy is a design default, not a sourced rule. No text found states either it or the broker's printed date as the rule, or rules either out. The only lean found is the inference from column 6's *"razviden iz prodajne ali druge pogodbe oziroma iz drugih dokazil"* above, which points a disposal toward the date the broker prints, and for Trading 212 toward the UTC date *(inference)*. It is not support for a different rule.
+
+**Recommendation to the maintainer.** Ask FURS in writing; the draft is below. Until FURS answers, keep ADR 0011 §7's default and its `moved` warning: no primary source settles a different rule, and column 6's lean is an inference, not a rule. The trade-versus-settlement half needs no question.
+
+A change to the rule is not "one policy change plus golden files", as ADR 0011 §7 and #13 put it. Besides `taxDate` itself, two things read its `moved` flag:
+
+- Trade Republic's refusal check (above). Changing the rule changes which Trade Republic rows are refused.
+- Trading 212's `dateMovedToLjubljana` warning. Its name and its message ("Slovenian dates are used") assume today's rule.
+
+Two more things sit outside `taxDate`:
+
+- `dayOf` in `packages/core/src/validate.ts` calls `ljubljanaDate` directly, not `taxDate`. It supplies the from and to days of the overlap findings (`overlapKindMissing` and `overlapMismatch`) when both files carry a time on every event. Those days would stay Ljubljana dates after a change to `taxDate`.
+- Answer (b) of the draft question below, the calendar date at the exchange's location, cannot be computed inside `taxDate` from a UTC instant. `BrokerTime` (`packages/core/src/ledger.ts`) holds only the broker's `instant` and `brokerDate`, with no trading venue or time zone. The Trading 212 columns the adapter knows name no venue either: `Ticker` can be a venue's alias ([06 §4.2](06-brokers-ibkr-t212-revolut.md#42-columns-the-header-is-dynamic-fee-and-tax-columns-appear-only-when-used)), but it names none. That answer would need a venue or time zone carried with each event.
+
+Any change therefore needs architect review, a decision on Trade Republic's check and on `dayOf`, and golden-file updates; answer (b) also needs a venue or time zone in the ledger. #65 tracks pointing ADR 0011 §7, two code comments and [07](07-brokers-eu-and-others.md) at this subsection, and these two places.
+
+**Draft question to FURS (Slovenian).** It contains no personal data. The maintainer sends it; nothing has been sent.
+
+> Zadeva: Datum pridobitve in odsvojitve vrednostnih papirjev, kadar je posel pri tujem borznem posredniku sklenjen blizu polnoči
+>
+> Spoštovani,
+>
+> prosimo za pisno pojasnilo k 101. in 102. členu ZDoh-2 pri izpolnjevanju napovedi Doh-KDVP.
+>
+> Rezidenti Slovenije trgujejo prek tujih borznih posrednikov, ki čas posla navajajo različno. Nekateri navajajo datum posla po času borze (npr. newyorški čas), drugi le časovni žig v UTC.
+>
+> Primer: posel na ameriški borzi je sklenjen 31. 12. ob 18.30 po newyorškem času. To je 31. 12. ob 23.30 po UTC in 1. 1. ob 0.30 po slovenskem času.
+>
+> 1. Kateri datum se v tem primeru šteje za »datum sklenitve pogodbe« po 101. oziroma 102. členu ZDoh-2 in se vpiše v stolpec 1 oziroma 6 popisnega lista:
+>    (a) datum, ki je naveden na potrdilu oziroma izpisku borznega posrednika,
+>    (b) koledarski datum po času kraja borze ali
+>    (c) koledarski datum po slovenskem času?
+> 2. Kateri datum velja, kadar borzni posrednik navaja le časovni žig v UTC, brez datuma posla?
+> 3. Ali iz tako določenega datuma izhajajo tudi:
+>    - tečaj Banke Slovenije (deveti odstavek 98. člena in tretji odstavek 99. člena ZDoh-2),
+>    - davčno leto (104. člen ZDoh-2),
+>    - obdobje imetništva in
+>    - rok 30 dni iz petega odstavka 97. člena ZDoh-2?
+> 4. Ali enako velja za »datum prejema dividende« na napovedi Doh-Div, kadar posrednik dividendo pripiše blizu polnoči in navaja le časovni žig v UTC?
+>
+> Vprašanje je splošno in se ne nanaša na posameznega davčnega zavezanca.
+>
+> Za odgovor se vam lepo zahvaljujemo.
+
+**Draft question to FURS (English).** The same text, for the record. Send the Slovenian version.
+
+> Subject: The date of acquisition and disposal of securities when a trade at a foreign broker is concluded near midnight
+>
+> Dear Sir or Madam,
+>
+> We ask for a written explanation of Articles 101 and 102 ZDoh-2 as they apply to the Doh-KDVP return.
+>
+> Slovenian residents trade through foreign brokers that record the time of a trade differently. Some give the trade date on the exchange's clock (for example New York time); others give only a UTC timestamp.
+>
+> Example: a trade on a US exchange is concluded on 31 December at 18:30 New York time. That is 23:30 UTC on 31 December and 00:30 on 1 January in Slovenia.
+>
+> 1. Which date is the "date the contract was concluded" under Articles 101 and 102 ZDoh-2, to be entered in column 1 or 6 of the inventory list:
+>    (a) the date on the broker's confirmation or statement,
+>    (b) the calendar date at the exchange's location, or
+>    (c) the calendar date in Slovenia?
+> 2. Which date applies when the broker gives only a UTC timestamp, without a trade date?
+> 3. Do the following also follow from the date so determined:
+>    - the Banka Slovenije rate (Art. 98(9) and Art. 99(3) ZDoh-2),
+>    - the tax year (Art. 104 ZDoh-2),
+>    - the holding period, and
+>    - the 30-day window of Art. 97(5) ZDoh-2?
+> 4. Does the same apply to the "date of receipt of the dividend" on the Doh-Div return, when a broker credits a dividend near midnight and gives only a UTC timestamp?
+>
+> The question is general and does not concern any particular taxpayer.
+>
+> Thank you for your answer.
+
+**Still unknown:**
+
+- Which calendar dates a trade near midnight: the broker's printed date, the exchange's local date, or the Ljubljana date.
+- Whether a dividend credited near midnight follows the same rule (Doh-Div uses the date of receipt, [02 §3.4](02-furs-doh-div-and-others.md#34-dividend-record)).
+
+**Sources for this subsection**, all retrieved 2026-10-11:
+
+- **ZDoh-2, NPB 36** (from 5 Mar 2026): [PISRS consolidated-text file](https://pisrs.si/api/datoteke/integracije/358727637). Arts. 98(9), 99(3), 101, 102 and 104. The file was served with no `Last-Modified`; its SHA-256 is `173eaefcd5b2c29abcba9380771812eb1cf042d831512d30c09894e1d27e938b`.
+- **ZDavP-2, NPB 32** (from 2 Jul 2026): [PISRS consolidated-text file](https://pisrs.si/api/datoteke/integracije/594731150), searched in full. No `Last-Modified`; SHA-256 `2e20ae8dce5295364fbde66834f6dec1eeea720deca833ef2b679f5293c8aaf6`.
+- **FURS opis**, *Obresti, dividende, dobiček iz kapitala in dohodek z INR*, 15th edition, August 2026: [fu.gov.si](https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Dohodnina/Dohodek_iz_kapitala/Opis/Obresti_dividende_in_dobicek_iz_kapitala.doc). Q&A 6.2 Q17 and 6.3 Q13. `Last-Modified: Tue, 04 Aug 2026 10:10:50 GMT`; SHA-256 `2cb56d5a9cba07cb594044d84b5153e7c30ec943cd1885ab62cc59e0e744a832`.
+- **Doh-KDVP navodila, SL**: [doh_odm_kdvp_25.n.sl.pdf](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_kdvp_25.n.sl.pdf). `Last-Modified: Wed, 14 Jan 2026 06:30:35 GMT`; SHA-256 `0c8244f13f526b35c9fe601252ffd5c69125f9de8396c79cfeea648e608b4823`, the same file [01 §5.2](01-furs-doh-kdvp.md#52-securities-plvp-securitieswithcontract-is-the-same-plus-stockexchangename-max-30-after-isfond) pinned.
+- **Doh-KDVP navodila, EN**: [doh_odm_kdvp_25.n.en.pdf](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_kdvp_25.n.en.pdf). `Last-Modified: Tue, 10 Mar 2026 11:24:32 GMT`; SHA-256 `aa36a5da7a74f835e0d02012d817d07f0af3ae00630968ea62165b37aca09c74`.
+- **KP_KDVP_2.xsd**, Slovenian brokers' reports to FURS: [edavki.durs.si](https://edavki.durs.si/Documents/Schemas/KP_KDVP_2.xsd). `Last-Modified: Wed, 14 Jan 2026 12:58:57 GMT`; SHA-256 `dd70c82a0933010f4316d7a3eb4c229aeac6a99fce58f248d7e84a9c6458623d`. `KP_KDVP_3.xsd` returned 404.
+- **FURS, Usmeritve pri dostavi podatkov KP-KDVP**: [fu.gov.si](https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Dohodnina/Dohodek_iz_kapitala/Opis/Usmeritve_pri_dostavi_podatkov_KP-KDVP.docx). `Last-Modified: Tue, 20 Jun 2023 07:41:20 GMT`.
+- **Not readable, so not counted as checked:**
+  - the annex to the *Pravilnik o dostavi podatkov …* in [Uradni list RS 107/2025](https://www.uradni-list.si/files/RS_-2025-107-03651-OB~P001-0000.PDF);
+  - [PISRS publication 1409/2026](https://pisrs.si/api/uradni-list/objava/u20261409.pdf).
 
 ### 4.4 FIFO is mandatory, per taxpayer, across brokers
 
@@ -597,6 +752,14 @@ An independent verifier re-checked all 25 critical claims against the PISRS cons
 
 **Added after verification (2026-10-10):** §9.2, on rights handed out free to holders, was written later from the primary sources it lists and has not been independently verified. It rests on ZDoh-2 NPB 36 (arts. 16(3), 90, 93, 94, 97(5), 98, 99, 100, 101 and 105, which read the same in NPB 35 apart from INR paragraphs and new articles not cited), ZTFI-1 NPB 4 (arts. 7, 25 and 49), the FURS opis (Q&A 6.1 Q1, Q6 and Q10), the FURS IFI brochure and the eDavki Doh-KDVP form. ZDDPO-2, whose related-person definition art. 90(3) also points to, was read only in a mirror (racunovodstvo.net, art. 16), not in PISRS's own file, and MiFIR art. 2(1)(29), which ZTFI-1 art. 7(5) points to, was not read from EUR-Lex. The §9 row's "high" confidence for the plain case rests on this unverified update, as §9.1's row does. The same day a §9 row pointed to it, and the Open questions entries on rights and on warrants were updated.
 
+**Added after verification (2026-10-11):** §4.3.1, on trades near midnight and the broker's time zone (#13), was written later from the primary sources it lists and has not been independently verified. Its settled half rests on these texts:
+
+- ZDoh-2 NPB 36, arts. 98(9), 99(3), 101, 102 and 104, read in PISRS's own file;
+- the FURS opis, Q&A 6.2 Q17 and 6.3 Q13;
+- the Doh-KDVP navodila, in Slovenian and English.
+
+It confirms §4.3 (trade date, not settlement date) and adds the opis's location for the settlement quote in [01 §8](01-furs-doh-kdvp.md#8-modeling-rules-for-a-correct-filing). Its other half is "not found": no text read says which calendar dates a trade near midnight. It lists what was searched, including two regulation annexes that did not extract readably and are not counted. The same day, an Open questions entry was added and the merger-date entry was pointed to §4.3.1. Its account of what the app does today was read from the code of all three adapters (IBKR, Trading 212 and Trade Republic) and of `dates.ts`, `validate.ts` and `ledger.ts` in `packages/core`, not from a primary source.
+
 **Claims not confirmed:** none.
 
 **Confirmed claims with minor corrections:**
@@ -649,6 +812,7 @@ An independent verifier re-checked all 25 critical claims against the PISRS cons
 
 ## Open questions
 
+- Which calendar dates a trade concluded near midnight, when the broker prints the exchange's date in US Eastern time or only a UTC timestamp: the broker's printed date, the exchange's local date, or the Ljubljana date (§4.3.1, #13)? The date also picks the tax year, the BSI rate and the holding period. No primary source found answers it (searched 2026-10-11). The app's Ljubljana-date default (ADR 0011 §7) is a design choice. IBKR events keep the exchange's date, and Trade Republic refuses a timed row whose Ljubljana date differs from its printed date (usually the Berlin date), so a change to the rule also changes which Trade Republic rows are refused. A draft written question to FURS, in Slovenian and English, is in §4.3.1. (Trade date versus settlement date is settled: the trade date, §4.3.1.)
 - Lots bought on the same day: is the time of acquisition the order Art. 103(1) means, and what applies when an export gives no time (§4.4)? No FURS example covers it.
 - Which BSI rate to use when no reference rate is published that day (weekends, TARGET holidays)? BSI says rates have no prescribed validity period, and no FURS primary text was found. Prior art (ib-edavki) uses the last earlier published rate. This should be cross-checked with the BSI research note and ideally with a FURS written answer. ([03 §9](03-bsi-exchange-rates.md#9-weekends-holidays-and-target-closing-days): BSI's own lookup returns the last list on or before the day; verified as website behavior, not law.)
 - Boundary-day counting for "po dopolnjenih 5/10 letih" and "po 15 letih imetništva": does a sale on the exact anniversary date already get the lower rate or exemption? eDavki computes the tax, so test with real filings.
@@ -668,7 +832,7 @@ An independent verifier re-checked all 25 critical claims against the PISRS cons
   The readers still refuse every such row, whatever its case: Trading 212's `Custom stock distribution` and `Equity rights`, IBKR's RI, SR, DI and ED corporate actions (SR is an exercise, DI and ED are dividend rights, none of them settled here), and Trade Republic's corporate actions as a category. Reading the settled cases is #29's second task.
 - Which market price values a taxable exchange of shares (art. 99(1)): the old shares' last price before they stopped trading, or the shares received at the exchange? No FURS text answers it for an individual's taxable exchange. §9.1 recommends the shares received, which ZDDPO-2 arts. 45(2) and 49(4) and ZDavP-2 arts. 332, 380(8)(2) and 381(8)(8) all point toward.
 - The Doh-KDVP code for shares received in an exchange offer without a merger (ZDDPO-2 art. 44): `E` names status changes, such as mergers and divisions, so is it `H` (*drugo*)? (§9.1)
-- The date of a merger's exchange of shares: the day the merger took legal effect, which §9.1 infers from the "other evidence" clause of arts. 101(1) and 102, the day the merger agreement was signed, or, for the company that merges away, the date of the resolution on its termination (art. 102)? It decides the tax year, the holding period and the exchange rate. ZDavP-2 art. 380(2) dates a deferrable exchange by its entry in the court register, which supports the first. Related: #13, the source for the trade-date rule.
+- The date of a merger's exchange of shares: the day the merger took legal effect, which §9.1 infers from the "other evidence" clause of arts. 101(1) and 102, the day the merger agreement was signed, or, for the company that merges away, the date of the resolution on its termination (art. 102)? It decides the tax year, the holding period and the exchange rate. ZDavP-2 art. 380(2) dates a deferrable exchange by its entry in the court register, which supports the first. Related: #13, the source for the trade-date rule (§4.3.1, which covers exchange trades and does not answer this case).
 - Treatment of payments in lieu of dividends, IBKR stock-lending (SYEP) income, and Trading 212 cash interest (deposit interest with the EUR 1,000 allowance versus other interest).
 - Does FURS compute the foreign tax credit per Doh-Div row or aggregated per country or year? Should `ForeignTax` be entered as the full amount withheld (30%) or capped at the treaty rate? The instructions say to enter the tax paid. (Per the verifier, enter the tax actually paid and FURS applies the cap; the per-row versus aggregate question remains open.)
 - Identity key for "istovrstni kapital" in FIFO and wash-sale matching: is ISIN sufficient, and how should ISIN changes after corporate actions be linked?
@@ -687,6 +851,9 @@ Also raised during verification:
 - [FURS - Odlog ugotavljanja davčne obveznosti](https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Dohodnina/Dohodek_iz_kapitala/Opis/Odlog_ugotavljanja_davcne_obveznosti.doc)
 - [FURS - Davek od dobička od odsvojitve izvedenih finančnih instrumentov, brošura (julij 2026)](https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Davek_od_dobicka_od_odsvojitve_izvedenih_financnih_instrumentov/Opis/Obdavcitev_dobicka_od_odsvojitve_izvedenih_financnih_instrumentov.docx)
 - [eDavki - Navodilo Doh-KDVP (2025 form)](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_kdvp_25.n.sl.pdf)
+- [eDavki - Doh-KDVP instructions, English edition (2025 form)](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_kdvp_25.n.en.pdf) (read for §4.3.1)
+- [eDavki - KP_KDVP_2.xsd (Slovenian brokers' reports to FURS)](https://edavki.durs.si/Documents/Schemas/KP_KDVP_2.xsd) (read for §4.3.1)
+- [FURS - Usmeritve pri dostavi podatkov KP-KDVP](https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Dohodnina/Dohodek_iz_kapitala/Opis/Usmeritve_pri_dostavi_podatkov_KP-KDVP.docx) (read for §4.3.1)
 - [eDavki - Obrazec Doh-KDVP (2025)](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_kdvp_25.i.sl.pdf)
 - [eDavki - Navodilo za izpolnjevanje napovedi za odmero dohodnine od dividend (March 2026)](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_div.n.sl.pdf)
 - [eDavki - Doh-Div XML navodilo](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_div_xml.n.sl.pdf)
