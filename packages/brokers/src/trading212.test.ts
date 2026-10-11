@@ -871,6 +871,21 @@ describe("importFile", () => {
     ]);
   });
 
+  it("does not know an export re-saved with semicolons, as before they were read", () => {
+    // A spreadsheet in a continental locale writes semicolons, and may
+    // have rewritten numbers and dates with them: the file fails whole,
+    // never row by row.
+    const resaved = fixture("t212-invest-v4-2026.csv").replaceAll(",", ";");
+    expect(read(resaved).diagnostics).toEqual([
+      { severity: "blocking", code: "unknownFormat", params: {} },
+    ]);
+    expect(
+      read(
+        "RecordType;Time;Ticker;Quantity\nCLOSED_POSITION;2026-01-06 14:31:02;KO;2\n",
+      ).diagnostics.map((d) => d.code),
+    ).toEqual(["unknownFormat"]);
+  });
+
   it("refuses a file no adapter knows, or that is not CSV at all", () => {
     expect(read("Date,Amount\n2026-01-01,5\n").diagnostics).toEqual([
       { severity: "blocking", code: "unknownFormat", params: {} },

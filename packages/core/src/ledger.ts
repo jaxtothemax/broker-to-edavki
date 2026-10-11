@@ -182,7 +182,17 @@ export type IgnoredReason =
    * D-IFI, which this version does not build. Exercises and assignments,
    * which make share trades, are refused, never left out.
    */
-  | "derivative";
+  | "derivative"
+  /** Cash given or received as a gift; a gift of securities never. */
+  | "gift"
+  /**
+   * A broker settling a tax of its own country with the account, on no
+   * income or sale of this ledger: a German tax refund or the German
+   * Vorabpauschale (InvStG §18) at Trade Republic. Never the withholding of
+   * a dividend, which is foreign tax on Doh-Div, and never a row that moves
+   * any amount but tax.
+   */
+  | "brokerTaxSettlement";
 
 export interface IgnoredRow {
   readonly kind: "ignored";

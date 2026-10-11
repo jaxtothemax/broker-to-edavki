@@ -814,10 +814,15 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
   };
 }
 
-/** Trading 212 Invest and ISA history exports. */
+/**
+ * Trading 212 Invest and ISA history exports. Every revision is written with
+ * commas: one read with semicolons is a re-save in another locale, whose
+ * numbers and dates may have changed with it, and is no export this knows.
+ */
 export const trading212: CsvAdapter = {
   broker: TRADING212,
-  matches: (header) =>
+  matches: (header, delimiter) =>
+    delimiter === "," &&
     header.includes("Action") &&
     (header.includes("Time") || header.includes("Time (UTC)")) &&
     header.includes("ISIN") &&
@@ -835,8 +840,10 @@ export const trading212: CsvAdapter = {
  */
 export const trading212Cfd: CsvAdapter = {
   broker: TRADING212,
-  matches: (header) =>
-    header.includes("RecordType") && header.includes("Ticker"),
+  matches: (header, delimiter) =>
+    delimiter === "," &&
+    header.includes("RecordType") &&
+    header.includes("Ticker"),
   read: () => ({
     broker: TRADING212,
     format: "trading212-cfd-csv",

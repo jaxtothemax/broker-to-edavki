@@ -17,7 +17,7 @@ import {
   type LedgerEvent,
 } from "@taxreporter/core";
 
-import { CsvError, readCsv, type CsvTable } from "./csv.js";
+import { CsvError, readCsv, type CsvDelimiter, type CsvTable } from "./csv.js";
 import { ibkr } from "./ibkr.js";
 import { tradeRepublic } from "./trade-republic.js";
 import { decodeUtf8, sniff } from "./intake.js";
@@ -68,8 +68,12 @@ export interface ReadContext {
 /** An adapter for a CSV export. */
 export interface CsvAdapter {
   readonly broker: string;
-  /** Recognizes the export by its header alone. */
-  matches(header: readonly string[]): boolean;
+  /**
+   * Recognizes the export by its header, and the delimiter the header line
+   * chose (`CsvTable.delimiter`): a header known with commas, read from a
+   * file re-saved with semicolons, is no export the adapter knows.
+   */
+  matches(header: readonly string[], delimiter: CsvDelimiter): boolean;
   read(table: CsvTable, context: ReadContext): ImportResult;
 }
 
@@ -168,11 +172,11 @@ function looksLikeXml(text: string): boolean {
  * file none recognizes, or more than one does, is never read on a guess.
  * Every family chooses through here.
  */
-function exactlyOne<T, A extends { matches(seen: T): boolean }>(
+function exactlyOne<A>(
   adapters: readonly A[],
-  seen: T,
+  matches: (adapter: A) => boolean,
 ): { readonly adapter: A } | { readonly refusal: ImportResult } {
-  const matching = adapters.filter((a) => a.matches(seen));
+  const matching = adapters.filter(matches);
   const [adapter] = matching;
   if (adapter === undefined) return { refusal: refused("unknownFormat", {}) };
   if (matching.length > 1) return { refusal: refused("ambiguousFormat", {}) };
@@ -182,7 +186,8 @@ function exactlyOne<T, A extends { matches(seen: T): boolean }>(
 /** The XML family: the root picks the adapter, which reads the rest. */
 function importXml(text: string, context: ReadContext): ImportResult {
   try {
-    const chosen = exactlyOne(XML_ADAPTERS, peekRoot(text));
+    const root = peekRoot(text);
+    const chosen = exactlyOne(XML_ADAPTERS, (a) => a.matches(root));
     if ("refusal" in chosen) return chosen.refusal;
     return capped(chosen.adapter.read(text, context));
   } catch (error) {
@@ -207,10 +212,8 @@ export function importXlsx(
     if (typeof book === "string") {
       return refused("fileRefused", { reason: book });
     }
-    const chosen = exactlyOne(adapters, {
-      sheets: book.sheets,
-      date1904: book.date1904,
-    });
+    const info = { sheets: book.sheets, date1904: book.date1904 };
+    const chosen = exactlyOne(adapters, (a) => a.matches(info));
     if ("refusal" in chosen) return chosen.refusal;
     return capped(chosen.adapter.read(book, context));
   } catch (error) {
@@ -253,7 +256,9 @@ export function importFile(request: ImportRequest): ImportResult {
       row: error.row,
     });
   }
-  const chosen = exactlyOne(CSV_ADAPTERS, table.header);
+  const chosen = exactlyOne(CSV_ADAPTERS, (a) =>
+    a.matches(table.header, table.delimiter),
+  );
   if ("refusal" in chosen) return chosen.refusal;
   return capped(chosen.adapter.read(table, context));
 }

@@ -174,38 +174,61 @@ Position ID	Action	Long / Short	Amount	Units / Contracts	Open Date	Close Date	Le
 
 **CSV export (April 2026)** [M]: Profile → Account statements → **Transaction export** → *All transactions* or a period → Create → Download. It is reported to be app-only. One file covers the securities account, the cash account and crypto. `GhostfolioSidekick` added its parser on 2026-04-17.
 
-**Header (23 columns, every field quoted)** [M]:
+**Two header revisions, 23 columns each** [H]. Updated 2026-10-10 from the six exports that [Portfolio Performance's importer is tested on](https://github.com/portfolio-performance/portfolio/tree/96f6040818d5b5e8aeaca63e60e7e6857b4befa2/name.abuchen.portfolio.tests/src/name/abuchen/portfolio/datatransfer/traderepublic) (pinned at `96f6040`, EPL-1.0, read and never copied), which look real: real ISINs, German residents' tax rows, and two transaction IDs (export 05) that are UUIDv7 whose time matches their row's `datetime`; the other 361 IDs are v4, which an anonymizer may have written. Which revision is the older is not known: export 01 holds rows from 2021, but its file is undated. Recorded in [ADR 0019](../adr/0019-trade-republic-export-revisions-and-row-types.md).
 
-```text
-"datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"
-```
+- **Comma revision**, quoted (exports 02–04) or not (05, 06):
 
-**Enumerations seen in parser fixtures** [M]:
+  ```text
+  "datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"
+  ```
 
-- `account_type`: `DEFAULT`.
+- **Semicolon revision**, unquoted (export 01, 339 rows from 2021 to 2026): the same columns with `value_date` after `transaction_id` and no `mcc_code`:
+
+  ```text
+  datetime;date;account_type;category;type;asset_class;name;symbol;shares;price;amount;fee;tax;currency;original_amount;original_currency;fx_rate;description;transaction_id;value_date;counterparty_name;counterparty_iban;payment_reference
+  ```
+
+  Its descriptions hold commas, so only the header line tells the delimiter. Every `datetime` is `<date>T00:00:00.000000Z`, a placeholder rather than a time. `value_date` is the settlement: two business days after `date` on 148 of 162 purchases (two to six calendar days), the same day on the 14 of crypto, and before `date` on the tax-base rows.
+
+**Enumerations** ([M] from parser fixtures; [H] where the exports above show them):
+
+- `account_type`: `DEFAULT`; `JUNIOR`, a child's account [H].
 - `category`: `TRADING`, `CASH`, `CORPORATE_ACTION`, `DELIVERY`.
 - `type`:
-  - trading: `BUY`, `SELL`, `SAVINGS_PLAN_EXECUTED`
-  - income: `DIVIDEND`, `INTEREST_PAYMENT`
-  - rewards: `BENEFITS_SAVEBACK`, `STOCKPERK`, `BONUS`
+  - trading: `BUY`, `SELL`, `SAVINGS_PLAN_EXECUTED` (the semicolon revision writes savings plans as `BUY` [H])
+  - income: `DIVIDEND`, `DISTRIBUTION` (a fund's), `INTEREST_PAYMENT` (cash interest, or a bond's coupon on a row naming the bond) [H]
+  - `DIVIDEND_EQUIVALENT_PAYMENT`, described as "Capital Distribution": a return of capital [H]
+  - rewards: `BENEFITS_SAVEBACK` (a cash row with no security in export 01, followed the next day by a purchase of the same amount [H]), `STOCKPERK`, `BONUS`
   - card: `CARD_TRANSACTION`, `CARD_TRANSACTION_INTERNATIONAL`
-  - transfers: `CUSTOMER_INBOUND`, `CUSTOMER_INPAYMENT`, `CUSTOMER_OUTBOUND_REQUEST`, `TRANSFER_INSTANT_INBOUND`, `TRANSFER_INSTANT_OUTBOUND`
-  - corporate actions and other: `REDEMPTION`, `FINAL_MATURITY`, `MIGRATION`, `PRIVATE_MARKET_BUY`
-- `asset_class`: `STOCK`, `FUND`, `BOND`, `PRIVATE_FUND` (crypto likely, not yet seen).
-- `symbol` holds the **ISIN**.
+  - transfers: `CUSTOMER_INBOUND`, `CUSTOMER_INPAYMENT`, `CUSTOMER_OUTBOUND_REQUEST`, `TRANSFER_INSTANT_INBOUND`, `TRANSFER_INSTANT_OUTBOUND`, and [H] `TRANSFER_IN`, `TRANSFER_OUT`, `TRANSFER_INBOUND`; `TRANSFER_DIRECT_DEBIT_INBOUND` is always money out, a direct debit [M, [libtraderepublic](https://github.com/aritzmmartinez/libtraderepublic) SCHEMA.md]
+  - `GIFT`: cash only, either sign, in export 01 [H]
+  - German tax [H]: `TAX_OPTIMIZATION` (a German tax refund or charge, cash, `amount` 0), `EARNINGS` (the Vorabpauschale, [InvStG §18](https://www.gesetze-im-internet.de/invstg_2018/__18.html), on a fund, `amount` 0) and `PRE_DETERMINED_TAX_BASE` (its tax base, likewise)
+  - bonds and derivatives [H]: `SEC_ACCOUNT` (bond), `TILG` (a derivative's redemption), and as corporate actions `REDEMPTION`, `FINAL_MATURITY`, `WARRANT_EXERCISE`, `SPLIT`
+  - other: `MIGRATION`, `PRIVATE_MARKET_BUY`
+- `asset_class`: `STOCK`, `FUND`, `BOND`, `PRIVATE_FUND`, `CRYPTO` (symbol a ticker such as `BTC`, not an ISIN) and `DERIVATIVE` [H]; `SYNTHETIC`, a gold certificate [M, libtraderepublic].
+- `symbol` holds the **ISIN**, except for crypto.
 
 **Formats.**
 
-- Dot decimals; `shares` has 10 decimal places (fractional savings plans); sells carry negative `shares`.
-- `amount` is the signed cash flow and `fee` is negative.
-- `datetime` is UTC (`…Z`) while `date` is the local Berlin date: `2024-02-14T23:19:02Z` belongs to `2024-02-15`.
+- Dot decimals; `shares` has 10 decimal places (fractional savings plans); sells carry negative `shares`. `amount` has 2 or 6 decimals, `price` 6 or 10.
+- `amount` is the signed cash flow and `fee` is negative. On every share, fund and crypto trade of the exports `amount` is gross, quantity times price within a cent, with the fee and tax beside it (174 of 179 trades in export 01; the other 5 are bond purchases with accrued interest) [H].
+- `tax` on a trade appears on five fund sales of export 01 (German capital-gains tax) [H]; libtraderepublic reports it on some purchases too [M].
+- In the comma revision `datetime` is UTC (`…Z`, with 0, 3 or 6 fractional digits) and `date` the local Berlin date: `2024-02-14T23:19:02Z` belongs to `2024-02-15`. **Not always:** dividend corrections in export 04 were booked at 12:17 UTC on 28 March and carry `date` 27 March [H]. Some cash rows of the comma revision also carry a bare midnight (`2026-03-13T00:00:00Z`, exports 02 and 06) [H].
+
+**Dividends** [H for the arithmetic, from exports 01, 04 and 05]:
+
+- `amount` is the gross in euros at Trade Republic's rate: `original_amount` × `fx_rate` (34.51 USD × 0.857265 = 29.58; 479.34 NOK × 0.086745 = 41.58). `original_amount` is the gross in the paying currency, and `fx_rate` is euros per unit of it, the inverse of a BSI quote. A euro dividend leaves all three empty.
+- `tax` is what Trade Republic withheld, in euros. **In these German residents' exports it includes German tax** (Aker, 15.53 on 41.58: 37%, above Norway's 25%), so what it holds for a Slovenian resident is still unknown.
+- A correction comes as a reversal (negative `amount`, positive `tax`) and a rebooking, up to a year after the payment, with a `date` of its own.
 
 **Pitfalls:**
 
 - `MIGRATION` comes as a −n/+n pair; it is not a disposal.
-- Saveback and stockperk acquisitions are free shares. Their cost basis is a tax question.
-- The exact meaning of `amount`/`tax`/`original_amount` on dividends is unconfirmed [L]. Parsers treat `amount` as gross EUR and `tax` as withholding. Verify against TR's dividend PDF.
-- Filter out card and transfer noise by `category`.
+- Saveback paid as cash is a cash row with no security, followed by an ordinary purchase of the same amount (export 01: +0.09 on 1 March, a 0.09 `BUY` the next day) [H]: card cashback, then a purchase at market price. A Saveback or stock-perk row that names a security is a free share, whose cost basis is a tax question.
+- `tax` on a sale in German residents' exports is German tax. Whether any of it could be credited on Doh-KDVP (`HasForeignTax`, research 04 §3; ZDoh-2 art. 137(2) limits a credit to the treaty's rate) depends on what the Slovenia–Germany treaty allows Germany on gains from shares, which this research has not yet read (#58).
+- A Slovenian resident's dividend `tax` is unconfirmed: see above. Verify against TR's dividend PDF.
+- Filter out card and transfer noise by `category`, and take a cash type only on a row with no security.
+- Descriptions and counterparty columns hold names and IBANs (`Outgoing transfer for <name> (<IBAN>)`).
 
 **Synthetic sample:**
 
@@ -476,7 +499,7 @@ The researcher rated these critical claims below high confidence:
 |---|---|---|
 | medium | An eToro closed position goes to D-IFI rather than Doh-KDVP if its Type is CFD (or OPT/FUT/FOP/Crypto Margin), or Leverage > 1, or it is a Short position; real assets are only long, unleveraged Stocks/ETF. | [masbug/etoro-edavki](https://github.com/masbug/etoro-edavki/blob/5f607d9e99/etoro_edavki.py) |
 | medium | In eToro statements, Amount/Profit/fee columns are in USD while Open Rate/Close Rate are in the instrument's currency; `FX rate at open/close (USD)` converts the instrument currency to USD (`-` or 1 for USD instruments). For leveraged CFDs, Amount is the margin and notional = Amount × Leverage. | [masbug/etoro-edavki](https://github.com/masbug/etoro-edavki/blob/5f607d9e99/etoro_edavki.py) |
-| medium | Trade Republic's native CSV export (April 2026) has 23 quoted columns (datetime … mcc_code); `symbol` holds the ISIN, `datetime` is UTC and `date` is the local (Berlin) date. | [GhostfolioSidekick TradeRepublicCsvRecord.cs](https://github.com/VibeNL/GhostfolioSidekick/blob/b0e397559035069670983551ed907216834e6d70/Parsers/TradeRepublic/TradeRepublicCsvRecord.cs) |
+| superseded by §4.2 (2026-10-10) | Trade Republic's native CSV export (April 2026) has 23 quoted columns (datetime … mcc_code); `symbol` holds the ISIN, `datetime` is UTC and `date` is the local (Berlin) date. §4.2 now has two revisions, quoted or not, and `date` not always the Berlin date of `datetime`. | [GhostfolioSidekick TradeRepublicCsvRecord.cs](https://github.com/VibeNL/GhostfolioSidekick/blob/b0e397559035069670983551ed907216834e6d70/Parsers/TradeRepublic/TradeRepublicCsvRecord.cs) |
 | medium | Trade Republic CSV `type` values include BUY, SELL, SAVINGS_PLAN_EXECUTED, DIVIDEND, INTEREST_PAYMENT, MIGRATION, REDEMPTION, FINAL_MATURITY; MIGRATION appears as a −n/+n pair of the same ISIN and is not a disposal. | [GhostfolioSidekick TR test files](https://github.com/VibeNL/GhostfolioSidekick/tree/b0e397559035069670983551ed907216834e6d70/Parsers.UnitTests/TestFiles/TradeRepublic/CSV) |
 | medium | XTB cash-operation Type spellings vary (`DIVIDENT`/`Dividend`, `Withholding Tax`/`Withholding tax`, `Stocks/ETF purchase`/`Stock purchase`, localized variants); withholding comments look like `AAPL.US USD WHT 15%`. | [Export-To-Ghostfolio XTB sample](https://github.com/dickwolff/Export-To-Ghostfolio/blob/9e35bd602f054f563b8c728bcb36dc5eb2bbcaa5/samples/xtb-export.csv) |
 | medium | DEGIRO's current English Transactions.csv and Account.csv headers are as given in §4.4 (blank headers hold currency codes); dividends and withholding exist only in Account.csv. | [GhostfolioSidekick DEGIRO test files](https://github.com/VibeNL/GhostfolioSidekick/tree/b0e397559035069670983551ed907216834e6d70/Parsers.UnitTests/TestFiles/DeGiro) |
@@ -487,11 +510,11 @@ The researcher rated these critical claims below high confidence:
 | medium | Scalable Capital's broker is only offered to residents of Germany, Austria, Italy, Spain, metropolitan France and the Netherlands (not Slovenia). | [Scalable trading FAQ](https://de.scalable.capital/en/trading-faq) |
 | medium | The ZDDOIFI amendment setting a flat 25% tax on derivative gains regardless of holding period was passed by the National Assembly in October 2025; the separate 25% crypto-gains bill (ZDDKS) was withdrawn from the December 2025 agenda (not in force for 2026). | [Svet24](https://svet24.si/novice/slovenija/davek-od-dobicka-od-odsvojitve-izvedenih-financnih-instrumentov-1856769) |
 
-**Before shipping a parser:** every fixture derived from this page must be validated against real (anonymized) exports from the broker, UI language and export version it claims to represent. The synthetic samples copy headers from public sources and contain no real account data; several formats (Trade Republic dividends, Saxo withholding, Bitpanda Real Securities) have not been seen in a real export at all.
+**Before shipping a parser:** every fixture derived from this page must be validated against real (anonymized) exports from the broker, UI language and export version it claims to represent. The synthetic samples copy headers from public sources and contain no real account data; several formats (Saxo withholding, Bitpanda Real Securities) have not been seen in a real export at all, and Trade Republic dividends only in German residents' exports (§4.2).
 
 ## Open questions
 
-- Exact semantics of Trade Republic CSV dividend fields: is `amount` gross or net EUR, and is `original_amount` gross or net in the original currency? Verify against a TR dividend PDF before using for Doh-Div.
+- Trade Republic CSV dividend fields: `amount` is the gross in EUR and `original_amount` the gross in the paying currency (§4.2, settled from exports that look real). Still open: what `tax` holds for a Slovenian resident; verify against a Slovenian resident's TR dividend PDF before using for Doh-Div (#12).
 - What Asset class / Transaction Type labels do Bitpanda Real Securities (real shares) use in the CSV, and is an ISIN ever exported? No primary sample found.
 - Tax classification under Slovenian law of Bitpanda legacy "Stock (derivative)" contracts: D-IFI (derivative) versus Doh-KDVP. No FURS position found.
 - eToro statement time zone (GMT vs local), whether eToro records splits as explicit Account Activity rows, and how partial closes create new Position IDs.

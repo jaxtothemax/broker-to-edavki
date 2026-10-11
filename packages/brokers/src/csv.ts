@@ -6,7 +6,11 @@
  * name stops the import instead of shifting a value into the wrong column.
  *
  * RFC 4180, plus what broker exports add: an optional byte-order mark, LF or
- * CRLF line ends, and empty lines, which carry no data and are skipped.
+ * CRLF line ends, empty lines, which carry no data and are skipped, and a
+ * semicolon in place of the comma, as one revision of Trade Republic's
+ * export (research 07 §4.2) and DEGIRO's continental-European exports
+ * write (research 07 §4.4). The header
+ * line chooses the delimiter before any row is read; see `delimiterOf`.
  * Errors name a rule and a row number, never a value from the file.
  */
 import { LIMITS, type CsvReason } from "@taxreporter/core";
@@ -55,7 +59,16 @@ export interface CsvRow {
   readonly cells: readonly string[];
 }
 
+/** The two delimiters a broker export uses between cells. */
+export type CsvDelimiter = "," | ";";
+
 export interface CsvTable {
+  /**
+   * The delimiter the header line chose. An adapter ties each header it
+   * knows to the delimiter that header was seen with, so a file re-saved by
+   * a spreadsheet in another locale fails as a whole, not row by row.
+   */
+  readonly delimiter: CsvDelimiter;
   readonly header: readonly string[];
   readonly rows: readonly CsvRow[];
   /**
@@ -67,9 +80,45 @@ export interface CsvTable {
 
 const QUOTE = 0x22;
 const COMMA = 0x2c;
+const SEMICOLON = 0x3b;
 const LF = 0x0a;
 const CR = 0x0d;
 const BOM = 0xfeff;
+
+/**
+ * The delimiter of the header line: the first line with text, past the
+ * byte-order mark and any empty lines, as the reader skips them. A comma
+ * outside quotes chooses the comma, as before semicolons were read, so
+ * every file that read before reads the same; a header with only
+ * semicolons outside quotes chooses the semicolon. Choosing wrong cannot
+ * misread a file: adapters match exact header names, so a wrong split ends
+ * in an unknown format or a row of the wrong length. One pass to the end of
+ * the line, quotes respected (a doubled quote toggles twice), no regular
+ * expression.
+ */
+function delimiterOf(text: string, start: number): CsvDelimiter {
+  let pos = start;
+  // Empty lines first, LF or CRLF, as the reader skips them.
+  for (;;) {
+    const c = text.charCodeAt(pos);
+    if (c === LF) pos += 1;
+    else if (c === CR && text.charCodeAt(pos + 1) === LF) pos += 2;
+    else break;
+  }
+  let quoted = false;
+  let semicolons = false;
+  for (; pos < text.length; pos += 1) {
+    const c = text.charCodeAt(pos);
+    if (c === QUOTE) {
+      quoted = !quoted;
+    } else if (!quoted) {
+      if (c === COMMA) return ",";
+      if (c === SEMICOLON) semicolons = true;
+      else if (c === LF || c === CR) break;
+    }
+  }
+  return semicolons ? ";" : ",";
+}
 
 /** Reads `text` as CSV with a header row; see the module comment for the rules. */
 export function readCsv(
@@ -79,6 +128,8 @@ export function readCsv(
   if (text.length > limits.maxLength) throw new CsvError("tooLarge", 0);
   const end = text.length;
   let pos = text.charCodeAt(0) === BOM ? 1 : 0;
+  const delimiter = delimiterOf(text, pos);
+  const separator = delimiter === ";" ? SEMICOLON : COMMA;
   let row = 0;
   let header: string[] | undefined;
   let headerRow = 0;
@@ -107,7 +158,7 @@ export function readCsv(
       let cell: string;
       if (text.charCodeAt(pos) === QUOTE) {
         // Quoted: "" stands for a quote, and everything else is literal,
-        // line breaks and commas included.
+        // line breaks and delimiters included.
         pos += 1;
         const parts: string[] = [];
         let length = 0;
@@ -126,17 +177,17 @@ export function readCsv(
           pos += 1;
         }
         cell = parts.join("");
-        // After the closing quote: a comma, a line end or the end of text.
-        if (pos < end && text.charCodeAt(pos) !== COMMA && !lineEnd(pos)) {
+        // After the closing quote: a delimiter, a line end or the end of text.
+        if (pos < end && text.charCodeAt(pos) !== separator && !lineEnd(pos)) {
           throw new CsvError("strayQuote", row);
         }
       } else {
-        // Unquoted: up to the next comma or line end. A quote inside is not
-        // RFC 4180, and a lone CR is no line end: both are refused.
+        // Unquoted: up to the next delimiter or line end. A quote inside is
+        // not RFC 4180, and a lone CR is no line end: both are refused.
         let at = pos;
         while (at < end) {
           const c = text.charCodeAt(at);
-          if (c === COMMA || c === LF) break;
+          if (c === separator || c === LF) break;
           if (c === CR) {
             if (text.charCodeAt(at + 1) === LF) break;
             throw new CsvError("strayCarriageReturn", row);
@@ -151,7 +202,7 @@ export function readCsv(
         pos = at;
       }
       cells.push(cell);
-      if (pos < end && text.charCodeAt(pos) === COMMA) {
+      if (pos < end && text.charCodeAt(pos) === separator) {
         pos += 1;
         continue;
       }
@@ -179,6 +230,7 @@ export function readCsv(
     columns.set(name, index);
   }
   return {
+    delimiter,
     header,
     rows,
     column: (name) => columns.get(name),

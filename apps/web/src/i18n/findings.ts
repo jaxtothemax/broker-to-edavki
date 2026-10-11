@@ -299,6 +299,12 @@ export const findingsEn: FindingMessages = {
     `${p.broker}: interest rows (${p.count}) are not on these returns. Interest is filed on Doh-Obr, which TaxReporter does not prepare yet.`,
   derivativesNotCovered: (p) =>
     `${p.broker}: option, future, CFD and warrant trades (${p.count}) are not on these returns. Derivatives are filed on D-IFI, which TaxReporter does not prepare yet.`,
+  brokerTaxSettled: (p) =>
+    `${p.broker}: rows of tax the broker settled under German rules (${p.count}), such as a tax refund, the Vorabpauschale or tax withheld on a sale, are left off these returns; the sales themselves are on Doh-KDVP. Whether German tax withheld on a sale may be entered on Doh-KDVP as tax paid abroad is not settled yet, so TaxReporter enters none.`,
+  juniorAccount: (p) =>
+    `${p.broker}: this file holds rows of a child's (Junior) account (${p.count}), which belongs to the child, another taxpayer. TaxReporter does not read Junior accounts, so those rows are not read with yours: export your own account.`,
+  missingTransactionId: (p) =>
+    `${p.broker}: a trade has no transaction ID, which TaxReporter needs to tell it apart from a trade alike in all else. Export the file again from the broker, unchanged.`,
   // Interactive Brokers Flex statements
   statementCountMismatch: (p) =>
     `The file says it holds ${p.declared} statements, but ${p.found} are in it, so it was cut short or changed. Export it again from Interactive Brokers, unchanged.`,
@@ -703,6 +709,12 @@ export const findingsSl: FindingMessages = {
     `${p.broker}: vrstice z obrestmi (${p.count}) niso v teh napovedih. Obresti se prijavijo na obrazcu Doh-Obr, ki ga TaxReporter še ne pripravlja.`,
   derivativesNotCovered: (p) =>
     `${p.broker}: posli z opcijami, terminskimi pogodbami, CFD in varanti (${p.count}) niso v teh napovedih. Izvedeni finančni instrumenti se prijavijo na obrazcu D-IFI, ki ga TaxReporter še ne pripravlja.`,
+  brokerTaxSettled: (p) =>
+    `${p.broker}: vrstice z davkom, ki ga je posrednik obračunal po nemških pravilih (${p.count}), kot so vračilo davka, Vorabpauschale ali davek, odtegnjen ob prodaji, niso v teh napovedih; same prodaje so na obrazcu Doh-KDVP. Ali se nemški davek, odtegnjen ob prodaji, lahko vpiše na Doh-KDVP kot davek, plačan v tujini, še ni razjasnjeno, zato ga TaxReporter ne vpiše.`,
+  juniorAccount: (p) =>
+    `${p.broker}: datoteka vsebuje vrstice otrokovega računa (Junior) (${p.count}), ki pripada otroku, drugemu davčnemu zavezancu. TaxReporter računov Junior ne bere, zato te vrstice niso prebrane skupaj z vašimi: izvozite svoj račun.`,
+  missingTransactionId: (p) =>
+    `${p.broker}: posel nima oznake transakcije, ki jo TaxReporter potrebuje, da ga loči od posla, ki je v vsem drugem enak. Datoteko znova izvozite pri posredniku, nespremenjeno.`,
   // Interactive Brokers Flex statements
   statementCountMismatch: (p) =>
     `Število izpiskov, ki ga navaja datoteka (${p.declared}), se ne ujema s številom izpiskov v njej (${p.found}), zato je bila odrezana ali spremenjena. Pri Interactive Brokers jo izvozite znova, nespremenjeno.`,
