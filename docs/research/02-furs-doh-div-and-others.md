@@ -184,13 +184,13 @@ Added on 2026-10-11 for #44, from the primary sources listed at the end of this 
 
 **Not found.** No FURS instruction, FAQ, schema note or public written answer found says who the *izplačevalec* is when a foreign broker passes a dividend on. None says whether the broker may be entered in the payer fields. Searched on 2026-10-11:
 
-- **ZDoh-2 NPB 36 and ZDavP-2 NPB 32, full texts (PISRS).** ZDoh-2 for *izplačevalec* and its forms. ZDavP-2 for *dividend* and the provisions on withholding agents and returns (arts. 58, 325, 326).
+- **ZDoh-2 NPB 36 and ZDavP-2 NPB 32, full texts (PISRS).** Both for *izplačevalec* and its forms. ZDavP-2 also for *dividend* and the provisions on withholding agents and returns (arts. 58, 325, 326).
 - **The FURS opis (15th edition, August 2026), full text.** Searched for *izplačevalec*, *posrednik*, *borzni posrednik*, *borznoposredniška*, *platform* and the brokers it names (eToro, Interactive Brokers, Revolut, Trade Republic, Mintos), and for Trading 212. It has no Q&A about the Doh-Div return or its payer. Four Q&As concern income taxed as a dividend, and none mentions the payer fields:
   - 6.1 Q8, a returned additional contribution (art. 90(4) point 4);
   - 6.1 Q20, payouts of a workers' ownership cooperative;
   - 6.2 Q12 and Q18, a fund's distributions (art. 90(4) point 3).
 
-  In the text read, the word *izplačevalec* occurs once, in §2.0 on interest: *"obresti, doseženih pri drugih izplačevalcih, ki niso banke ali hranilnice"*. Its §3.3 and Q&A 6.2 Q7 are quoted below.
+  In the text read, the word *izplačevalec* occurs once, in §2.6 on the interest return (*Napoved za odmero dohodnine od obresti*): *"obresti, doseženih pri drugih izplačevalcih, ki niso banke ali hranilnice"*. Its §3.3 and Q&A 6.2 Q7 are quoted below.
 - **Every FURS Doh-Div document listed under Sources below:** the form instructions, the XML and CSV guides, the legal form and the UI help.
 - **The payer elements of `Doh_Div_3.xsd`** (the vendored copy in `packages/furs/schemas/`). They are documented only as "Davčna številka izplačevalca dividend", "Identifikacijska številka izplačevalca dividend", "Naziv izplačevalca dividend", "Naslov izplačevalca dividend" and "Država izplačevalca dividend". Nothing says who the payer is.
 - **FURS's life-event page "Prejel sem dividende" and the e-uprava page on dividend tax.** Neither mentions brokers or the payer fields.
@@ -204,14 +204,28 @@ Added on 2026-10-11 for #44, from the primary sources listed at the end of this 
   - point 6, *"oseba, ki za tuj račun prejme dohodek"* subject to withholding (or that would be, had a point-1 person paid it), but only *"če oseba, ki jo dohodek bremeni, ali oseba iz 1.a točke tega odstavka ni plačnik davka v skladu s predhodnimi točkami tega odstavka ali dvanajstim odstavkom tega člena"* (the person who receives income on another's account, when the person the income burdens, or a point-1.a employer, is not a withholding agent under the earlier points or paragraph 12);
   - point 7, *"oseba, ki za tuj račun prejme dohodek iz finančnih instrumentov, izdanih v nematerializirani obliki"* (the person who receives income from dematerialized instruments on another's account).
 
-  Art. 58(2) points 2 and 3 apply to income from dematerialized instruments only:
+  The other points do not bear on a dividend a foreign broker passes on. None of them can make a broker with no business unit or branch in Slovenia a withholding agent, because of the opening words. They also fail on their own terms:
+  - Point 3 is the only point that names a broker. It covers a *"borznoposredniška družba, družba za upravljanje ali drug upravljavec, ki na podlagi pogodbe o gospodarjenju s finančnimi instrumenti za račun stranke prejme dohodek od naložb denarnega dobroimetja stranke v finančne instrumente, ki ni dohodek iz 7. točke tega odstavka"*: income received under a portfolio-management contract, and not the income from dematerialized instruments that point 7 covers. That an ordinary brokerage account, such as one at Trading 212, is not such a contract is an *(inference)*.
+  - Points 1.a, 2, 4 and 5 cover an employer, a fund manager paying out a fund's income, the manager of an apartment building and the organizer of an event.
+  - Point 8 covers another person who receives income on another's account when the person the income burdens cannot know who is entitled to it, and only *"če tako predpiše minister, pristojen za finance"*. Whether the minister has prescribed such a case was not checked.
+
+  Art. 58(2) moves the duty along a chain. Its points 2 and 3 apply to income from dematerialized instruments only:
   - point 2: when *"oseba iz 1. ali 6. točke prvega odstavka tega člena izplača dohodek iz nematerializiranih finančnih instrumentov osebi iz 7. točke prvega odstavka tega člena"*, the point-7 person counts as the withholding agent;
   - point 3: when *"oseba iz 7. točke prvega odstavka tega člena izplača dohodek iz nematerializiranih finančnih instrumentov drugi osebi iz 7. točke prvega odstavka tega člena"*, the second person counts as the withholding agent.
 
-  Art. 58(8) narrows point 6. It opens *"Ne glede na 6. točko prvega odstavka tega člena se oseba, ki za račun fizične osebe prejme dohodek od fizične osebe, šteje za plačnika davka le, če je:"*. Its point 2 is *"oseba, ki za račun fizične osebe rezidenta prejme dohodek z virom izven Slovenije"* (a person who receives income with a source outside Slovenia on a resident natural person's account).
+  Its point 1 moves the duty to a point-4, 5 or 8 person. Its point 4 moves it to a point-3 portfolio manager: *"oseba iz 1. ali 2. točke prvega odstavka tega člena izplača dohodek osebi iz 3. točke prvega odstavka tega člena, za plačnika davka šteje oseba iz 3. točke prvega odstavka tega člena"*. Point 4 therefore reaches only what point 3 reaches, and so not a dividend passed on through an ordinary brokerage account *(inference)*.
 
-  So the statute describes an intermediary both as receiving income on another's account (points 6 and 7, art. 58(8)) and as paying it on (art. 58(2) point 3). Opis Q&A 6.2 Q7 likewise calls the last intermediary in a chain the *"posrednik, ki je dohodek izplačal"* (below). Art. 58 therefore does not settle whether an intermediary is the form's *izplačevalec* *(inference)*. Art. 58 decides who withholds Slovenian tax, and it does not mention the form's payer fields.
-- ***Izplačevalec* on the form** is not a term ZDoh-2 defines. In ZDoh-2 the word occurs only in unrelated provisions, on income in kind, withholding, advance tax and pension annuities. The legal form (MF-FURS obr. DOHKAP št. 3, Uradni list RS 43/2022) titles section 3 *"PODATKI O IZPLAČEVALCU DIVIDEND"*, with the columns *Firma*, *Sedež*, *Država* and *Davčna ali identifikacijska številka*. Reading the form's *izplačevalec* as art. 90(2)'s *plačnik* is an *(inference)*.
+  Art. 58(8) narrows point 6, and only for income received from a natural person. It opens *"Ne glede na 6. točko prvega odstavka tega člena se oseba, ki za račun fizične osebe prejme dohodek od fizične osebe, šteje za plačnika davka le, če je:"* (notwithstanding point 6, a person who receives income from a natural person on a natural person's account counts as the withholding agent only if it is one of the following). Its point 2 is *"oseba, ki za račun fizične osebe rezidenta prejme dohodek z virom izven Slovenije"* (a person who receives income with a source outside Slovenia on a resident natural person's account), within that opening limit. A company's dividend is not income from a natural person, so art. 58(8) does not reach it.
+
+  So the statute describes an intermediary both as receiving income on another's account (points 6 and 7) and as paying it on (art. 58(2) point 3). Art. 58(5) calls whoever pays income to such an intermediary an *izplačevalec dohodka*, and under point 3 that payer is itself an intermediary (next bullet). Opis Q&A 6.2 Q7 likewise calls the last intermediary in a chain the *"posrednik, ki je dohodek izplačal"* (below). Art. 58 therefore does not settle whether an intermediary is the form's *izplačevalec* *(inference)*. Art. 58 decides who withholds Slovenian tax, and it does not mention the form's payer fields.
+- ***Izplačevalec* on the form** is not a term ZDoh-2 or ZDavP-2 defines. In ZDoh-2 the word occurs only in unrelated provisions, on income in kind, withholding, advance tax and pension annuities. ZDavP-2 uses the word 29 times, counting every inflected form (searched 2026-10-11), and never defines it. Three of its uses bear on the question:
+  - **Art. 376.a(1)**, a corporate income tax procedure. A company that exempted dividends from its tax base under ZDDPO-2 art. 24 must keep, and produce on request, *"dokazilo o rezidentstvu za davčne namene izplačevalca"*. It must also hold proof that the *izplačevalec* is liable to one of the taxes of the EU's common system for parent and subsidiary companies or, for one outside the EU, *"dokazilo o zavezanosti za davek od dohodka oziroma dobička, ki je primerljiv z davkom po ZDDPO-2"*. Only the company that distributes the dividend is liable to such a tax, so the *izplačevalec* here is that company *(inference)*. This supports the company reading, by analogy from corporate tax *(inference)*.
+  - **Art. 58(5):** *"Osebe, ki so plačniki davka po 2., 3. in 4. točki drugega odstavka tega člena, morajo izplačevalcem dohodka pred izplačilom dohodka predložiti izjavo o tem, da bodo s prejemom dohodka postali plačniki davka."* The *izplačevalec dohodka* is whoever pays the income to that withholding agent: a point-1 or point-6 person under art. 58(2) point 2, another point-7 intermediary under point 3, and a point-1 or point-2 person under point 4. Here the word therefore covers the company, a fund manager, or an intermediary that pays income on *(inference)*.
+  - **Art. 35(2) and (5) to (7)**, on tax numbers, use it generically, for whoever pays income out. Art. 35(2) reads *"Fizična oseba mora predložiti svojo davčno številko izplačevalcu dohodkov v vseh primerih, ko prejema dohodke"*. Under art. 35(6) and (7) the *"izplačevalec dohodka"* records a non-resident's identification number and country of residence *"ob izplačilu"* (when paying).
+
+  Its other uses are unrelated: enforcement on wages and other monetary receipts (arts. 151 and 161 to 165), payers of pensions and other income (arts. 286, 287, 313 and 322), and data on farming and forestry income (art. 340). ZDavP-2 thus uses the word both for the company that distributes a dividend and for an intermediary, so it does not settle what the form means *(inference)*.
+
+  The legal form (MF-FURS obr. DOHKAP št. 3, Uradni list RS 43/2022) titles section 3 *"PODATKI O IZPLAČEVALCU DIVIDEND"*, with the columns *Firma*, *Sedež*, *Država* and *Davčna ali identifikacijska številka*. Reading the form's *izplačevalec* as art. 90(2)'s *plačnik* is an *(inference)*.
 
 **The return is due whichever reading holds.** A foreign broker with no business unit or branch in Slovenia cannot be a *plačnik davka* (art. 58(1)). ZDavP-2 art. 325(5) then applies:
 
@@ -242,12 +256,12 @@ Added on 2026-10-11 for #44, from the primary sources listed at the end of this 
 - **Duplicate IDs.** Two records with the same identification number on the same day are a critical error (§5).
   - If the broker were the payer and its own number were entered, two companies' dividends paid on one day through one broker would collide.
   - The app avoids that today by writing the security's ISIN (§5). An ISIN identifies the security, not the payer *"v državi rezidentstva izplačevalca"*. The preset therefore pairs the broker's name with the security's identifier *(inference)*.
-  - FURS itself suggests sequential numbers in that field when IDs collide, so the field evidently accepts numbers that are not tax numbers.
+  - FURS itself suggests sequential numbers in that field when IDs collide, so the field can hold numbers that are not tax numbers *(inference)*.
 
 **Confidence.**
 
 - In ZDoh-2, the *plačnik* of a dividend is the company: **high**.
-- The form's *izplačevalec* means that company: **low**. It is an inference; no FURS text says so.
+- The form's *izplačevalec* means that company: **low**. It is an inference; no FURS text says so. ZDavP-2 uses the word for the distributing company in art. 376.a and for an intermediary in art. 58(5), and defines it nowhere.
 - A foreign broker may be entered in the payer fields: **not found**. The only support is the one eDavki record [L].
 
 **Recommendation to the maintainer.** Ask FURS in writing; the draft is below.
@@ -308,14 +322,14 @@ Added on 2026-10-11 for #44, from the primary sources listed at the end of this 
 **Sources for this subsection**, all retrieved 2026-10-11:
 
 - **ZDoh-2, NPB 36** (from 5 Mar 2026): [PISRS consolidated-text file](https://pisrs.si/api/datoteke/integracije/358727637). Art. 90. The file was served with no `Last-Modified`; its SHA-256 is `173eaefcd5b2c29abcba9380771812eb1cf042d831512d30c09894e1d27e938b`.
-- **ZDavP-2, NPB 32** (from 2 Jul 2026): [PISRS consolidated-text file](https://pisrs.si/api/datoteke/integracije/594731150). Arts. 58 (paragraphs 1, 2 and 8) and 325. No `Last-Modified`; SHA-256 `2e20ae8dce5295364fbde66834f6dec1eeea720deca833ef2b679f5293c8aaf6`.
+- **ZDavP-2, NPB 32** (from 2 Jul 2026): [PISRS consolidated-text file](https://pisrs.si/api/datoteke/integracije/594731150). Arts. 35, 58 (paragraphs 1, 2, 5 and 8), 325 and 376.a, and every use of *izplačevalec*. No `Last-Modified`; SHA-256 `2e20ae8dce5295364fbde66834f6dec1eeea720deca833ef2b679f5293c8aaf6`.
 - **Form instructions (2020, 2021, 2023+)**: [doh_odm_div20.n.sl.pdf](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_div20.n.sl.pdf). `Last-Modified: Mon, 30 Mar 2026 11:10:58 GMT`; SHA-256 `82801e8342fb5c4f81dd6eefaa1d40f4fb3c3d55a6c3d314d8a0046a26f066e5`.
 - **Form instructions, the other file**: [doh_odm_div.n.sl.pdf](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_div.n.sl.pdf). `Last-Modified: Wed, 11 Mar 2026 10:52:32 GMT`; SHA-256 `29afd5a92ddaaf65ac40b3349621cecbe5fc10fceb4f28d35cdc0e6a86a13465`.
 - **XML guide (2026)**: [doh_odm_div_xml.n.sl.pdf](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_div_xml.n.sl.pdf). `Last-Modified: Wed, 04 Feb 2026 12:05:00 GMT`; SHA-256 `58500ea1911ff0883e7fc68e251773927cc57ed20545783ed4bb3f3a25f8356e`.
 - **CSV guide**: [doh_odm_div_csv.n.docx](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_div_csv.n.docx). `Last-Modified: Tue, 04 Mar 2025 11:34:04 GMT`; SHA-256 `7b259235063502581c864c1a3f632e2d1d4ded292512c166b4a062ab993a9cff`.
 - **eDavki UI help (stale)**: [NavodiloZaNapovedDiv.html](https://edavki.durs.si/OpenPortal/Doc/Durs/Dohodnina/NavodiloZaNapovedDiv.html). Windows-1250 encoded. `Last-Modified: Fri, 09 May 2014 08:10:34 GMT`; SHA-256 `86e1a7c46d557d8af5084789ad1f5d847136ae1bf0fd695ed328415829b6d3e7`.
 - **Legal form DOHKAP št. 3** (Uradni list RS 43/2022): [doh_odm_div.i.sl.pdf](https://edavki.durs.si/OpenPortal/Dokumenti/doh_odm_div.i.sl.pdf). `Last-Modified: Wed, 30 Mar 2022 05:56:42 GMT`; SHA-256 `30ed62f17493dd9e18da3731d879c55827323c65b4e86f0d0ca373e65e0feec1`.
-- **FURS opis**, 15th edition, August 2026: [fu.gov.si](https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Dohodnina/Dohodek_iz_kapitala/Opis/Obresti_dividende_in_dobicek_iz_kapitala.doc). §2.0, §3.3 and Q&A 6.2 Q7; Q&A 6.1 Q8 and Q20 and 6.2 Q12 and Q18 for income taxed as a dividend. `Last-Modified: Tue, 04 Aug 2026 10:10:50 GMT`.
+- **FURS opis**, 15th edition, August 2026: [fu.gov.si](https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Dohodnina/Dohodek_iz_kapitala/Opis/Obresti_dividende_in_dobicek_iz_kapitala.doc). §2.6, §3.3 and Q&A 6.2 Q7; Q&A 6.1 Q8 and Q20 and 6.2 Q12 and Q18 for income taxed as a dividend. `Last-Modified: Tue, 04 Aug 2026 10:10:50 GMT`.
 - **FURS life-event pages.** Neither covers brokers or the payer fields:
   - [Prejel sem dividende](https://www.fu.gov.si/zivljenjski_dogodki_prebivalci/prejel_sem_dividende/), refreshed 14 Apr 2025;
   - [e-uprava: Obdavčitev dividend](https://e-uprava.gov.si/si/podrocja/davki/dohodek-iz-kapitala/obdavcitev-dividend.html), changed 5 Jul 2024.
@@ -511,10 +525,10 @@ An independent verifier re-downloaded the XSDs, FURS guides and templates, the p
 
 **Added after verification (2026-10-11):** §5.1, on who the payer is for a dividend a foreign broker passes on (#44), was written later from the primary sources it lists and has not been independently verified. It rests on these texts:
 
-- ZDoh-2 NPB 36, art. 90, and ZDavP-2 NPB 32, arts. 58 (paragraphs 1, 2 and 8) and 325, read in PISRS's own files;
+- ZDoh-2 NPB 36, art. 90, and ZDavP-2 NPB 32, arts. 35, 58 (paragraphs 1, 2, 5 and 8), 325 and 376.a, read in PISRS's own files;
 - the Doh-Div form instructions, XML guide, CSV guide, legal form and the 2014 UI help;
 - the vendored `Doh_Div_3.xsd`, for the documentation of its five payer elements;
-- the FURS opis, §2.0, §3.3 and Q&A 6.2 Q7, and the Q&As on income taxed as a dividend (6.1 Q8 and Q20, 6.2 Q12 and Q18).
+- the FURS opis, §2.6, §3.3 and Q&A 6.2 Q7, and the Q&As on income taxed as a dividend (6.1 Q8 and Q20, 6.2 Q12 and Q18).
 
 Its answer is "not found". The statutory term *plačnik* in art. 90(2) is the company (high confidence), but no FURS text says that the form's *izplačevalec* means it, or whether a broker may be entered. The same day, the §5 payer bullet and the Open questions entry were pointed to §5.1.
 

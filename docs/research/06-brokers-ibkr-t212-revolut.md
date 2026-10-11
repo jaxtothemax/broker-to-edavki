@@ -1,6 +1,6 @@
 # Broker export formats: Interactive Brokers, Trading 212, Revolut
 
-> Researched: 2026-10-07 · Verification: not independently verified · Updated: 2026-10-11 (the open question on trades after midnight points to 04 §4.3.1) and 2026-10-09 (one real Trading 212 export inspected: the `0E-10` zero, dividend prices to 6 decimals, the V4 header and a takeover's rows, §4.2–§4.4; the tax rule for takeovers and mergers paid in shares linked from §3.5 and §4.3; `Dividend (Bonus)` and `Dividend (Demerger)` rows from a second, full-history export, §4.3)
+> Researched: 2026-10-07 · Verification: not independently verified · Updated: 2026-10-11 (the open question on trades after midnight, and the date rule in §2, point to 04 §4.3.1) and 2026-10-09 (one real Trading 212 export inspected: the `0E-10` zero, dividend prices to 6 decimals, the V4 header and a takeover's rows, §4.2–§4.4; the tax rule for takeovers and mergers paid in shares linked from §3.5 and §4.3; `Dividend (Bonus)` and `Dividend (Demerger)` rows from a second, full-history export, §4.3)
 >
 > Research for building TaxReporter. It is not tax advice, and FURS publications and the law win over anything written here. Where this page overlaps a verified doc (01–03), the verified doc wins; such places are cross-referenced inline. See the [README](README.md#confidence-and-verification-legend) for the legend.
 
@@ -29,6 +29,7 @@ The research produced synthetic fixtures for every format described here, with t
 2. **Dates.**
    - IBKR's `tradeDate` (and the date part of `dateTime`) is the exchange business date in ET. Use it as is. Converting `20260401;202000` ET to Ljubljana time would move a dividend to the next day.
    - T212 and Revolut give UTC instants. Convert them to `Europe/Ljubljana` before taking the date. This only matters near midnight: extended-hours trades and 31 Dec.
+   - These two rules are a design default, which the app follows for IBKR and Trading 212 (ADR 0011 §7, ADR 0012 item 8), not a sourced tax rule. The primary-source reading lives in [04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone): the trade date, not the settlement date, is settled, but which time zone dates a trade near midnight is an open question, with a draft written question to FURS (#13).
 3. **Fail closed.** Abort on any unknown `Action`/`Type`/`type` value and on any unknown column that carries a value. Every mature parser does this (cgt-calc, jal). Silently skipping rows was the most common bug in the tools surveyed.
 4. **Identify columns by header name**, never by position. T212 has reordered its columns at least twice.
 5. **Deduplicate overlapping exports.**
