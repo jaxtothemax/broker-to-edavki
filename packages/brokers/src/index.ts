@@ -2,7 +2,8 @@
  * @taxreporter/brokers — broker-export adapters (ADR 0004, ADR 0011). Each
  * turns one export format into the ledger events of @taxreporter/core;
  * `importFile` checks a file's bytes and picks the adapter by the file's
- * content, never by its name. Trading 212 first, Interactive Brokers next.
+ * content, never by its name. Trading 212 first, Interactive Brokers next,
+ * then Trade Republic and eToro.
  *
  * Platform-neutral like @taxreporter/core (browser app and CLI): no Node.js
  * built-ins, enforced by `make build` (tsconfig.build.json). Callers read the
@@ -20,6 +21,7 @@ export {
   type ImportResult,
   type ReadContext,
   type XlsxAdapter,
+  XLSX_ADAPTERS,
 } from "./adapter.js";
 export {
   CSV_LIMITS,
@@ -31,6 +33,7 @@ export {
   type CsvRow,
   type CsvTable,
 } from "./csv.js";
+export { ETORO, etoro } from "./etoro.js";
 export { decodeUtf8, sniff } from "./intake.js";
 export { fromUtcStamp } from "./time.js";
 export {

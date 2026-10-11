@@ -18,6 +18,7 @@ import {
 } from "@taxreporter/core";
 
 import { CsvError, readCsv, type CsvDelimiter, type CsvTable } from "./csv.js";
+import { etoro } from "./etoro.js";
 import { ibkr } from "./ibkr.js";
 import { tradeRepublic } from "./trade-republic.js";
 import { decodeUtf8, sniff } from "./intake.js";
@@ -51,6 +52,12 @@ export interface ImportResult {
   readonly diagnostics: readonly Diagnostic[];
   /** One entry per account with a dated row. */
   readonly reach: readonly AccountReach[];
+  /**
+   * The file is its account's whole history, from the account's opening
+   * (eToro's statement, ADR 0020 §3): a second file of the same account is
+   * refused (`secondStatement`), as two would only disagree.
+   */
+  readonly wholeHistory?: boolean;
 }
 
 /** What an adapter is told about the file it reads, and nothing more. */
@@ -137,11 +144,11 @@ export const CSV_ADAPTERS: readonly CsvAdapter[] = Object.freeze([
 export const XML_ADAPTERS: readonly XmlAdapter[] = Object.freeze([ibkr]);
 
 /**
- * Every XLSX adapter; a workbook must match exactly one of them. None yet:
- * eToro's comes first (ADR 0014), and until then a workbook is read, and
- * not recognized.
+ * Every XLSX adapter; a workbook must match exactly one of them. eToro's
+ * account statement first (ADR 0014, ADR 0020), not yet checked against
+ * an untouched export.
  */
-export const XLSX_ADAPTERS: readonly XlsxAdapter[] = Object.freeze([]);
+export const XLSX_ADAPTERS: readonly XlsxAdapter[] = Object.freeze([etoro]);
 
 function refused<C extends DiagnosticCode>(
   code: C,

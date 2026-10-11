@@ -561,7 +561,10 @@ export const wordsEn: FindingWords = {
     partialClose: "partly closed positions",
     short: "short positions",
     leveraged: "leveraged positions",
+    leveragedOrShort:
+      "positions still open that paid an overnight fee, as only leveraged or short ones do",
     nonUsd: "instruments in a currency other than US dollars",
+    franked: "franked dividends",
     shortSale: "short sales",
     isinChange: "corporate actions that change an ISIN",
     returnOfCapital: "returns of capital",
@@ -1052,7 +1055,10 @@ export const wordsSl: FindingWords = {
     partialClose: "delno zaprte pozicije",
     short: "pozicije na kratko",
     leveraged: "pozicije s finančnim vzvodom",
+    leveragedOrShort:
+      "še odprte pozicije s plačanim nadomestilom za čez noč, ki ga plačujejo le pozicije s finančnim vzvodom ali na kratko",
     nonUsd: "instrumenti v valuti, ki ni ameriški dolar",
+    franked: "dividende z avstralskim davčnim dobropisom (franking)",
     shortSale: "prodaje na kratko",
     isinChange: "korporacijska dejanja, ki spremenijo ISIN",
     returnOfCapital: "vračila kapitala",

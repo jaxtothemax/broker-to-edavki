@@ -13,6 +13,7 @@ import {
   type ImportResult,
   type XlsxAdapter,
 } from "./adapter.js";
+import { etoro } from "./etoro.js";
 import { CONTENT_TYPE, makeWorkbook } from "./testing/workbook.js";
 import { makeZip } from "./testing/zip-writer.js";
 
@@ -51,8 +52,8 @@ function adapter(name: string, sheet = 1): XlsxAdapter & { seen: unknown[] } {
 }
 
 describe("importFile, the XLSX family", () => {
-  it("has no XLSX adapter yet, so reads a workbook and does not recognize it", () => {
-    expect(XLSX_ADAPTERS).toEqual([]);
+  it("has eToro's adapter, which a workbook without its sheets does not match", () => {
+    expect(XLSX_ADAPTERS).toEqual([etoro]);
     expect(importFile({ bytes: book, ...context }).diagnostics).toEqual([
       diagnostic("blocking", "unknownFormat", {}),
     ]);
