@@ -449,7 +449,7 @@ describe("a Trading 212 dividend's payer, from the files to Doh-Div (#45)", () =
   const ADR = "US01609W1027";
   const header = t212v4.split("\n")[0] ?? "";
   // One Trading 212 account's dividends of an ADR, under the plain label
-  // and the labelled ones the broker also writes. Synthetic, amounts made up.
+  // and the labeled ones the broker also writes. Synthetic, amounts made up.
   const dividend = (action: string, day: string) =>
     `${action},2026-07-${day} 13:05:12+00:00,${ADR},BABA,"Alibaba Group Holding",,,4.0000000000,1.0500000000,USD,0.85155000,,,3.58,"EUR",,,,,,`;
   const adr = file(
@@ -461,6 +461,8 @@ describe("a Trading 212 dividend's payer, from the files to Doh-Div (#45)", () =
       dividend("Dividend (Dividends paid by us corporations)", "14"),
       dividend("Dividend (Dividends paid by foreign corporations)", "15"),
       dividend("Dividend (Bonus)", "16"),
+      dividend("Dividend (Property income distribution)", "17"),
+      dividend("Dividend (Demerger)", "20"),
     ].join("\n"),
   );
   // The page keeps each file's bytes by its id; here the id is its name.
@@ -548,9 +550,9 @@ describe("a Trading 212 dividend's payer, from the files to Doh-Div (#45)", () =
     expect(unknownPayers(reply)).toEqual([]);
     expect(reply.div.blocking).toBe(0);
     expect(reply.div.xml).toContain("TRADING 212");
-    // Every payment is on the form, the labelled ones too.
+    // Every payment is on the form, the labeled ones too.
     const paid = reply.preview.dividends.filter((d) => d.isin === ADR);
-    expect(paid).toHaveLength(5);
+    expect(paid).toHaveLength(7);
     for (const row of paid) expect(row.payer).toBe("TRADING 212");
   });
 

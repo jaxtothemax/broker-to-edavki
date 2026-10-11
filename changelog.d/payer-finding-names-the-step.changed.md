@@ -1,1 +1,1 @@
-- **The Doh-Div finding that asks for a payer's name, address and country** now says they go on the Details step, and the Trading 212 payer preset is tested from the files to the form.
+- **The Doh-Div finding that asks for a payer's name, address and country** now says they go on the Details step. No figure on a written return changes.
