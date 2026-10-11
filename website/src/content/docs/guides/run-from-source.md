@@ -76,6 +76,13 @@ It prints what it read, the estimated tax and every finding, and writes `Doh_KDV
 written. The exit code is 0 when nothing blocks, 1 when something does, and 2 for a mistake in
 the command. Add `--json` for a report other tools can read.
 
+The JSON report says what became of each return, under `returns`: `written`; `withheld`, when
+the return is needed but not written (a finding blocks it, a file was refused, or the write
+failed); or `nothingToFile`. While any file is refused, both returns are `withheld`, because a
+file that was not read may hold the year's sales or payments; `refused` says which. The
+`estimates` are given in every case, but for a withheld return the figure may change once what
+stops it is fixed. The plain text says the same on each return's line.
+
 The JSON report also lists the shares you still hold, under `holdings`, in two views:
 
 - **`accounts`**: each account's own position per security, which you can compare with what

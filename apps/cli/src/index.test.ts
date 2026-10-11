@@ -1,9 +1,11 @@
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   statSync,
+  truncateSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -486,6 +488,151 @@ describe("taxreporter", () => {
     expect(result.stdout).toContain("[export.csv, row 12]");
     expect(result.stdout).not.toContain("Gift card");
     expect(existsSync(out)).toBe(false);
+  });
+
+  describe("what became of each return", () => {
+    type Report = {
+      written: string[];
+      refused: string[];
+      returns: { kdvp: string; div: string };
+      estimates: Record<string, string>;
+    };
+    const command = (
+      dir: string,
+      files: string[],
+      year: string,
+      ...x: string[]
+    ) => [
+      ...files,
+      "--year",
+      year,
+      "--tax-number",
+      "12345678",
+      "--out",
+      join(dir, "out"),
+      ...x,
+    ];
+    const json = (dir: string, files: string[], year: string, ...x: string[]) =>
+      run(command(dir, files, year, "--json", ...x));
+    const plain = (
+      dir: string,
+      files: string[],
+      year: string,
+      ...x: string[]
+    ) => run(command(dir, files, year, ...x));
+
+    it("says written for a return that is, with its estimate", () => {
+      const dir = scratch();
+      const result = json(dir, history, "2026", "--payers", payersFile(dir));
+      const report = JSON.parse(result.stdout) as Report;
+      expect(report.returns).toEqual({ kdvp: "written", div: "written" });
+      expect(report.estimates.gainsTaxEur).toMatch(/^\d+\.\d{2}$/);
+    });
+
+    it("says withheld, with the estimate and that it may change, when a finding blocks", () => {
+      const dir = scratch();
+      const takeover = fixture("t212-invest-v4-history-takeover.csv");
+      const report = JSON.parse(
+        json(dir, [takeover], "2025", "--payers", payersFile(dir)).stdout,
+      ) as Report;
+      expect(report.written).toEqual([]);
+      expect(report.returns).toEqual({ kdvp: "withheld", div: "withheld" });
+      // The figure stays, as in the web app, and the text says what it is.
+      expect(report.estimates.gainsTaxEur).toMatch(/^\d+\.\d{2}$/);
+      const text = run([
+        takeover,
+        "--year",
+        "2025",
+        "--tax-number",
+        "12345678",
+        "--out",
+        join(dir, "text"),
+        "--payers",
+        payersFile(dir),
+      ]).stdout;
+      expect(text).toContain("Doh-KDVP 2025: not written. Estimated tax");
+      expect(text).toContain("which may change once what stops it is fixed");
+      expect(text).not.toContain("worked out without");
+    });
+
+    // A file refused at intake never reaches the ledger, so the refusal is
+    // the only thing that can say the return is needed.
+    it.each([
+      {
+        label: "a file that does not exist",
+        make: (dir: string) => join(dir, "nope.csv"),
+        refusal: "nope.csv cannot be opened",
+      },
+      {
+        label: "a directory",
+        make: (dir: string) => {
+          const folder = join(dir, "folder.csv");
+          mkdirSync(folder);
+          return folder;
+        },
+        refusal: "folder.csv is not a regular file",
+      },
+      {
+        label: "a file over the size limit",
+        make: (dir: string) => {
+          // Sparse, and refused on its size before a byte is read.
+          const big = join(dir, "big.csv");
+          writeFileSync(big, "");
+          truncateSync(big, LIMITS.fileBytes + 1);
+          return big;
+        },
+        refusal: "big.csv is larger than any broker export",
+      },
+    ])(
+      "withholds both returns, not nothing to file, when $label is the only input",
+      ({ make, refusal }) => {
+        const dir = scratch();
+        const input = make(dir);
+        const result = json(dir, [input], "2026");
+        const report = JSON.parse(result.stdout) as Report;
+        expect(report.refused).toEqual([expect.stringContaining(refusal)]);
+        expect(report.returns).toEqual({ kdvp: "withheld", div: "withheld" });
+        expect(report.written).toEqual([]);
+        expect(result.code).toBe(1);
+        const said = plain(dir, [input], "2026").stdout;
+        expect(said).toContain("Doh-KDVP 2026: not written.");
+        expect(said).toContain("Doh-Div 2026: not written.");
+        expect(said).not.toContain("nothing to file");
+      },
+    );
+
+    it("withholds a year with no sales when a file is refused, and only because of it", () => {
+      const dir = scratch();
+      const payers = payersFile(dir);
+      const readable = JSON.parse(
+        json(dir, history, "2024", "--payers", payers).stdout,
+      ) as Report;
+      expect(readable.returns).toEqual({
+        kdvp: "nothingToFile",
+        div: "nothingToFile",
+      });
+      const files = [...history, join(dir, "nope.csv")];
+      const refused = json(dir, files, "2024", "--payers", payers);
+      expect((JSON.parse(refused.stdout) as Report).returns).toEqual({
+        kdvp: "withheld",
+        div: "withheld",
+      });
+      expect(refused.code).toBe(1);
+      const said = plain(dir, files, "2024", "--payers", payers).stdout;
+      expect(said).toContain("Doh-KDVP 2024: not written.");
+      expect(said).not.toContain("nothing to file");
+    });
+
+    it("says nothing to file for a year with no sales and no payments", () => {
+      const dir = scratch();
+      const result = json(dir, history, "2024", "--payers", payersFile(dir));
+      const report = JSON.parse(result.stdout) as Report;
+      expect(report.returns).toEqual({
+        kdvp: "nothingToFile",
+        div: "nothingToFile",
+      });
+      expect(result.code).toBe(0);
+    });
   });
 
   it("writes a year's returns that another year's refused rows cannot change (ADR 0017)", () => {

@@ -187,6 +187,28 @@ const SEVERITY_TITLE: Readonly<Record<Severity, string>> = {
 const count = (n: number, one: string, many: string) =>
   `${String(n)} ${n === 1 ? one : many}`;
 
+/** What became of one return of a run. */
+type ReturnStatus = "written" | "withheld" | "nothingToFile";
+
+/**
+ * One return's line of the summary. A return that is not written still shows
+ * its estimate, as the web app does, but says the figure may change once
+ * what stops the return is fixed: whether it does depends on the finding, so
+ * the line promises no more than that.
+ */
+function returnLine(
+  name: string,
+  status: ReturnStatus,
+  what: string,
+  figure: string,
+): string {
+  if (status === "nothingToFile") return `${name}: nothing to file.`;
+  if (status === "withheld") {
+    return `${name}: not written. Estimated ${figure}, which may change once what stops it is fixed.`;
+  }
+  return `${name}: ${what}, estimated ${figure}.`;
+}
+
 /**
  * A diagnostic as one line: code, parameters, and where it came from. Text
  * copied from a file is never printed: a terminal is often captured into a
@@ -507,6 +529,36 @@ export function main(
     refused.length > 0 || failed !== null || hasBlocking(diagnostics);
   const kdvpTax = kdvp.estimate.tax.toFixed(2, "halfUp");
   const divDue = div.estimate.taxDueEur.toFixed(2, "halfUp");
+  // What became of each return, by the rule the web app uses: written; or
+  // needed but not written (a finding blocks it, a file was refused, or the
+  // write failed), whose estimate may change once that is fixed; or nothing
+  // to file, which is not a failure.
+  const blockingOf = (found: readonly Diagnostic[]) =>
+    found.filter((d) => d.severity === "blocking").length;
+  // A file left out may hold this year's sales or payments, and a refused
+  // file never reaches the ledger, so nothing in it could say the return is
+  // needed: with one refused, neither return may be called "nothing to file".
+  // The web app likewise never shows a status while a refused file is listed
+  // (state/wizard.ts, blockingReason).
+  const anyRefused = refused.length > 0;
+  const status = (name: string, needed: boolean): ReturnStatus =>
+    written.some((path) => path.endsWith(name))
+      ? "written"
+      : needed || anyRefused
+        ? "withheld"
+        : "nothingToFile";
+  const returns = {
+    kdvp: status(
+      `Doh_KDVP_${String(year)}.xml`,
+      kdvp.lists.length > 0 ||
+        prepared.scope.kdvp.length + blockingOf(kdvp.diagnostics) > 0,
+    ),
+    div: status(
+      `Doh_Div_${String(year)}.xml`,
+      div.dividends.length > 0 ||
+        prepared.scope.div.length + blockingOf(div.diagnostics) > 0,
+    ),
+  };
 
   if (values.json) {
     io.stdout.write(
@@ -529,6 +581,7 @@ export function main(
           written,
           stale,
           ...(failed === null ? {} : { failed }),
+          returns,
           estimates: { gainsTaxEur: kdvpTax, dividendTaxDueEur: divDue },
           holdings:
             prepared.holdings === null
@@ -568,12 +621,22 @@ export function main(
     lines.push(`Skipped ${file}: the same file as ${sameAs}.`);
   }
   lines.push(
-    kdvp.form === null
-      ? `Doh-KDVP ${String(year)}: not written.`
-      : `Doh-KDVP ${String(year)}: ${count(kdvp.form.lists.length, "security", "securities")}, estimated tax ${kdvpTax} EUR.`,
-    div.form === null
-      ? `Doh-Div ${String(year)}: not written.`
-      : `Doh-Div ${String(year)}: ${count(div.form.dividends.length, "payment", "payments")}, estimated tax still due ${divDue} EUR.`,
+    returnLine(
+      `Doh-KDVP ${String(year)}`,
+      returns.kdvp,
+      kdvp.form === null
+        ? ""
+        : count(kdvp.form.lists.length, "security", "securities"),
+      `tax ${kdvpTax} EUR`,
+    ),
+    returnLine(
+      `Doh-Div ${String(year)}`,
+      returns.div,
+      div.form === null
+        ? ""
+        : count(div.form.dividends.length, "payment", "payments"),
+      `tax still due ${divDue} EUR`,
+    ),
   );
   for (const path of written) lines.push(`Wrote ${path}`);
   if (failed !== null) lines.push(`Failed: ${failed}.`);
