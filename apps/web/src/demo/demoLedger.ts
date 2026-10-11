@@ -251,6 +251,18 @@ export function demoLedgerEvents(): LedgerEvent[] {
     ];
   };
 
+  /** A securities transfer, kept as an ignored row (ADR 0011). */
+  const transfer = (file: DemoFile): LedgerEvent => {
+    file.row += 1;
+    return {
+      kind: "ignored",
+      reason: "securitiesTransfer",
+      broker: file.broker,
+      account: file.account,
+      source: { fileId: file.fileId, row: file.row },
+    };
+  };
+
   const vwceBuys = [
     ["2024-01-15", "1.3871", "108.14"],
     ["2024-04-15", "1.3304", "112.75"],
@@ -288,5 +300,10 @@ export function demoLedgerEvents(): LedgerEvent[] {
     ...paid(ibkr, ALV, "2026-05-08", "123.20", "32.49", "EUR"),
     ...paid(ibkr, AAPL, "2026-05-14", "2.70", "0.40", "USD"),
     ...paid(ibkr, AAPL, "2026-08-13", "2.70", "0.40", "USD"),
+    // The Trading 212 shares of NVIDIA that the February sale at IBKR used
+    // were moved to IBKR: a transfer creates no lot (FIFO runs across
+    // accounts), and is not read yet (#48), so the account is flagged and
+    // its count of NVIDIA is short by them. Last, so no row above moves.
+    transfer(ibkr),
   ];
 }
