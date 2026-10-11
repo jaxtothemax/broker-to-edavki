@@ -663,6 +663,180 @@ describe("rows it refuses rather than guesses", () => {
   });
 });
 
+describe("what a row is comes before its date (ADR 0019 §6, #56)", () => {
+  const GOOD = "2026-01-06 14:31:02+00:00";
+  // Not a time at all, and a shape that names no real day.
+  const UNDATABLE = ["06/01/2026 14:31", "2026-02-30 10:00:00"];
+  const line = (
+    action: string,
+    time: string,
+    isin = "US1912161007",
+    ticker = "KO",
+    price = "69.5",
+  ) =>
+    `${action},${time},${isin},${ticker},Coca-Cola,,EOF1,2,${price},USD,,,,118.55,EUR,,`;
+  const findings = (result: ImportResult) =>
+    result.diagnostics.map((d) => [d.code, d.params, d.source?.row]);
+  const lastDates = (...rows: string[]) =>
+    v4(...rows).reach.map((r) => r.lastDate);
+
+  it("refuses a row its action refuses for that, though it cannot be dated", () => {
+    for (const time of UNDATABLE) {
+      const result = v4(
+        line("Transfer in", time),
+        line("Dividend (Tax exempted)", time),
+        line("Gift card", time),
+      );
+      expect(findings(result)).toEqual([
+        [
+          "unsupportedAction",
+          { broker: "trading212", action: "Transfer in" },
+          2,
+        ],
+        [
+          "unsupportedAction",
+          { broker: "trading212", action: "Dividend (Tax exempted)" },
+          3,
+        ],
+        [
+          "unknownAction",
+          { broker: "trading212", action: { untrusted: "Gift card" } },
+          4,
+        ],
+      ]);
+      // No row is dropped: each is accounted for by its refusal.
+      expect(result.events).toEqual([]);
+      expect(accountedRows(result)).toEqual([2, 3, 4]);
+    }
+  });
+
+  it("gives an empty row the unknown action it has", () => {
+    // 17 empty cells: no action and no time. Blocking either way; the cause
+    // is now the action's, as for every row (#56), not the date's.
+    expect(findings(v4(",".repeat(16)))).toEqual([
+      ["unknownAction", { broker: "trading212", action: { untrusted: "" } }, 2],
+    ]);
+  });
+
+  it("still dates every row it reads, an ignored one included", () => {
+    for (const time of UNDATABLE) {
+      const result = v4(
+        line("Market buy", time),
+        line("Market sell", time),
+        line("Dividend (Dividend)", time),
+        line("Stock split close", time),
+        line("Deposit", time, "", ""),
+        line("Interest on cash", time, "", ""),
+      );
+      expect(blocking(result)).toEqual([
+        ["invalidTime", 2],
+        ["invalidTime", 3],
+        ["invalidTime", 4],
+        ["invalidTime", 5],
+        ["invalidTime", 6],
+        ["invalidTime", 7],
+      ]);
+      // Nothing but the refusals: an interest row that is not dated is not
+      // counted in the warning about the ones that are.
+      expect(result.diagnostics).toHaveLength(6);
+      expect(result.events).toEqual([]);
+      expect(result.reach).toEqual([]);
+    }
+  });
+
+  it("moves the file's reach for a refused row only when the row is dated", () => {
+    const buy = line("Market buy", GOOD);
+    expect(lastDates(buy)).toEqual(["2026-01-06"]);
+    // Dated: the refusal reaches as far as its own date.
+    const later = "2026-03-02 10:00:00";
+    expect(lastDates(buy, line("Transfer in", later))).toEqual(["2026-03-02"]);
+    expect(lastDates(buy, line("Gift card", later))).toEqual(["2026-03-02"]);
+    // Undated: no row vouches for a reach, so it stays where the dated rows
+    // put it, or empty when there are none.
+    for (const time of UNDATABLE) {
+      expect(
+        lastDates(buy, line("Transfer in", time), line("Gift card", time)),
+      ).toEqual(["2026-01-06"]);
+      expect(lastDates(line("Transfer in", time))).toEqual([]);
+    }
+  });
+
+  it("scopes a refusal only when it can be dated, so an undated one withholds every return (ADR 0017)", () => {
+    const sale = line(
+      "Market sell",
+      "2026-09-08 14:05:12",
+      "US00000ORBT1",
+      "ORBT",
+      "0E-10",
+    );
+    const nova = (time: string) =>
+      line("Stock distribution", time, "US00000NOVA8", "NOVA", "0E-10");
+    const rights = (time: string) =>
+      line(
+        "Custom stock distribution",
+        time,
+        "US00000VEGA3",
+        "VEGA.RST",
+        "0E-10",
+      );
+    for (const time of UNDATABLE) {
+      const result = v4(sale, nova(time), rights(time));
+      // Neither names an ISIN, a date or what it does to a holding, which
+      // is the shape that withholds both returns of every year. The sale at
+      // 0 is not paired with new shares that have no time either.
+      expect(findings(result)).toEqual([
+        ["invalidPrice", {}, 2],
+        [
+          "unsupportedAction",
+          { broker: "trading212", action: "Stock distribution" },
+          3,
+        ],
+        [
+          "unsupportedAction",
+          { broker: "trading212", action: "Custom stock distribution" },
+          4,
+        ],
+      ]);
+      expect(accountedRows(result)).toEqual([2, 3, 4]);
+    }
+    // The same rows with a time are the shapes research has seen: scoped.
+    const dated = v4(
+      sale,
+      nova("2026-09-08 14:05:27"),
+      rights("2026-09-09 10:00:00"),
+    );
+    expect(findings(dated)).toEqual([
+      [
+        "invalidPrice",
+        { isin: "US00000ORBT1", date: "2026-09-08", shares: "out" },
+        2,
+      ],
+      [
+        "unsupportedAction",
+        {
+          broker: "trading212",
+          action: "Stock distribution",
+          isin: "US00000NOVA8",
+          date: "2026-09-08",
+          shares: "in",
+        },
+        3,
+      ],
+      [
+        "unsupportedAction",
+        {
+          broker: "trading212",
+          action: "Custom stock distribution",
+          isin: "US00000VEGA3",
+          date: "2026-09-09",
+          shares: "rights",
+        },
+        4,
+      ],
+    ]);
+  });
+});
+
 describe("limits and shapes", () => {
   it("refuses a currency not written as T212 writes it", () => {
     const result = v4(

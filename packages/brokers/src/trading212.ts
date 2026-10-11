@@ -10,7 +10,8 @@
  * - **Dates by the one date policy.** Rows carry UTC times, which the
  *   ledger keeps; the trade or payment date is what core's `taxDate` makes
  *   of them, for now the Slovenian calendar date of the instant (06 §2.2;
- *   ADR 0011 §7).
+ *   ADR 0011 §7). A row that cannot be dated is refused, unless its action
+ *   refuses it first, for what it is (ADR 0019 §6).
  * - **Trades at the contract price**, in the instrument's currency (GBX for
  *   pence, which the rate lookup scales). Fees, T212's own exchange rate and
  *   its realized result are never used: costs are covered by the normed
@@ -429,7 +430,11 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
   const received: (Leg & { readonly index: number })[] = [];
   const soldAtZero: (Leg & { readonly index: number })[] = [];
   let interestRows = 0;
-  let lastDate: string | null = null;
+  // Widened, not narrowed to null: `reached` assigns it from a closure.
+  let lastDate = null as IsoDate | null;
+  const reached = (date: IsoDate) => {
+    if (lastDate === null || date > lastDate) lastDate = date;
+  };
 
   for (const row of table.rows) {
     const source: SourceRef = { fileId: context.fileId, row: row.row };
@@ -440,16 +445,82 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
       diagnostics.push(diagnostic("blocking", code, params, source));
     };
     const action = text(row, "Action");
-    const at = fromUtcStamp(text(row, timeColumn));
-    const dated = at === null ? null : taxDate(at);
-    if (at === null || dated === null) {
+    // What a row is comes before its date (ADR 0019 §6, #56). A row refused
+    // for its action gives that reason even when it cannot be dated, and
+    // moves the file's reach only when it can be: a reach no row vouches for
+    // would weaken the check of the 30-day rule (ZDoh-2 art. 97(5), research
+    // 04 §5.3). One that cannot be dated names no date, so it is never scoped
+    // to a year (ADR 0017) and withholds both returns of every year, as every
+    // unscoped refusal does. Every row read as an event, an ignored one
+    // included, must still be dated.
+    const stamp = fromUtcStamp(text(row, timeColumn));
+    const dated = stamp === null ? null : taxDate(stamp);
+    const when =
+      stamp !== null && dated !== null
+        ? { at: stamp, date: dated.date, moved: dated.moved }
+        : null;
+
+    if (UNSETTLED.has(action)) {
+      // Refused either way. What the refusal can reach is stated only where
+      // the row's shape shows it (ADR 0017): rights booked under a `.RST`
+      // ticker, and new shares paired with a sale at 0 after the last row.
+      // Every other refusal withholds both returns of every year.
+      if (when !== null) reached(when.date);
+      const isin = text(row, "ISIN");
+      if (
+        when !== null &&
+        (action === FREE_RIGHTS || action === SHARES_RECEIVED) &&
+        isIsin(isin)
+      ) {
+        const rights =
+          action === FREE_RIGHTS && text(row, "Ticker").endsWith(".RST");
+        block("unsupportedAction", {
+          broker: TRADING212,
+          action,
+          isin,
+          date: when.date,
+          ...(rights ? { shares: "rights" as const } : {}),
+        });
+        const ms =
+          when.at.instant === null ? null : instantMillis(when.at.instant);
+        if (action === SHARES_RECEIVED && ms !== null) {
+          received.push({
+            index: diagnostics.length - 1,
+            ms,
+            isin,
+            date: when.date,
+          });
+        }
+      } else {
+        block("unsupportedAction", { broker: TRADING212, action });
+      }
+      continue;
+    }
+    const cash = CASH.get(action);
+    const side = BUYS.has(action) ? "buy" : SELLS.has(action) ? "sell" : null;
+    const isSplit = action === SPLIT_CLOSE || action === SPLIT_OPEN;
+    if (
+      cash === undefined &&
+      !INTEREST.has(action) &&
+      side === null &&
+      !isSplit &&
+      !DIVIDENDS.has(action) &&
+      !LABELLED_DIVIDENDS.has(action)
+    ) {
+      if (when !== null) reached(when.date);
+      // The action is file text: it travels only wrapped, for the screen,
+      // and every export of the finding drops it.
+      block("unknownAction", { broker: TRADING212, action: untrusted(action) });
+      continue;
+    }
+
+    if (when === null) {
       block("invalidTime", {});
       continue;
     }
-    const date = dated.date;
-    if (lastDate === null || date > lastDate) lastDate = date;
+    const { at, date } = when;
+    reached(date);
 
-    const cash = CASH.get(action);
     if (cash !== undefined) {
       events.push({
         kind: "ignored",
@@ -471,47 +542,6 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
       interestRows += 1;
       continue;
     }
-    if (UNSETTLED.has(action)) {
-      // Refused either way. What the refusal can reach is stated only where
-      // the row's shape shows it (ADR 0017): rights booked under a `.RST`
-      // ticker, and new shares paired with a sale at 0 after the last row.
-      // Every other refusal withholds both returns of every year.
-      const isin = text(row, "ISIN");
-      if (
-        (action === FREE_RIGHTS || action === SHARES_RECEIVED) &&
-        isIsin(isin)
-      ) {
-        const rights =
-          action === FREE_RIGHTS && text(row, "Ticker").endsWith(".RST");
-        block("unsupportedAction", {
-          broker: TRADING212,
-          action,
-          isin,
-          date,
-          ...(rights ? { shares: "rights" as const } : {}),
-        });
-        const ms = at.instant === null ? null : instantMillis(at.instant);
-        if (action === SHARES_RECEIVED && ms !== null) {
-          received.push({ index: diagnostics.length - 1, ms, isin, date });
-        }
-      } else {
-        block("unsupportedAction", { broker: TRADING212, action });
-      }
-      continue;
-    }
-    const side = BUYS.has(action) ? "buy" : SELLS.has(action) ? "sell" : null;
-    const isSplit = action === SPLIT_CLOSE || action === SPLIT_OPEN;
-    if (
-      side === null &&
-      !isSplit &&
-      !DIVIDENDS.has(action) &&
-      !LABELLED_DIVIDENDS.has(action)
-    ) {
-      // The action is file text: it travels only wrapped, for the screen,
-      // and every export of the finding drops it.
-      block("unknownAction", { broker: TRADING212, action: untrusted(action) });
-      continue;
-    }
 
     // Every action left concerns one security.
     const isin = text(row, "ISIN");
@@ -523,7 +553,7 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
     // window; where it differs from the UTC date T212 shows, say so. Which
     // clock defines a trade date has no FURS source yet (research 06, open
     // questions).
-    if (dated.moved) {
+    if (when.moved) {
       diagnostics.push(
         diagnostic(
           "warning",
