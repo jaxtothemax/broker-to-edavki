@@ -26,24 +26,35 @@ import {
   type BuiltRow,
 } from "@taxreporter/furs";
 import type { BsiRate } from "@taxreporter/fx";
-import type { Prepared, ReadExports } from "@taxreporter/pipeline";
+import type {
+  AccountLabel,
+  Holdings,
+  Prepared,
+  ReadExports,
+} from "@taxreporter/pipeline";
 
 import {
   BROKERS,
+  type AccountRef,
+  type AccountSummary,
   type BrokerId,
   type DividendRow,
   type Finding,
   type FindingParam,
+  type HeldLotRow,
+  type HeldSecurity,
+  type HoldingsPreview,
   type ImportedFile,
   type KdvpRow,
   type MatchedLot,
   type Money,
+  type PositionRow,
   type RateProvenance,
   type ReturnPreview,
   type SecurityResult,
 } from "../model/preview";
 import { isTicker, plainText } from "../i18n/text";
-import type { FileSummary, PayerPrompt } from "./protocol";
+import { isHoldings, type FileSummary, type PayerPrompt } from "./protocol";
 
 /** The request's files: their names by position, and positions by ID. */
 export interface FileIndex {
@@ -346,6 +357,129 @@ export function findingsOf(prepared: Prepared): readonly Diagnostic[] {
   ];
 }
 
+/** A name from a file, cleaned and cut: hundreds of characters is no name. */
+const NAME_LENGTH = 100;
+const nameText = (text: string | undefined): string =>
+  Array.from(plainText(text ?? ""))
+    .slice(0, NAME_LENGTH)
+    .join("");
+
+/**
+ * The shares still held, as the page shows them (ADR 0018). Accounts leave
+ * as their label and the names of their files, never a scope. Null when
+ * any of it cannot be shown, such as an account at a broker the page cannot
+ * name (the engine labels one it cannot place "unknown"): holdings are a
+ * view beside the returns and never fail a reply.
+ */
+export function holdingsPreview(
+  holdings: Holdings | null,
+  index: FileIndex,
+): HoldingsPreview | null {
+  if (holdings === null) return null;
+  try {
+    const shown = toHoldings(holdings, index);
+    // The page's own check, so a shape it would refuse costs the holdings
+    // and never the reply.
+    return isHoldings(shown) ? shown : null;
+  } catch {
+    return null;
+  }
+}
+
+function toHoldings(holdings: Holdings, index: FileIndex): HoldingsPreview {
+  const perBroker = new Map<string, number>();
+  for (const { label } of holdings.accounts) {
+    perBroker.set(label.broker, (perBroker.get(label.broker) ?? 0) + 1);
+  }
+  const refs = new Map<string, AccountRef>();
+  const refOf = (label: AccountLabel): AccountRef => {
+    const known = refs.get(label.key);
+    if (known !== undefined) return known;
+    const ref: AccountRef = {
+      id: label.key,
+      broker: brokerId(label.broker),
+      ordinal: label.ordinal,
+      showOrdinal: (perBroker.get(label.broker) ?? 0) > 1,
+    };
+    refs.set(label.key, ref);
+    return ref;
+  };
+  const accounts: AccountSummary[] = holdings.accounts.map((a) => ({
+    ...refOf(a.label),
+    asOf: a.asOf,
+    files: a.files.map((id) => nameOf(index, id)),
+    transferred: a.transferred,
+    refusedRows: a.refusedRows,
+    positions: a.positions.map((p): PositionRow => ({
+      isin: p.isin,
+      symbol: tickerOf(p.security.symbol),
+      name: nameText(p.security.name),
+      quantity: eight(p.quantity),
+    })),
+  }));
+  const securities = holdings.securities.map((s): HeldSecurity => {
+    const lots = s.lots.map((l): HeldLotRow => {
+      const account = refOf(l.account);
+      return {
+        account,
+        purchaseDate: l.purchaseDate,
+        quantity: eight(l.quantity),
+        price: toMoney(l.price),
+        // A split since the purchase restated the quantity and the price.
+        splitAdjusted: !l.factor.equals(Decimal.ONE),
+        rate: l.rate === null ? null : toRate(l.rate),
+        ...(l.missingRate === undefined ? {} : { missingRate: l.missingRate }),
+        unitCostEur: l.unitCostEur === null ? null : eight(l.unitCostEur),
+        costEur: l.costEur === null ? null : cents(l.costEur),
+        bucket: l.outlook.bucket,
+        next:
+          l.outlook.next === null
+            ? null
+            : { bucket: l.outlook.next.bucket, from: l.outlook.next.from },
+        source: {
+          file: nameOf(index, l.source.fileId),
+          row: l.source.row,
+          ...partOf(l.source),
+        },
+      };
+    });
+    return {
+      isin: s.isin,
+      symbol: tickerOf(s.security.symbol),
+      name: nameText(s.security.name),
+      asOf: s.asOf,
+      quantity: eight(s.quantity),
+      costEur: s.costEur === null ? null : cents(s.costEur),
+      incomplete: s.incomplete,
+      accounts: [...new Set(lots.map((l) => l.account))],
+      lots,
+    };
+  });
+  const days = securities.map((s) => s.asOf).sort();
+  return {
+    accounts,
+    securities,
+    totals: {
+      securities: securities.length,
+      lots: holdings.securities.reduce((n, s) => n + s.lots.length, 0),
+      // The lots that have a cost; the card says how many do not.
+      costEur: cents(
+        Decimal.sum(
+          holdings.securities.flatMap((s) =>
+            s.lots.flatMap((l) => (l.costEur === null ? [] : [l.costEur])),
+          ),
+        ),
+      ),
+      withoutRate: holdings.securities.reduce(
+        (n, s) => n + s.lots.filter((l) => l.costEur === null).length,
+        0,
+      ),
+      asOfFirst: days[0] ?? null,
+      asOfLast: days.at(-1) ?? null,
+    },
+  };
+}
+
 /**
  * The dashboard's headline: the cents each card shows, added. Their sum to
  * the cent, never a separately rounded total, which could differ by one
@@ -413,6 +547,7 @@ export function toPreview(
       taxEur: cents(gains.tax),
     },
     taxToPayEur: taxToPay(gains.tax, div.estimate.taxDueEur),
+    holdings: holdingsPreview(prepared.holdings, index),
     dividendsEstimate: {
       taxRate: div.estimate.taxRate.toString(),
       grossEur: cents(div.estimate.grossEur),
