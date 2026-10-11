@@ -75,13 +75,15 @@ test-e2e: build  ## Browser tests (Playwright) on the built web app; not part of
 
 build:  ## Build every package (tsc) and both apps: apps/cli/dist and apps/web/dist
 	@# The web app's public path comes from TAXREPORTER_WEB_BASE (default "/");
-	@# the GitHub Pages build will set /app/. See apps/web/vite.config.ts.
+	@# the GitHub Pages build sets the docs base followed by app/
+	@# (/broker-to-edavki/app/, or /app/ on a custom domain). See apps/web/vite.config.ts.
 	pnpm run build
 
 clean:  ## Remove build output, coverage and TypeScript build state (never node_modules)
 	@# Generated output only: `make clean && make build` must not need a reinstall.
 	rm -rf coverage packages/*/dist apps/*/dist
 	rm -f ./*.tsbuildinfo packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo
+	rm -f apps/*/scripts/*/*.tsbuildinfo
 
 # ONE PREREQUISITE PER LINE. Make accumulates prerequisites across repeated rule
 # lines, so this is the same target as one long line. It is split because every new
@@ -108,6 +110,7 @@ pre-push-checks: check-load-bearing
 pre-push-checks: check-added-files-covered
 pre-push-checks: check-app-fixture-gates
 pre-push-checks: check-licenses
+pre-push-checks: check-pages-build
 
 check-collision:  ## Block a push that would open a duplicate MR for an issue
 	@# Runs FIRST, before the slower code gates: finding out you duplicated
@@ -242,6 +245,15 @@ check-load-bearing:  ## Every call site declared load-bearing is still present
 	@# that has declared nothing passes trivially and says so — see
 	@# load-bearing.declarations for when a call site earns a declaration.
 	@bash scripts/check-load-bearing.sh
+
+# A hand mirror, not a derived one: scripts/check-prepush-parity.sh only sees
+# gates directly under the top-level scripts/ folder (#63), so it cannot tell that
+# this gate under apps/web/scripts/ needs one. Self-test only: the real scan reads
+# a Vite build of apps/web made for the Pages base, which the pre-push set does not
+# produce. CI's website-build job (.github/workflows/docs.yml) runs both.
+.PHONY: check-pages-build
+check-pages-build:  ## The web app's Pages build check proves it can still fail (self-test only)
+	@node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
 
 check-stale-refs:  ## STUB/WIP markers, and TODO(#N)/SUPPRESSED-UNTIL(#N) against closed issues
 	@# NOT in pre-push-checks on purpose: its oracle is the issue tracker, so a

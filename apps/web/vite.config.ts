@@ -1,34 +1,16 @@
 import react from "@vitejs/plugin-react";
 import { defaultClientConditions, defineConfig, type Plugin } from "vite";
-
-/**
- * The built app's Content Security Policy (CLAUDE.md, "Secure code"): scripts,
- * fonts and requests from its own origin only, so even injected markup cannot
- * load code or send data elsewhere. The opt-in LLM check will add exactly its
- * provider's origin to connect-src when it lands (ADR 0008).
- */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self'",
-  // No 'unsafe-inline': React applies the style prop through the CSSOM, which
-  // a policy does not restrict, and no markup carries a style attribute.
-  "style-src 'self'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "connect-src 'self'",
-  // blob: for the engine worker's bootstrap, which makes the worker inherit
-  // this policy (ADR 0013 §3): a worker loaded from its own URL would get
-  // its policy from response headers, and GitHub Pages sends none.
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join("; ");
+// The policy itself lives in its own module, which the Pages build check
+// (scripts/pages-build/check-pages-build.mjs) also imports, so the check
+// compares the tag in the output with exactly what this plugin injects.
+import { CONTENT_SECURITY_POLICY } from "./content-security-policy.mjs";
 
 /**
  * Build-only, because the dev server's React refresh runtime is an inline
  * script the policy would rightly block. GitHub Pages cannot send headers, so
  * the policy travels as a <meta> tag (which cannot carry frame-ancestors).
+ * Injected first in <head> (head-prepend): a meta policy does not cover what
+ * comes before it, and the Pages build check fails if anything does.
  */
 function contentSecurityPolicy(): Plugin {
   return {
@@ -49,8 +31,9 @@ function contentSecurityPolicy(): Plugin {
 
 export default defineConfig({
   // Public path the built app is served from. Local dev and `vite preview` use
-  // "/"; the GitHub Pages deploy will serve it under /app/, so that build sets
-  // TAXREPORTER_WEB_BASE=/app/. An empty value counts as unset.
+  // "/". The GitHub Pages build (.github/workflows/docs.yml) sets
+  // TAXREPORTER_WEB_BASE to the docs base followed by app/: /broker-to-edavki/app/
+  // on the project site, /app/ on a custom domain. An empty value counts as unset.
   base: process.env.TAXREPORTER_WEB_BASE || "/",
   plugins: [react(), contentSecurityPolicy()],
   // The workspace packages export their TypeScript sources under the
