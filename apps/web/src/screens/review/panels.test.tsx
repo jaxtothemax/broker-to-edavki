@@ -55,6 +55,23 @@ describe("GainsPanel", () => {
     expect(text(html)).toContain("1 EUR = 1,1900 USD");
   });
 
+  it("shows a fund house's wordmark on a fund only", () => {
+    const fund = demoPreview.securities.find((s) => s.isFund);
+    if (fund === undefined) throw new Error("the demo sells no fund");
+    const mark = (isFund: boolean) =>
+      render(
+        <GainsPanel
+          securities={[{ ...fund, isFund }]}
+          estimate={demoPreview.gainsEstimate}
+          open={new Set()}
+          onToggle={() => undefined}
+        />,
+      );
+    expect(mark(true)).toContain("logo-wordmark");
+    expect(mark(false)).not.toContain("logo-wordmark");
+    expect(mark(false)).toContain('class="ticker"');
+  });
+
   it("opens exactly the securities its view names", () => {
     const [first, second] = demoPreview.securities;
     if (first === undefined || second === undefined) {
@@ -166,10 +183,23 @@ describe("DividendsPanel", () => {
 
     it("shows a fund house's wordmark on every fund it issues", () => {
       const fund = panel([
-        { ...row, name: "Vanguard Test World (Acc)", symbol: "TSTB" },
+        {
+          ...row,
+          name: "Vanguard Test World (Acc)",
+          symbol: "TSTB",
+          isFund: true,
+        },
       ]);
       expect(fund).toContain("logo-wordmark");
       expect(fund).not.toContain('class="ticker"');
+    });
+
+    it("keeps the ticker tile for a company named like a fund house", () => {
+      const company = panel([
+        { ...row, name: "Vanguard Test Semiconductor Corp", isFund: false },
+      ]);
+      expect(company).not.toContain("logo-wordmark");
+      expect(company).toContain('class="ticker"');
     });
 
     it("keeps the total row under the first four columns", () => {

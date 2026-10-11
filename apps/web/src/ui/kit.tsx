@@ -184,24 +184,27 @@ export function Ticker({
 
 /**
  * The mark beside a security: the company's own logo when the app ships one
- * for its ISIN (ui/logos.ts), else its fund house's wordmark when the name
- * leads with one (ui/brandMarks.ts: every Vanguard fund shows Vanguard), else
- * its ticker tile. Decorative like the tile; `labelled` gives screen readers
- * the symbol where it is not written out next to the mark.
+ * for its ISIN (ui/logos.ts), else, for a fund, its fund house's wordmark when
+ * the name leads with one (ui/brandMarks.ts: every Vanguard fund shows
+ * Vanguard), else its ticker tile. Decorative like the tile; `labelled` gives
+ * screen readers the symbol where it is not written out next to the mark.
  */
 export function SecurityMark({
   isin,
   symbol,
   name,
+  isFund,
   labelled = false,
 }: {
   readonly isin: string;
   readonly symbol: string;
   readonly name: string;
+  /** The importer recognized it as a fund; only a fund gets a wordmark. */
+  readonly isFund: boolean;
   readonly labelled?: boolean;
 }) {
   const logo = LOGOS[isin];
-  const wordmark = logo === undefined ? brandMarkOf(name) : undefined;
+  const wordmark = logo === undefined ? brandMarkOf(name, isFund) : undefined;
   if (logo === undefined && wordmark === undefined) {
     return <Ticker symbol={symbol} labelled={labelled} />;
   }
@@ -221,9 +224,10 @@ export function SecurityMark({
       {wordmark !== undefined ? (
         <span className="logo logo-wordmark" aria-hidden>
           <svg viewBox={wordmark.viewBox} focusable="false">
-            {wordmark.paths.map((path) => (
+            {wordmark.paths.map((path, index) => (
               <path
-                key={path.d}
+                // Two paths of a mark may share their data (in two fills).
+                key={`${String(index)}:${path.d}`}
                 d={path.d}
                 fill={path.fill}
                 fillRule={path.evenOdd ? "evenodd" : "nonzero"}

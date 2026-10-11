@@ -34,7 +34,12 @@ function SecurityCell({ row }: { readonly row: DividendRow }) {
     row.symbol !== "" ? row.symbol : row.name !== "" ? row.name : row.isin;
   return (
     <span className="security-id">
-      <SecurityMark isin={row.isin} symbol={row.symbol} name={row.name} />
+      <SecurityMark
+        isin={row.isin}
+        symbol={row.symbol}
+        name={row.name}
+        isFund={row.isFund}
+      />
       <span className="security-names">
         <span className="security-symbol">{heading}</span>
         {row.symbol !== "" && row.name !== "" ? (

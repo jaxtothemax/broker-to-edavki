@@ -240,6 +240,25 @@ describe("isReply on the review", () => {
           ),
         ],
       },
+      // Whether it is a fund, which alone lets a fund house's mark show.
+      { ...preview, securities: [{ ...security, isFund: "true" }] },
+      { ...preview, dividends: [{ ...dividend, isFund: 1 }] },
+      {
+        ...preview,
+        securities: [
+          Object.fromEntries(
+            Object.entries(security).filter(([key]) => key !== "isFund"),
+          ),
+        ],
+      },
+      {
+        ...preview,
+        dividends: [
+          Object.fromEntries(
+            Object.entries(dividend).filter(([key]) => key !== "isFund"),
+          ),
+        ],
+      },
       {
         ...preview,
         dividends: [{ ...dividend, source: { file: 1, row: 2 } }],

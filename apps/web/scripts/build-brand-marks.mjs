@@ -2,8 +2,8 @@
 /**
  * Builds apps/web/src/ui/brandMarks.ts from the vendored SVGs in
  * apps/web/brand-art/: the published wordmarks of the fund houses whose ETFs
- * investors most often hold, matched by the start of a security's name
- * (ISINs cannot say who issued a fund).
+ * investors most often hold, matched by the start of a fund's name (ISINs
+ * cannot say who issued a fund).
  *
  * The art ships inside the app. Fetching a logo from a service would tell
  * that service which securities the user holds, and the app makes no
@@ -12,8 +12,10 @@
  *
  * The SVGs are read as data. Only <svg>, <g> and <path> with the attributes
  * below are accepted; a style, script, image, use, filter, gradient or any
- * other attribute fails the build, because the production CSP
+ * other attribute makes this script fail, because the production CSP
  * (`style-src 'self'`) blocks inline styles and none of it is ever executed.
+ * src/ui/kit.test.tsx runs `readSvg` over the committed files and compares
+ * what it reads with brandMarks.ts.
  *
  * Usage:
  *   node apps/web/scripts/build-brand-marks.mjs          write the module
@@ -43,6 +45,31 @@ const ALLOWED = {
 
 function fail(file, message) {
   throw new Error(`${file}: ${message}`);
+}
+
+/** Every character JavaScript ends a line, and so a `//` comment, at. */
+const LINE_BREAK = /[\n\r\u2028\u2029]/;
+
+/**
+ * The source url and license of a manifest entry, checked. Both are written
+ * into a `//` comment of the module as they are, so a line break in either
+ * would end the comment and make the rest of the field code.
+ */
+export function checkSource(file, source) {
+  if (
+    typeof source?.url !== "string" ||
+    !source.url.startsWith("https://") ||
+    typeof source.license !== "string"
+  ) {
+    fail(file, "a source url and a license are required");
+  }
+  if (LINE_BREAK.test(source.url) || LINE_BREAK.test(source.license)) {
+    fail(
+      file,
+      "the source url and license must each be one line: they are written into a comment",
+    );
+  }
+  return source;
 }
 
 /** "#abc" and "#ABCDEF" as "#AABBCC", so equal colors compare equal. */
@@ -177,13 +204,7 @@ export async function render() {
         "names must be lowercase, trimmed prefixes of three or more characters",
       );
     }
-    if (
-      typeof entry.source?.url !== "string" ||
-      !entry.source.url.startsWith("https://") ||
-      typeof entry.source.license !== "string"
-    ) {
-      fail(file, "a source url and a license are required");
-    }
+    checkSource(file, entry.source);
     const { viewBox, paths } = readSvg(file, bytes.toString("utf8"));
     return { entry, viewBox, paths };
   });

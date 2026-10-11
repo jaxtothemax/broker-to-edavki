@@ -222,6 +222,7 @@ function SecurityItem({
             isin={security.isin}
             symbol={security.symbol}
             name={security.name}
+            isFund={security.isFund}
           />
           <span className="security-names">
             <span className="security-symbol">{labelOf(security)}</span>

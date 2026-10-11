@@ -102,6 +102,12 @@ export interface SecurityResult {
   readonly isin: string;
   readonly symbol: string;
   readonly name: string;
+  /**
+   * The importer recognized it as a fund (`IsFond` on Doh-KDVP). Only a fund
+   * shows a fund house's wordmark: a company whose name starts with the same
+   * word is not that fund house.
+   */
+  readonly isFund: boolean;
   readonly brokers: readonly BrokerId[];
   readonly rows: readonly KdvpRow[];
   readonly lots: readonly MatchedLot[];
@@ -116,6 +122,8 @@ export interface DividendRow {
   readonly symbol: string;
   /** The security's name as the export gives it, "" when it gives none. */
   readonly name: string;
+  /** The importer recognized the security as a fund, as on SecurityResult. */
+  readonly isFund: boolean;
   readonly payer: string;
   readonly isin: string;
   /** ISO 3166-1 alpha-2 country the income comes from, not the payer's. */

@@ -28,6 +28,7 @@ import { BRAND_MARKS } from "./brandMarks";
 import { LOGOS } from "./logos";
 
 import manifestJson from "../../brand-art/marks.json?raw";
+import { checkSource, readSvg } from "../../scripts/build-brand-marks.mjs";
 
 function render(node: ReactNode, locale: Locale = "en"): string {
   return renderToStaticMarkup(
@@ -126,7 +127,12 @@ describe("logos", () => {
 
   it("show a company's logo where one ships, and the ticker tile otherwise", () => {
     const apple = render(
-      <SecurityMark isin="US0378331005" symbol="AAPL" name="Apple Inc." />,
+      <SecurityMark
+        isin="US0378331005"
+        symbol="AAPL"
+        name="Apple Inc."
+        isFund={false}
+      />,
     );
     expect(apple).toContain('class="logo"');
     expect(apple).toContain("<path d=");
@@ -136,6 +142,7 @@ describe("logos", () => {
         isin="IE00BK5BQT80"
         symbol="TSTX"
         name="Examplefund Global Index"
+        isFund
       />,
     );
     expect(fund).toContain('class="ticker"');
@@ -149,6 +156,7 @@ describe("logos", () => {
           isin="US0378331005"
           symbol="AAPL"
           name="Apple Inc."
+          isFund={false}
           labelled={labelled}
         />,
       );
@@ -165,7 +173,7 @@ describe("logos", () => {
       "  vanguard test world",
     ]) {
       const html = render(
-        <SecurityMark isin="IE00TESTFUND" symbol="TSTA" name={name} />,
+        <SecurityMark isin="IE00TESTFUND" symbol="TSTA" name={name} isFund />,
       );
       expect(html, name).toContain('class="logo logo-wordmark"');
       expect(html, name).toContain('fill="#96151D"');
@@ -176,17 +184,44 @@ describe("logos", () => {
         isin="IE00TESTFUND"
         symbol="TSTB"
         name="iShares Test Core"
+        isFund
       />,
     );
     expect(iShares).toContain("logo-wordmark");
     expect(iShares).toContain('fill-rule="evenodd"');
   });
 
+  it("show a fund house's wordmark on a fund only, never on a company named like one", () => {
+    // A listed company whose name starts with a fund house's word, under a
+    // synthetic ISIN no logo is keyed by: not a fund, so its ticker tile.
+    const name = "Vanguard International Semiconductor Corp";
+    const mark = (isFund: boolean) =>
+      render(
+        <SecurityMark
+          isin="TW00TESTCORP"
+          symbol="TSTE"
+          name={name}
+          isFund={isFund}
+        />,
+      );
+    expect(mark(false)).toContain('class="ticker"');
+    expect(mark(false)).not.toContain("logo-wordmark");
+    expect(brandMarkOf(name, false)).toBeUndefined();
+    // The same name on a fund still gets the wordmark.
+    expect(mark(true)).toContain('class="logo logo-wordmark"');
+    expect(mark(true)).not.toContain("ticker");
+  });
+
   it("prefer a company's own logo over a wordmark, and a wordmark over the tile", () => {
     // Visa is keyed by ISIN; a name that also leads with a fund house changes
-    // nothing for it.
+    // nothing for it, even marked as a fund.
     const own = render(
-      <SecurityMark isin="US92826C8394" symbol="V" name="Vanguard Test Visa" />,
+      <SecurityMark
+        isin="US92826C8394"
+        symbol="V"
+        name="Vanguard Test Visa"
+        isFund
+      />,
     );
     expect(own).toContain('class="logo"');
     expect(own).not.toContain("logo-wordmark");
@@ -195,6 +230,7 @@ describe("logos", () => {
         isin="IE00TESTFUND"
         symbol="TSTC"
         name="Nobody Test Fund"
+        isFund
       />,
     );
     expect(tile).toContain('class="ticker"');
@@ -208,23 +244,28 @@ describe("logos", () => {
       "Vanguard2 Test",
       "",
     ]) {
-      expect(brandMarkOf(name), name).toBeUndefined();
+      expect(brandMarkOf(name, true), name).toBeUndefined();
     }
-    expect(brandMarkOf("Vanguard")?.title).toBe("Vanguard");
-    expect(brandMarkOf("Vanguard-Test Fund")?.title).toBe("Vanguard");
-    expect(brandMarkOf("Van Eck Test Fund")?.title).toBe("VanEck");
-    expect(brandMarkOf("VanEck Test Fund")?.title).toBe("VanEck");
-    expect(brandMarkOf("Amundi Test Fund")?.title).toBe("Amundi");
+    expect(brandMarkOf("Vanguard", true)?.title).toBe("Vanguard");
+    expect(brandMarkOf("Vanguard-Test Fund", true)?.title).toBe("Vanguard");
+    expect(brandMarkOf("Van Eck Test Fund", true)?.title).toBe("VanEck");
+    expect(brandMarkOf("VanEck Test Fund", true)?.title).toBe("VanEck");
+    expect(brandMarkOf("Amundi Test Fund", true)?.title).toBe("Amundi");
   });
 
-  it("read a hostile name in bounded time and match nothing from it", () => {
-    const long = `${"a".repeat(2_000_000)} Vanguard`;
-    const started = performance.now();
-    expect(brandMarkOf(long)).toBeUndefined();
-    expect(brandMarkOf(`Vanguard${" ".repeat(2_000_000)}`)?.title).toBe(
+  it("read only the start of a name, so a hostile one matches nothing from the rest", () => {
+    // 48 characters are read: the issuer's word just fits after 40 spaces,
+    // and after 60 the cut alone keeps it out (trimming would find it).
+    expect(brandMarkOf(`${" ".repeat(40)}Vanguard`, true)?.title).toBe(
       "Vanguard",
     );
-    expect(performance.now() - started).toBeLessThan(250);
+    expect(brandMarkOf(`${" ".repeat(60)}Vanguard`, true)).toBeUndefined();
+    expect(
+      brandMarkOf(`${"a".repeat(2_000_000)} Vanguard`, true),
+    ).toBeUndefined();
+    expect(brandMarkOf(`Vanguard${" ".repeat(2_000_000)}`, true)?.title).toBe(
+      "Vanguard",
+    );
   });
 });
 
@@ -253,9 +294,10 @@ describe("brand marks", () => {
   });
 
   it("are the module the build script writes from brand-art/", async () => {
-    // The script's own `--check` is the exact test; this one needs no Node
-    // APIs and fails the same way: a vendored file or the manifest changed
-    // and brandMarks.ts did not.
+    // The script's `--check` compares the whole module. This test runs the
+    // script's own reader over each committed file and compares every path's
+    // data, fill and fill rule and the viewBox with brandMarks.ts, so a
+    // recolored or cropped mark fails here, as does a file changed alone.
     const svgs = import.meta.glob<string>("../../brand-art/*.svg", {
       query: "?raw",
       import: "default",
@@ -288,16 +330,33 @@ describe("brand marks", () => {
       const mark = BRAND_MARKS[index];
       expect(mark?.title).toBe(entry.title);
       expect(mark?.names).toEqual(entry.names);
-      const drawn = [...svg.matchAll(/ d="([^"]+)"/g)].map((m) =>
-        (m[1] ?? "").replace(/\s+/g, " ").trim(),
-      );
       expect(
-        mark?.paths.map((path) => path.d),
+        { viewBox: mark?.viewBox, paths: mark?.paths },
         entry.file,
-      ).toEqual(drawn);
+      ).toEqual(readSvg(entry.file, svg));
       // Where each file came from and under what terms, kept with it.
-      expect(entry.source.url).toMatch(/^https:\/\//);
+      expect(checkSource(entry.file, entry.source).url).toMatch(/^https:\/\//);
       expect(entry.source.license).not.toBe("");
+    }
+  });
+
+  it("keep a source on one line, since the generator writes it into a comment", () => {
+    // A line break would end the `//` comment in brandMarks.ts and make the
+    // rest of the field code.
+    for (const tail of ["\n", "\r", "\u2028", "\u2029"]) {
+      const url = `https://example.test/${tail}export const x = 1;`;
+      expect(
+        () => checkSource("test.svg", { url, license: "Public domain" }),
+        JSON.stringify(tail),
+      ).toThrow(/one line/);
+      expect(
+        () =>
+          checkSource("test.svg", {
+            url: "https://example.test/",
+            license: `Public domain${tail}export const x = 1;`,
+          }),
+        JSON.stringify(tail),
+      ).toThrow(/one line/);
     }
   });
 });
