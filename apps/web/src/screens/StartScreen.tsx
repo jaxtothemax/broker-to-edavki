@@ -67,7 +67,13 @@ function HeroVisual() {
     <figure className="hero-visual">
       <div className="glass-card hero-card">
         <div className="hero-card-head">
-          <SecurityMark isin={apple.isin} symbol={apple.symbol} labelled />
+          <SecurityMark
+            isin={apple.isin}
+            symbol={apple.symbol}
+            name={apple.name}
+            isFund={apple.isFund}
+            labelled
+          />
           <div className="hero-card-id">
             <p className="strong">{apple.name}</p>
             <p className="muted small">

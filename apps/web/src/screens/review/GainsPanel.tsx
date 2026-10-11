@@ -218,7 +218,12 @@ function SecurityItem({
           {t.review.showDetails(labelOf(security))}
         </span>
         <span className="security-id" {...explain("sec.symbol")}>
-          <SecurityMark isin={security.isin} symbol={security.symbol} />
+          <SecurityMark
+            isin={security.isin}
+            symbol={security.symbol}
+            name={security.name}
+            isFund={security.isFund}
+          />
           <span className="security-names">
             <span className="security-symbol">{labelOf(security)}</span>
             <span className="security-name">{security.name}</span>

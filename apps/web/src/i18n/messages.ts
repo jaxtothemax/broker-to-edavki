@@ -203,6 +203,7 @@ export interface Messages {
     readonly source: (file: string, row: string) => string;
     readonly sourceIn: (file: string, part: string, row: string) => string;
     readonly colPayer: string;
+    readonly colSecurity: string;
     readonly colCountry: string;
     readonly colGross: string;
     readonly colForeignTax: string;
@@ -681,6 +682,7 @@ export const en: Messages = {
     source: (file, row) => `${file}, row ${row}`,
     sourceIn: (file, part, row) => `${file}, ${part}, row ${row}`,
     colPayer: "Payer",
+    colSecurity: "Security",
     colCountry: "Country",
     colGross: "Gross",
     colForeignTax: "Tax withheld",
@@ -1246,6 +1248,7 @@ export const sl: Messages = {
     source: (file, row) => `${file}, vrstica ${row}`,
     sourceIn: (file, part, row) => `${file}, ${part}, vrstica ${row}`,
     colPayer: "Izplačevalec",
+    colSecurity: "Vrednostni papir",
     colCountry: "Država",
     colGross: "Bruto",
     colForeignTax: "Odtegnjeni davek",

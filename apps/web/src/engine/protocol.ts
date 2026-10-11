@@ -315,6 +315,7 @@ const isSecurity = (v: unknown): v is SecurityResult =>
   isAnIsin(v["isin"]) &&
   isString(v["symbol"]) &&
   isString(v["name"]) &&
+  typeof v["isFund"] === "boolean" &&
   isArrayOf(v["brokers"], isBroker) &&
   isArrayOf(v["rows"], isKdvpRow) &&
   isArrayOf(v["lots"], isLot) &&
@@ -324,6 +325,8 @@ const isDividend = (v: unknown): v is DividendRow =>
   isRecord(v) &&
   isDate(v["date"]) &&
   isString(v["symbol"]) &&
+  isString(v["name"]) &&
+  typeof v["isFund"] === "boolean" &&
   isString(v["payer"]) &&
   isAnIsin(v["isin"]) &&
   isString(v["country"]) &&

@@ -292,6 +292,55 @@ describe("handleRequest: prepare", () => {
     expect(preview.dividendsEstimate.taxRate).toBe("0.25");
   });
 
+  it("says which securities are funds, and names a dividend's security as the export does", async () => {
+    // Trading 212's files alone, so a fund is one its own export calls a
+    // UCITS ETF by name, and no other broker's statement decides it.
+    const t212 = async (request: readonly RequestFile[]) => {
+      const reply = await handleRequest(
+        {
+          ...base,
+          id: 3,
+          kind: "prepare",
+          files: request,
+          taxpayer,
+          payers: [coca],
+        },
+        loadRates,
+      );
+      if (reply.kind !== "prepare") throw new Error(reply.kind);
+      return reply.preview;
+    };
+    const preview = await t212([
+      file("t212-2025.csv", t212v3),
+      file("t212-2026.csv", t212v4),
+    ]);
+    expect(preview.securities.map((s) => [s.isin, s.isFund])).toEqual([
+      ["IE00BK5BQT80", true],
+      ["US00000ACME1", false],
+      ["US1912161007", false],
+    ]);
+    // The Name column of the export's dividend row, not the payer's name.
+    const coke = preview.dividends.filter((d) => d.isin === "US1912161007");
+    expect(coke.length).toBeGreaterThan(0);
+    for (const row of coke) {
+      expect([row.name, row.isFund]).toEqual(["Coca-Cola", false]);
+    }
+    // A fund's dividend, synthetic, amounts made up.
+    const header = t212v4.split("\n")[0] ?? "";
+    const fund = await t212([
+      file(
+        "fund.csv",
+        [
+          header,
+          'Dividend (Dividend),2026-07-10 13:05:12+00:00,IE00B3RBWM25,VWRL,"Vanguard FTSE All-World UCITS ETF (Dist)",,,4.0000000000,0.6000000000,USD,0.85155000,,,2.04,"EUR",,,,,,',
+        ].join("\n"),
+      ),
+    ]);
+    expect(fund.dividends.map((d) => [d.name, d.isFund])).toEqual([
+      ["Vanguard FTSE All-World UCITS ETF (Dist)", true],
+    ]);
+  });
+
   it("shows the country the income comes from, not the payer's", async () => {
     // A broker's own country (GB) as the payer of a US share's dividends.
     const { preview } = await prepare([{ ...coca, country: "GB" }]);

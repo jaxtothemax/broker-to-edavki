@@ -24,8 +24,13 @@ const OUT = new URL("../src/ui/logos.ts", import.meta.url);
 
 /**
  * ISIN, Simple Icons title, and the icon's file name (its slug). Only brands
- * the package covers with no license of their own; ETF issuers (Vanguard,
- * iShares, Amundi, Xtrackers, SPDR) are not in it, so funds keep a tile.
+ * the package covers with no license of their own. Every ISIN was checked
+ * against the company it names (OpenFIGI) when it was added: the check digit
+ * cannot tell a typo that happens to be valid, and a wrong ISIN puts one
+ * company's logo on another's shares. Fund houses are not in the package;
+ * their wordmarks are vendored in brand-art/ and matched by name
+ * (build-brand-marks.mjs). Chosen for being widely held, not for any one
+ * portfolio; a security without an entry keeps its ticker tile.
  */
 const LOGOS = [
   ["US0378331005", "Apple", "apple"],
@@ -58,6 +63,22 @@ const LOGOS = [
   ["DE0007664039", "Volkswagen", "volkswagen"],
   ["DE0005190003", "BMW", "bmw"],
   ["DE000A1EWWW0", "adidas", "adidas"],
+  ["US0970231058", "Boeing", "boeing"],
+  ["US17275R1023", "Cisco", "cisco"],
+  ["US8552441094", "Starbucks", "starbucks"],
+  ["US3453708600", "Ford", "ford"],
+  ["US37045V1008", "General Motors", "generalmotors"],
+  ["US38141G1040", "Goldman Sachs", "goldmansachs"],
+  ["US7707001027", "Robinhood", "robinhood"],
+  ["KYG4124C1096", "Grab", "grab"],
+  ["US98980L1017", "Zoom", "zoom"],
+  ["US8334451098", "Snowflake", "snowflake"],
+  ["US72352L1061", "Pinterest", "pinterest"],
+  ["US75734B1008", "Reddit", "reddit"],
+  ["US7710491033", "Roblox", "roblox"],
+  ["NL0011585146", "Ferrari", "ferrari"],
+  ["NL0000235190", "Airbus", "airbus"],
+  ["FI0009000681", "Nokia", "nokia"],
 ];
 
 /** ISO 6166 check digit, so a typo cannot attach a logo to the wrong security. */

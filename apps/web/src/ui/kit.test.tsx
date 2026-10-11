@@ -23,7 +23,12 @@ import {
   TICKER_HUES,
   tabTarget,
 } from "./kit";
+import { brandMarkOf } from "./brandMark";
+import { BRAND_MARKS } from "./brandMarks";
 import { LOGOS } from "./logos";
+
+import manifestJson from "../../brand-art/marks.json?raw";
+import { checkSource, readSvg } from "../../scripts/build-brand-marks.mjs";
 
 function render(node: ReactNode, locale: Locale = "en"): string {
   return renderToStaticMarkup(
@@ -121,22 +126,238 @@ describe("logos", () => {
   });
 
   it("show a company's logo where one ships, and the ticker tile otherwise", () => {
-    const apple = render(<SecurityMark isin="US0378331005" symbol="AAPL" />);
+    const apple = render(
+      <SecurityMark
+        isin="US0378331005"
+        symbol="AAPL"
+        name="Apple Inc."
+        isFund={false}
+      />,
+    );
     expect(apple).toContain('class="logo"');
     expect(apple).toContain("<path d=");
     expect(apple).toContain('aria-hidden="true"');
-    const fund = render(<SecurityMark isin="IE00BK5BQT80" symbol="VWCE" />);
+    const fund = render(
+      <SecurityMark
+        isin="IE00BK5BQT80"
+        symbol="TSTX"
+        name="Examplefund Global Index"
+        isFund
+      />,
+    );
     expect(fund).toContain('class="ticker"');
-    expect(fund).toContain(">VWCE<");
+    expect(fund).toContain(">TSTX<");
   });
 
   it("name the symbol for screen readers only when asked", () => {
+    const mark = (labelled: boolean) =>
+      render(
+        <SecurityMark
+          isin="US0378331005"
+          symbol="AAPL"
+          name="Apple Inc."
+          isFund={false}
+          labelled={labelled}
+        />,
+      );
+    expect(mark(true)).toContain('<span class="visually-hidden">AAPL</span>');
+    expect(mark(false)).not.toContain("visually-hidden");
+  });
+
+  it("show a fund house's wordmark for any of its funds, whatever the ISIN", () => {
+    // Synthetic ISINs and tickers: no logo is keyed by them, so only the
+    // name's leading word can pick the mark.
+    for (const name of [
+      "Vanguard Test World (Acc)",
+      "VANGUARD TEST WORLD UCITS ETF",
+      "  vanguard test world",
+    ]) {
+      const html = render(
+        <SecurityMark isin="IE00TESTFUND" symbol="TSTA" name={name} isFund />,
+      );
+      expect(html, name).toContain('class="logo logo-wordmark"');
+      expect(html, name).toContain('fill="#96151D"');
+      expect(html, name).not.toContain("ticker");
+    }
+    const iShares = render(
+      <SecurityMark
+        isin="IE00TESTFUND"
+        symbol="TSTB"
+        name="iShares Test Core"
+        isFund
+      />,
+    );
+    expect(iShares).toContain("logo-wordmark");
+    expect(iShares).toContain('fill-rule="evenodd"');
+  });
+
+  it("show a fund house's wordmark on a fund only, never on a company named like one", () => {
+    // A listed company whose name starts with a fund house's word, under a
+    // synthetic ISIN no logo is keyed by: not a fund, so its ticker tile.
+    const name = "Vanguard International Semiconductor Corp";
+    const mark = (isFund: boolean) =>
+      render(
+        <SecurityMark
+          isin="TW00TESTCORP"
+          symbol="TSTE"
+          name={name}
+          isFund={isFund}
+        />,
+      );
+    expect(mark(false)).toContain('class="ticker"');
+    expect(mark(false)).not.toContain("logo-wordmark");
+    expect(brandMarkOf(name, false)).toBeUndefined();
+    // The same name on a fund still gets the wordmark.
+    expect(mark(true)).toContain('class="logo logo-wordmark"');
+    expect(mark(true)).not.toContain("ticker");
+  });
+
+  it("prefer a company's own logo over a wordmark, and a wordmark over the tile", () => {
+    // Visa is keyed by ISIN; a name that also leads with a fund house changes
+    // nothing for it, even marked as a fund.
+    const own = render(
+      <SecurityMark
+        isin="US92826C8394"
+        symbol="V"
+        name="Vanguard Test Visa"
+        isFund
+      />,
+    );
+    expect(own).toContain('class="logo"');
+    expect(own).not.toContain("logo-wordmark");
+    const tile = render(
+      <SecurityMark
+        isin="IE00TESTFUND"
+        symbol="TSTC"
+        name="Nobody Test Fund"
+        isFund
+      />,
+    );
+    expect(tile).toContain('class="ticker"');
+  });
+
+  it("matches the first word of the name and nothing else", () => {
+    for (const name of [
+      "Vanguardia Test Corp",
+      "Not Vanguard Test Fund",
+      "Test Vanguard Fund",
+      "Vanguard2 Test",
+      "",
+    ]) {
+      expect(brandMarkOf(name, true), name).toBeUndefined();
+    }
+    expect(brandMarkOf("Vanguard", true)?.title).toBe("Vanguard");
+    expect(brandMarkOf("Vanguard-Test Fund", true)?.title).toBe("Vanguard");
+    expect(brandMarkOf("Van Eck Test Fund", true)?.title).toBe("VanEck");
+    expect(brandMarkOf("VanEck Test Fund", true)?.title).toBe("VanEck");
+    expect(brandMarkOf("Amundi Test Fund", true)?.title).toBe("Amundi");
+  });
+
+  it("read only the start of a name, so a hostile one matches nothing from the rest", () => {
+    // 48 characters are read: the issuer's word just fits after 40 spaces,
+    // and after 60 the cut alone keeps it out (trimming would find it).
+    expect(brandMarkOf(`${" ".repeat(40)}Vanguard`, true)?.title).toBe(
+      "Vanguard",
+    );
+    expect(brandMarkOf(`${" ".repeat(60)}Vanguard`, true)).toBeUndefined();
     expect(
-      render(<SecurityMark isin="US0378331005" symbol="AAPL" labelled />),
-    ).toContain('<span class="visually-hidden">AAPL</span>');
-    expect(
-      render(<SecurityMark isin="US0378331005" symbol="AAPL" />),
-    ).not.toContain("visually-hidden");
+      brandMarkOf(`${"a".repeat(2_000_000)} Vanguard`, true),
+    ).toBeUndefined();
+    expect(brandMarkOf(`Vanguard${" ".repeat(2_000_000)}`, true)?.title).toBe(
+      "Vanguard",
+    );
+  });
+});
+
+describe("brand marks", () => {
+  it("hold only plain paths, hex fills and a viewBox", () => {
+    expect(BRAND_MARKS.length).toBeGreaterThanOrEqual(4);
+    for (const mark of BRAND_MARKS) {
+      expect(mark.viewBox, mark.title).toMatch(
+        /^-?[\d.]+ -?[\d.]+ [\d.]+ [\d.]+$/,
+      );
+      expect(mark.paths.length, mark.title).toBeGreaterThan(0);
+      for (const path of mark.paths) {
+        expect(path.fill).toMatch(/^#[0-9A-F]{6}$/);
+        expect(path.d).toMatch(/^[MmLlHhVvCcSsQqTtAaZz0-9.,\s-]+$/);
+      }
+      for (const prefix of mark.names) {
+        expect(prefix, mark.title).toBe(prefix.trim().toLowerCase());
+        expect(prefix.length).toBeGreaterThan(2);
+      }
+    }
+  });
+
+  it("never share a name prefix, so a name picks one mark", () => {
+    const prefixes = BRAND_MARKS.flatMap((mark) => mark.names);
+    expect(new Set(prefixes).size).toBe(prefixes.length);
+  });
+
+  it("are the module the build script writes from brand-art/", async () => {
+    // The script's `--check` compares the whole module. This test runs the
+    // script's own reader over each committed file and compares every path's
+    // data, fill and fill rule and the viewBox with brandMarks.ts, so a
+    // recolored or cropped mark fails here, as does a file changed alone.
+    const svgs = import.meta.glob<string>("../../brand-art/*.svg", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    });
+    const manifest = JSON.parse(manifestJson) as {
+      marks: {
+        id: string;
+        title: string;
+        file: string;
+        names: string[];
+        sha256: string;
+        source: { url: string; license: string };
+      }[];
+    };
+    expect(Object.keys(svgs)).toHaveLength(manifest.marks.length);
+    expect(BRAND_MARKS).toHaveLength(manifest.marks.length);
+    for (const [index, entry] of manifest.marks.entries()) {
+      const svg = svgs[`../../brand-art/${entry.file}`] ?? "";
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(svg),
+      );
+      expect(
+        [...new Uint8Array(digest)]
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join(""),
+        entry.file,
+      ).toBe(entry.sha256);
+      const mark = BRAND_MARKS[index];
+      expect(mark?.title).toBe(entry.title);
+      expect(mark?.names).toEqual(entry.names);
+      expect(
+        { viewBox: mark?.viewBox, paths: mark?.paths },
+        entry.file,
+      ).toEqual(readSvg(entry.file, svg));
+      // Where each file came from and under what terms, kept with it.
+      expect(checkSource(entry.file, entry.source).url).toMatch(/^https:\/\//);
+      expect(entry.source.license).not.toBe("");
+    }
+  });
+
+  it("keep a source on one line, since the generator writes it into a comment", () => {
+    // A line break would end the `//` comment in brandMarks.ts and make the
+    // rest of the field code.
+    for (const tail of ["\n", "\r", "\u2028", "\u2029"]) {
+      const url = `https://example.test/${tail}export const x = 1;`;
+      expect(
+        () => checkSource("test.svg", { url, license: "Public domain" }),
+        JSON.stringify(tail),
+      ).toThrow(/one line/);
+      expect(
+        () =>
+          checkSource("test.svg", {
+            url: "https://example.test/",
+            license: `Public domain${tail}export const x = 1;`,
+          }),
+        JSON.stringify(tail),
+      ).toThrow(/one line/);
+    }
   });
 });
 

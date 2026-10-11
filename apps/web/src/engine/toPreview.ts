@@ -223,6 +223,7 @@ function toSecurity(
     isin: list.isin,
     symbol: tickerOf(list.ticker),
     name: plainText(list.name),
+    isFund: list.isFund,
     brokers: BROKERS.filter((b) => rows.some((row) => row.broker === b)),
     rows,
     lots: lots.map(toLot),
@@ -251,6 +252,9 @@ function toDividend(
   return {
     date: d.date,
     symbol: tickerOf(d.security.symbol),
+    name: plainText(d.security.name ?? ""),
+    // The same test build-div.ts picks the Doh-Div type by: 4 for a fund.
+    isFund: d.security.isFund === true,
     payer: plainText(
       filled(
         d.record?.payer.name ?? payerNames.get(isin),

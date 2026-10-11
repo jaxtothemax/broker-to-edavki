@@ -19,6 +19,37 @@ function isCapped(row: DividendRow): boolean {
   return row.creditEur !== row.foreignTaxEur;
 }
 
+/** A broker named as the payer needs no second line saying it is the broker. */
+const sameAsBroker = (payer: string, broker: string) =>
+  payer.trim().toLowerCase() === broker.toLowerCase();
+
+/**
+ * The security that paid: its ticker, else its name, else its ISIN, with the
+ * name beneath a ticker. The payer is a separate column because the two are
+ * often not the same: a broker that holds the shares is the payer on the
+ * form, and the company whose dividend it was must still be readable.
+ */
+function SecurityCell({ row }: { readonly row: DividendRow }) {
+  const heading =
+    row.symbol !== "" ? row.symbol : row.name !== "" ? row.name : row.isin;
+  return (
+    <span className="security-id">
+      <SecurityMark
+        isin={row.isin}
+        symbol={row.symbol}
+        name={row.name}
+        isFund={row.isFund}
+      />
+      <span className="security-names">
+        <span className="security-symbol">{heading}</span>
+        {row.symbol !== "" && row.name !== "" ? (
+          <span className="security-name">{row.name}</span>
+        ) : null}
+      </span>
+    </span>
+  );
+}
+
 export function DividendsPanel({
   dividends,
   totals,
@@ -41,6 +72,7 @@ export function DividendsPanel({
         <thead>
           <tr>
             <th scope="col">{t.review.colDate}</th>
+            <th scope="col">{t.review.colSecurity}</th>
             <th scope="col">{t.review.colPayer}</th>
             <th scope="col">{t.review.colCountry}</th>
             <th scope="col" className="end">
@@ -64,19 +96,21 @@ export function DividendsPanel({
               <th scope="row" className="num nowrap">
                 {formatDate(row.date, locale)}
               </th>
-              <td>
-                <span className="payer">
-                  <SecurityMark isin={row.isin} symbol={row.symbol} labelled />
-                  <span className="stack-tight">
-                    <span className="strong">{row.payer}</span>
+              <td className="security-cell">
+                <SecurityCell row={row} />
+              </td>
+              <td className="payer-cell">
+                <span className="stack-tight">
+                  <span className="strong">{row.payer}</span>
+                  {sameAsBroker(row.payer, t.brokers[row.broker]) ? null : (
                     <span className="muted small">
                       <BrokerName broker={row.broker} />
                     </span>
-                    <SourceText source={row.source} />
-                  </span>
+                  )}
+                  <SourceText source={row.source} />
                 </span>
               </td>
-              <td className="nowrap">
+              <td>
                 {row.country === "" ? "" : formatCountry(row.country, locale)}
               </td>
               <td className="end" {...explain("div.gross")}>
@@ -116,7 +150,7 @@ export function DividendsPanel({
         </tbody>
         <tfoot>
           <tr>
-            <th scope="row" colSpan={3}>
+            <th scope="row" colSpan={4}>
               {t.review.dividendsTotal}
             </th>
             <td className="end">
