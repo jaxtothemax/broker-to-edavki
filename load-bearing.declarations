@@ -124,10 +124,18 @@ path: apps/web/src/App.tsx
 call: onError={() => {
 why:  The only way a failure inside the guided tour ends it. The tour's boundary renders nothing in its place, so without this handler the tour stays open with no dialog: its stop keeps overriding the screen the user navigates to, the screen-change focus move stays off, and the user's view is never given back (ADR 0016). No test makes the tour throw, so deleting it leaves every test green.
 
-path: apps/web/vite.config.ts
+path: apps/web/content-security-policy.mjs
 call: "worker-src 'self' blob:",
 why:  The only grant for the engine's blob: bootstrap, which makes the worker inherit the page's policy (ADR 0013 §3). Drop blob: and every test and build stays green while the deployed app can no longer start its engine, so no file of the user's is read.
 
 path: .github/workflows/ci.yml
 call: pnpm --dir apps/web exec playwright test
 why:  The only place CI runs the browser tests: the guided tour's keyboard path, focus and scroll restore, no sideways scroll at 320px, and the zero-violation check of the Content Security Policy on the built app. Delete it and the e2e job passes having run nothing.
+
+path: .github/workflows/docs.yml
+call: node apps/web/scripts/pages-build/check-pages-build.mjs apps/web/dist "$WEB_BASE"
+why:  The only run of the Pages build check on the real build output. Delete it and the step runs only the self-test, which keeps check-gate-selftest-parity green, while a wrong base, a lost Content Security Policy tag or an inline script reaches the artifact with every gate green.
+
+path: .github/workflows/docs.yml
+call: if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then
+why:  The only thing keeping the web app out of the Pages artifact until PUBLISH_WEB_APP is true. Delete the guard and the next push to main publishes the app with every gate green.

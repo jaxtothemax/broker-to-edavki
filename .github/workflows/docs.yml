@@ -8,8 +8,8 @@
 #                        under DOCS_ROOT fails the run. See that script's module
 #                        docstring for what is configurable here versus
 #                        hard-coded to the Astro Starlight shape.
-#   website-build        compiles and VERIFIES the site, builds and checks the web
-#                        app, then uploads the Pages artifact (on PRs too, so the
+#   website-build        builds and checks the web app, compiles and VERIFIES the
+#                        site, then uploads the Pages artifact (on PRs too, so the
 #                        artifact a PR would publish is inspectable). The app is
 #                        in that artifact only when the repository variable
 #                        PUBLISH_WEB_APP is "true"; see "The web app" below.
@@ -51,8 +51,9 @@
 # The web app (apps/web, ADR 0009). website-build builds it on every run, with
 # its public path set to the docs base followed by app/ (so /<repo>/app/ on a
 # project site, /app/ on a custom domain), and apps/web/scripts/pages-build/
-# check-pages-build.mjs fails the job if the build lacks the Content Security
-# Policy meta tag, references a script or stylesheet outside that path, or has an
+# check-pages-build.mjs fails the job if the build's Content Security Policy meta
+# tag is missing, not first in <head> or not the policy vite.config.ts injects,
+# or the build references a script or stylesheet outside that path, or has an
 # inline script. Publishing is OFF: the app is copied into the Pages artifact
 # only when the repository variable PUBLISH_WEB_APP equals "true" (Settings ->
 # Secrets and variables -> Actions -> Variables). The pages job deploys that
@@ -138,12 +139,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: website/package-lock.json
-      - run: npm ci
       # origin: "https://<owner>.github.io" (or the custom domain);
       # base_path: "/<repo>", or "" when the site is served at the root.
       - id: pages
@@ -177,6 +172,65 @@ jobs:
           printf 'docs=%s\n' "$docs_base" >> "$GITHUB_OUTPUT"
           printf 'app=%s\n' "$app_base" >> "$GITHUB_OUTPUT"
           echo "docs base path: '${docs_base}'; web app public path: '${app_base}'"
+      # ── The web app (apps/web, ADR 0009) ───────────────────────────────────
+      # Built and checked on EVERY run, pull requests included, so a wrong base
+      # path or a lost Content Security Policy is red in the PR that causes it.
+      # It joins the Pages artifact only when the repository variable
+      # PUBLISH_WEB_APP is "true" (the copy step after the docs build);
+      # otherwise the artifact is exactly the docs site.
+      #
+      # These steps run BEFORE the docs build on purpose. The app's toolchain
+      # (Vite, Rolldown, the React plugin and what they pull in) runs here even
+      # with publishing off, so a compromised build-time dependency could write
+      # into website/dist. The docs build refuses to start over an existing
+      # website/dist and then writes it from scratch, so the app gets into the
+      # artifact only through the copy step. That narrows the exposure; it does
+      # not remove it, because code that runs in this job can still tamper with
+      # the steps after it.
+      # The job's default working directory is website/, so each `run:` in this
+      # block, and the copy step after the docs build, says `working-directory: .`
+      # to run at the repository root.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # Only apps/web and the workspace packages it imports. Vite bundles those
+      # from their TypeScript sources, so no package build is needed first.
+      - name: Install the workspace packages apps/web needs
+        working-directory: .
+        run: pnpm install --frozen-lockfile --filter "@taxreporter/web..."
+      - name: Build the web app
+        working-directory: .
+        env:
+          TAXREPORTER_WEB_BASE: ${{ steps.base.outputs.app }}
+        run: pnpm --filter @taxreporter/web build
+      # Self-test first, in this same job (scripts/CLAUDE.md), then the real check.
+      - name: Check the web app build for Pages
+        working-directory: .
+        env:
+          WEB_BASE: ${{ steps.base.outputs.app }}
+        run: |
+          node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
+          node apps/web/scripts/pages-build/check-pages-build.mjs apps/web/dist "$WEB_BASE"
+      # ── The documentation site ─────────────────────────────────────────────
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      # astro build empties its output directory, but not completely: Astro's
+      # emptyDir is passed new Set(".git"), a set of the characters ".", "g", "i"
+      # and "t", so a top-level entry with one of those names survives it. So the
+      # build does not rely on it: nothing before this point writes website/dist,
+      # and if anything did, the job stops here instead of publishing it.
+      - name: Refuse a website/dist that the docs build did not write
+        run: |
+          if [ -e dist ] || [ -L dist ]; then
+            echo "::error::website/dist exists before the docs build, so an earlier step wrote it; refusing to build the Pages artifact on top of it."
+            exit 1
+          fi
       # Expressions are resolved into env vars, never into the script itself.
       # A skipped configure-pages step has empty outputs, so pull requests fall
       # back to the default project-site origin.
@@ -213,59 +267,41 @@ jobs:
             exit 1
           fi
           echo "Docs build verification passed: every source page rendered a non-trivial output file."
-      # ── The web app (apps/web, ADR 0009) ───────────────────────────────────
-      # Built and checked on EVERY run, pull requests included, so a wrong base
-      # path or a lost Content Security Policy is red in the PR that causes it.
-      # It joins the Pages artifact only when the repository variable
-      # PUBLISH_WEB_APP is "true" (last step below); otherwise the artifact is
-      # exactly the docs site. These steps come after the docs build and its
-      # verification on purpose: nothing here can change what the docs build saw.
-      # The job's default working directory is website/, so each `run:` below says
-      # `working-directory: .` to run at the repository root.
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      # Only apps/web and the workspace packages it imports. Vite bundles those
-      # from their TypeScript sources, so no package build is needed first.
-      - name: Install the workspace packages apps/web needs
-        working-directory: .
-        run: pnpm install --frozen-lockfile --filter "@taxreporter/web..."
-      - name: Build the web app
-        working-directory: .
-        env:
-          TAXREPORTER_WEB_BASE: ${{ steps.base.outputs.app }}
-        run: pnpm --filter @taxreporter/web build
-      # Self-test first, in this same job (scripts/CLAUDE.md), then the real check.
-      - name: Check the web app build for Pages
-        working-directory: .
-        env:
-          WEB_BASE: ${{ steps.base.outputs.app }}
-        run: |
-          node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
-          node apps/web/scripts/pages-build/check-pages-build.mjs apps/web/dist "$WEB_BASE"
       # PUBLISH_WEB_APP must be a repository or organization variable: this job
       # has no `environment:`, so a variable set on the github-pages environment
       # is invisible here. It is read through env, never interpolated into the
       # script. Unset, empty or anything but "true" leaves the artifact alone.
       # To publish: set PUBLISH_WEB_APP to true; the next push to main deploys
-      # the app at /app/. Unset it and the next push removes the app again.
+      # the app under the docs base followed by app/ (/<repo>/app/ on a project
+      # site, /app/ on a custom domain). Unset it and the next push removes the
+      # app again.
+      #
+      # upload-pages-artifact archives with `tar --dereference`, so a symbolic
+      # link in the copy would put whatever it points at into the public site.
+      # Vite never emits one, so any link in apps/web/dist fails the step, on
+      # every run (publishing off too, so a pull request shows it), and the copy
+      # itself never follows links (cp -P).
       - name: Add the web app to the Pages artifact (only if PUBLISH_WEB_APP is true)
         working-directory: .
         env:
           PUBLISH_WEB_APP: ${{ vars.PUBLISH_WEB_APP }}
         run: |
+          links="$(find apps/web/dist -type l)"
+          if [ -n "$links" ]; then
+            echo "::error::apps/web/dist contains symbolic links, which the Pages artifact would follow; refusing to publish:"
+            printf '%s\n' "$links"
+            exit 1
+          fi
           if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then
             echo "PUBLISH_WEB_APP is not \"true\": the web app was built and checked but is NOT in the Pages artifact."
             exit 0
           fi
-          if [ -e website/dist/app ]; then
+          if [ -e website/dist/app ] || [ -L website/dist/app ]; then
             echo "::error::website/dist/app already exists (a docs page at /app/?); refusing to overwrite it."
             exit 1
           fi
           mkdir website/dist/app
-          cp -R apps/web/dist/. website/dist/app/
+          cp -R -P apps/web/dist/. website/dist/app/
           test -s website/dist/app/index.html
           echo "PUBLISH_WEB_APP is \"true\": the web app is in the Pages artifact under app/."
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

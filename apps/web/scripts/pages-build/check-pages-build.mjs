@@ -4,10 +4,10 @@
 //
 // ## Why this exists
 //
-// The app is served under a path prefix (the repository name, then app/), and a
-// build made for the wrong prefix looks fine in `vite preview` and 404s every
-// script and stylesheet once deployed. GitHub Pages also cannot send response
-// headers, so the Content Security Policy travels as a <meta> tag that only the
+// The app is served under a path prefix (the docs base, then app/), and a build
+// made for the wrong prefix looks fine in `vite preview` and 404s every script
+// and stylesheet once deployed. GitHub Pages also cannot send response headers,
+// so the Content Security Policy travels as a <meta> tag that only the
 // production build adds (apps/web/vite.config.ts); a build without it would
 // publish an app that nothing restricts. The website-build job runs this check on
 // every pull request and push, so a wrong prefix or a lost policy is red before
@@ -15,33 +15,53 @@
 //
 // ## What it checks
 //
-//   1. index.html has a Content Security Policy <meta http-equiv> tag with a
-//      non-empty content attribute, inside <head>, before the first <script> and
-//      the first stylesheet or modulepreload <link>. The HTML Standard ignores such a tag outside <head> or with an
-//      empty content, and Content Security Policy Level 3 (section on the meta
-//      element) says a meta policy is not applied to content that precedes it.
-//   2. Every <script src>, <link rel="stylesheet" href> and
+//   1. The Content Security Policy <meta http-equiv> tag is where the build puts
+//      it (head-prepend in apps/web/vite.config.ts): before it come only a
+//      doctype, comments, whitespace, an <html> start tag and the first <head>
+//      start tag. That is stricter than the HTML Standard on purpose. A browser
+//      ignores the tag outside <head>, and Content Security Policy Level 3
+//      (section on the meta element) does not apply it to what precedes it; any
+//      other element or text before it can end <head> early (a <div>, stray
+//      text), hold it as text or inert content (<noscript>, <noframes>, <xmp>,
+//      <iframe>, <noembed>, <plaintext>, <template>), or come after a <head>
+//      the browser ignores. Modeling the HTML tree builder is out of scope, so
+//      nothing of the sort is allowed in front of the tag.
+//   2. Its content, after decoding character references, is exactly
+//      CONTENT_SECURITY_POLICY from apps/web/content-security-policy.mjs, the
+//      module vite.config.ts injects it from. A weakened or replaced policy
+//      fails.
+//   3. Every <script src>, <link rel="stylesheet" href> and
 //      <link rel="modulepreload" href> URL starts with the expected base and is
 //      already in normalized form (no scheme, no "//", no "." or ".." segment, no
 //      backslash), and the file it names exists in the output directory.
-//   3. No <script> is inline: a <script> without src (an import map or a JSON
+//   4. No <script> is inline: a <script> without src (an import map or a JSON
 //      data block counts), or one with both src and a non-blank body.
+//   5. No <svg> or <math> element. Inside foreign content <title>, <style> and
+//      <textarea> are ordinary elements, not text, so a <script> in an SVG
+//      <title> runs while a reader that takes <title> for text skips it. The
+//      app's index.html has none.
 //
 // ## What it does not check
 //
 // Only index.html is read. Other elements that load resources (<img>, <iframe>,
 // <link rel="icon">), inline event-handler attributes and javascript: URLs are
 // not inspected; the Content Security Policy itself blocks them in the browser.
-// Character references in attribute values are not decoded: a URL containing
-// "&" is rejected instead. The tokenizer below is a deliberate subset of the HTML
-// one (comments, quoted and unquoted attribute values, raw-text elements); it
-// reads the output of our own build, not arbitrary hostile pages.
+// Character references in URLs are not decoded: a URL containing "&" is
+// rejected instead. In the policy and http-equiv values only numeric references
+// and &amp; &lt; &gt; &quot; &apos; are decoded (escape-html, which Vite uses,
+// emits nothing else); any other "&" makes the policy a mismatch. The tokenizer
+// below is a deliberate subset of the HTML one (comments, doctypes, quoted and
+// unquoted attribute values, raw-text elements). Past the policy tag it may see
+// MORE markup than a browser would (a <script> inside <noscript>, say), never
+// less, so it errs toward failing.
 //
 // ## Safe on hostile input
 //
 // The file is size-capped, parsed with indexOf and character codes only (every
 // loop advances, so the work is linear, and there is no regular expression on
 // file content, hence nothing to backtrack), and nothing in it is executed.
+// Values quoted from it in messages are JSON-escaped and truncated, so a newline
+// in an attribute cannot start a line of its own (a GitHub Actions command).
 //
 // ## Usage
 //
@@ -70,8 +90,13 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { CONTENT_SECURITY_POLICY } from "../../content-security-policy.mjs";
+
 const TOOL = "check-pages-build";
 const USAGE = `usage: ${TOOL}.mjs <dist-dir> <expected-base>  (base starts and ends with "/")\n       ${TOOL}.mjs --self-test`;
+
+// Where the expected policy lives, for messages.
+const POLICY_MODULE = "apps/web/content-security-policy.mjs";
 
 // The real index.html is about 1.3 kB. A megabyte is far past anything the
 // build emits and still reads instantly.
@@ -80,20 +105,47 @@ const MAX_INDEX_BYTES = 1024 * 1024;
 // A hostile file can hold one problem per tag; list the first few, count all.
 const MAX_PRINTED_PROBLEMS = 20;
 
+// Characters of a value from the file shown in a message.
+const MAX_QUOTED_CHARS = 200;
+
 // A URL is resolved against this origin only to normalize it; nothing is fetched.
 const PLACEHOLDER_ORIGIN = "https://pages.invalid";
 
 // Elements whose content is text, not markup, up to their matching end tag.
+// True for title, style and textarea only outside svg and math, which is why
+// FOREIGN_ELEMENTS are refused outright.
 const RAW_TEXT_ELEMENTS = new Set(["script", "style", "textarea", "title"]);
+
+// Elements that switch the HTML parser to foreign content.
+const FOREIGN_ELEMENTS = new Set(["svg", "math"]);
+
+// The named character references decoded in the policy (see the header).
+const NAMED_REFERENCES = new Map([
+  ["amp", "&"],
+  ["lt", "<"],
+  ["gt", ">"],
+  ["quot", '"'],
+  ["apos", "'"],
+]);
+
+const MISSING_POLICY =
+  "no Content Security Policy <meta http-equiv> tag with a non-empty content attribute first in <head>";
 
 /**
  * @typedef {object} Tag
- * @property {string} name Lower-case element name.
+ * @property {string} name Element name, ASCII lower-cased.
  * @property {boolean} closing True for an end tag.
- * @property {Map<string, string>} attrs Lower-case name to raw value; the first of a repeated attribute wins, as in a browser.
+ * @property {Map<string, string>} attrs ASCII lower-cased name to raw value; the first of a repeated attribute wins, as in a browser.
  * @property {number} start Offset of the "<".
- * @property {boolean} inHead True between <head> and </head> (or <body>).
  * @property {string} body Text up to the end tag, for raw-text elements only.
+ */
+
+/**
+ * @typedef {{ kind: "doctype" | "comment" | "declaration" | "text", start: number }} PlainToken
+ *   A doctype, a comment, any other "<!...>" or "<?...>", or a run of text that
+ *   is more than whitespace (start is its first non-whitespace character).
+ * @typedef {{ kind: "tag", start: number, tag: Tag }} TagToken
+ * @typedef {PlainToken | TagToken} Token
  */
 
 /** @param {number} c */
@@ -103,6 +155,51 @@ const isSpace = (c) =>
 /** @param {number} c */
 const isAsciiLetter = (c) =>
   (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a);
+
+/**
+ * Lower-cases A to Z only, as the HTML tokenizer does. String#toLowerCase also
+ * folds non-ASCII letters (the Kelvin sign becomes "k"), which a browser never
+ * does to a tag or attribute name.
+ * @param {string} value
+ */
+function asciiLower(value) {
+  let out = "";
+  let from = 0;
+  for (let at = 0; at < value.length; at += 1) {
+    const c = value.charCodeAt(at);
+    if (c >= 0x41 && c <= 0x5a) {
+      out += value.slice(from, at) + String.fromCharCode(c + 0x20);
+      from = at + 1;
+    }
+  }
+  return from === 0 ? value : out + value.slice(from);
+}
+
+/**
+ * A value from the file, safe to print: JSON-escaped (no raw newline or control
+ * character reaches the log) and truncated.
+ * @param {string} value
+ */
+function quoted(value) {
+  return JSON.stringify(
+    value.length > MAX_QUOTED_CHARS
+      ? `${value.slice(0, MAX_QUOTED_CHARS)}...`
+      : value,
+  );
+}
+
+/**
+ * Offset of the first non-whitespace character in html[from, to), or -1.
+ * @param {string} html
+ * @param {number} from
+ * @param {number} to
+ */
+function firstNonSpace(html, from, to) {
+  for (let at = from; at < to; at += 1) {
+    if (!isSpace(html.charCodeAt(at))) return at;
+  }
+  return -1;
+}
 
 /**
  * Offset just past the comment that starts at `lt`, or -1 when it never ends.
@@ -137,7 +234,7 @@ function commentEnd(html, lt) {
 function rawTextEnd(html, name, from) {
   let at = html.indexOf("</", from);
   while (at !== -1) {
-    const candidate = html.slice(at + 2, at + 2 + name.length).toLowerCase();
+    const candidate = asciiLower(html.slice(at + 2, at + 2 + name.length));
     const after = html.charCodeAt(at + 2 + name.length);
     if (
       candidate === name &&
@@ -150,20 +247,28 @@ function rawTextEnd(html, name, from) {
 }
 
 /**
- * Splits HTML into start and end tags. Comments, doctypes and the content of
- * raw-text elements are skipped, so markup inside them is never reported.
+ * Splits HTML into tokens: start and end tags, comments, doctypes, other
+ * declarations, and the text between them when it is more than whitespace. The
+ * content of raw-text elements is the element's body, so markup inside it is
+ * never reported as tags.
  * @param {string} html
- * @returns {{ tags: Tag[], errors: string[] }}
+ * @returns {{ tokens: Token[], errors: string[] }}
  */
-function scanTags(html) {
+function tokenize(html) {
   const lineOf = makeLineOf(html);
-  /** @type {Tag[]} */
-  const tags = [];
+  /** @type {Token[]} */
+  const tokens = [];
   /** @type {string[]} */
   const errors = [];
   const n = html.length;
-  let i = 0;
-  let inHead = false;
+  let i = 0; // where the search for the next "<" resumes
+  let textFrom = 0; // start of the text run that ends at the next token
+
+  /** Records the text run that ends at `to`, unless it is all whitespace. */
+  const flushText = (/** @type {number} */ to) => {
+    const at = firstNonSpace(html, textFrom, to);
+    if (at !== -1) tokens.push({ kind: "text", start: at });
+  };
 
   while (i < n) {
     const lt = html.indexOf("<", i);
@@ -175,26 +280,33 @@ function scanTags(html) {
         errors.push(`unterminated comment at line ${lineOf(lt)}`);
         break;
       }
-      i = end;
+      flushText(lt);
+      tokens.push({ kind: "comment", start: lt });
+      i = textFrom = end;
       continue;
     }
 
     const c1 = html.charCodeAt(lt + 1);
     if (c1 === 0x21 || c1 === 0x3f) {
-      // "<!doctype ...>", "<![CDATA[...", "<?...>": a bogus comment up to ">".
+      // "<!doctype ...>", "<![CDATA[...", "<?...>": up to the first ">", which
+      // ends a doctype and a bogus comment alike.
       const end = html.indexOf(">", lt + 2);
       if (end === -1) {
         errors.push(`unterminated declaration at line ${lineOf(lt)}`);
         break;
       }
-      i = end + 1;
+      flushText(lt);
+      const doctype =
+        c1 === 0x21 && asciiLower(html.slice(lt + 2, lt + 9)) === "doctype";
+      tokens.push({ kind: doctype ? "doctype" : "declaration", start: lt });
+      i = textFrom = end + 1;
       continue;
     }
 
     const closing = c1 === 0x2f;
     const nameStart = lt + (closing ? 2 : 1);
     if (!isAsciiLetter(html.charCodeAt(nameStart))) {
-      i = lt + 1; // a literal "<" in text
+      i = lt + 1; // a literal "<": it stays part of the current text run
       continue;
     }
 
@@ -204,7 +316,7 @@ function scanTags(html) {
       if (isSpace(c) || c === 0x2f || c === 0x3e) break;
       p += 1;
     }
-    const name = html.slice(nameStart, p).toLowerCase();
+    const name = asciiLower(html.slice(nameStart, p));
 
     /** @type {Map<string, string>} */
     const attrs = new Map();
@@ -230,7 +342,7 @@ function scanTags(html) {
         if (isSpace(c) || c === 0x2f || c === 0x3e || c === 0x3d) break;
         p += 1;
       }
-      const attrName = html.slice(nameFrom, p).toLowerCase();
+      const attrName = asciiLower(html.slice(nameFrom, p));
       let q = p;
       while (q < n && isSpace(html.charCodeAt(q))) q += 1;
       let value = "";
@@ -265,35 +377,25 @@ function scanTags(html) {
       break;
     }
 
-    if (!closing) {
-      if (name === "head") inHead = true;
-      else if (name === "body") inHead = false;
-    } else if (name === "head") {
-      inHead = false;
-    }
-
-    let body = "";
-    i = p;
+    flushText(lt);
+    /** @type {Tag} */
+    const tag = { name, closing, attrs, start: lt, body: "" };
+    tokens.push({ kind: "tag", start: lt, tag });
+    i = textFrom = p;
     if (!closing && RAW_TEXT_ELEMENTS.has(name)) {
       const end = rawTextEnd(html, name, p);
       if (end === -1) {
         errors.push(`<${name}> at line ${lineOf(lt)} has no end tag`);
-        tags.push({
-          name,
-          closing,
-          attrs,
-          start: lt,
-          inHead,
-          body: html.slice(p),
-        });
+        tag.body = html.slice(p);
+        i = textFrom = n;
         break;
       }
-      body = html.slice(p, end);
-      i = end;
+      tag.body = html.slice(p, end);
+      i = textFrom = end;
     }
-    tags.push({ name, closing, attrs, start: lt, inHead, body });
   }
-  return { tags, errors };
+  flushText(n);
+  return { tokens, errors };
 }
 
 /**
@@ -328,23 +430,192 @@ function makeLineOf(html) {
 }
 
 /**
- * Space-separated tokens of an attribute value, lower-cased.
+ * Space-separated tokens of an attribute value, ASCII lower-cased.
  * @param {string} value
  */
-function tokens(value) {
+function spaceSeparated(value) {
   /** @type {string[]} */
   const found = [];
   let from = -1;
   for (let at = 0; at <= value.length; at += 1) {
     const separator = at === value.length || isSpace(value.charCodeAt(at));
     if (separator && from !== -1) {
-      found.push(value.slice(from, at).toLowerCase());
+      found.push(asciiLower(value.slice(from, at)));
       from = -1;
     } else if (!separator && from === -1) {
       from = at;
     }
   }
   return found;
+}
+
+/**
+ * The code point a numeric character reference names, or null when its digits
+ * are not all valid or it names something a browser would replace (NUL, a
+ * surrogate, past U+10FFFF, or the C1 range that HTML remaps).
+ * @param {string} digits
+ * @param {10 | 16} radix
+ */
+function numericReference(digits, radix) {
+  if (digits === "") return null;
+  for (let at = 0; at < digits.length; at += 1) {
+    const c = digits.charCodeAt(at);
+    const decimal = c >= 0x30 && c <= 0x39;
+    const hex = (c >= 0x41 && c <= 0x46) || (c >= 0x61 && c <= 0x66);
+    if (!(decimal || (radix === 16 && hex))) return null;
+  }
+  const code = Number.parseInt(digits, radix);
+  if (
+    code === 0 ||
+    code > 0x10ffff ||
+    (code >= 0xd800 && code <= 0xdfff) ||
+    (code >= 0x80 && code <= 0x9f)
+  )
+    return null;
+  return String.fromCodePoint(code);
+}
+
+/**
+ * Decodes the character references in an attribute value in a single pass (so
+ * "&amp;#39;" is "&#39;", not "'"), or returns null when the value holds an "&"
+ * that is not one of the references named in the header.
+ * @param {string} value
+ * @returns {string | null}
+ */
+function decodeReferences(value) {
+  let out = "";
+  let from = 0;
+  let amp = value.indexOf("&");
+  while (amp !== -1) {
+    // The longest reference decoded here is "&#x10FFFF;": look no further.
+    const semicolon = value.slice(amp + 1, amp + 10).indexOf(";");
+    if (semicolon === -1) return null;
+    const name = value.slice(amp + 1, amp + 1 + semicolon);
+    const decoded =
+      name.startsWith("#x") || name.startsWith("#X")
+        ? numericReference(name.slice(2), 16)
+        : name.startsWith("#")
+          ? numericReference(name.slice(1), 10)
+          : (NAMED_REFERENCES.get(name) ?? null);
+    if (decoded === null) return null;
+    out += value.slice(from, amp) + decoded;
+    from = amp + 2 + semicolon;
+    amp = value.indexOf("&", from);
+  }
+  return out + value.slice(from);
+}
+
+/**
+ * Whether a tag is a Content Security Policy <meta> a browser would read: its
+ * http-equiv is the policy (ASCII case-insensitively, after decoding) and its
+ * content is not blank.
+ * @param {Tag} tag
+ */
+function isPolicyMeta(tag) {
+  if (tag.closing || tag.name !== "meta") return false;
+  const equiv = decodeReferences(tag.attrs.get("http-equiv") ?? "");
+  if (equiv === null || asciiLower(equiv) !== "content-security-policy")
+    return false;
+  const raw = tag.attrs.get("content") ?? "";
+  const content = decodeReferences(raw) ?? raw;
+  return content.trim() !== "";
+}
+
+/**
+ * The first token before tokenList[end] that may not precede the policy tag, or
+ * null. In order, only these may: a doctype, an <html> start tag, the first
+ * <head> start tag, with comments anywhere. Whitespace-only text never becomes
+ * a token. A second <head> is refused: a browser ignores it, so a tag after it
+ * would sit wherever the first <head> left the parser.
+ * @param {Token[]} tokenList
+ * @param {number} end
+ * @returns {Token | null}
+ */
+function firstTokenBeforePolicy(tokenList, end) {
+  // 0 nothing yet, 1 after the doctype, 2 after <html>, 3 after <head>
+  let stage = 0;
+  for (let k = 0; k < end; k += 1) {
+    const token = tokenList[k];
+    if (token === undefined) break;
+    if (token.kind === "comment") continue;
+    if (token.kind === "doctype" && stage === 0) {
+      stage = 1;
+      continue;
+    }
+    if (token.kind === "tag" && !token.tag.closing) {
+      if (token.tag.name === "html" && stage < 2) {
+        stage = 2;
+        continue;
+      }
+      if (token.tag.name === "head" && stage < 3) {
+        stage = 3;
+        continue;
+      }
+    }
+    return token;
+  }
+  return null;
+}
+
+/** @param {Token} token */
+function describeToken(token) {
+  switch (token.kind) {
+    case "tag":
+      return `<${token.tag.closing ? "/" : ""}${token.tag.name}>`;
+    case "text":
+      return "text";
+    case "doctype":
+      return "a misplaced <!doctype>";
+    case "declaration":
+      return 'a "<!" or "<?" declaration';
+    case "comment":
+      return "a comment";
+  }
+}
+
+/**
+ * @typedef {"present" | "missing" | "not first in <head>" | "not the expected policy"} PolicyStatus
+ */
+
+/**
+ * Checks 1 and 2 of the header: the policy tag comes first in <head> and
+ * carries exactly the policy vite.config.ts injects.
+ * @param {Token[]} tokenList
+ * @param {(offset: number) => number} lineOf
+ * @returns {{ status: PolicyStatus, problems: string[] }}
+ */
+function checkPolicy(tokenList, lineOf) {
+  const at = tokenList.findIndex(
+    (token) => token.kind === "tag" && isPolicyMeta(token.tag),
+  );
+  const meta = tokenList[at];
+  if (meta === undefined || meta.kind !== "tag") {
+    return { status: "missing", problems: [MISSING_POLICY] };
+  }
+
+  const early = firstTokenBeforePolicy(tokenList, at);
+  if (early !== null) {
+    return {
+      status: "not first in <head>",
+      problems: [
+        MISSING_POLICY,
+        `${describeToken(early)} at line ${lineOf(early.start)} comes before the Content Security Policy <meta> tag at line ${lineOf(meta.start)}. ` +
+          "Only a doctype, comments, <html> and the first <head> may (the build injects the tag first in <head>): " +
+          "anything else can end <head> early, hide the tag as text or inert content, or come before what it must cover",
+      ],
+    };
+  }
+
+  const raw = meta.tag.attrs.get("content") ?? "";
+  if (decodeReferences(raw) !== CONTENT_SECURITY_POLICY) {
+    return {
+      status: "not the expected policy",
+      problems: [
+        `the Content Security Policy <meta> tag at line ${lineOf(meta.start)} is not the policy in ${POLICY_MODULE}: its content is ${quoted(raw)}`,
+      ],
+    };
+  }
+  return { status: "present", problems: [] };
 }
 
 /**
@@ -403,7 +674,7 @@ function assetExists(url, base, distDir) {
 /**
  * @typedef {object} Report
  * @property {string[]} problems
- * @property {{ script: number, stylesheet: number, modulepreload: number, inline: number, csp: boolean }} counts
+ * @property {{ script: number, stylesheet: number, modulepreload: number, inline: number, csp: PolicyStatus }} counts
  */
 
 /**
@@ -414,43 +685,35 @@ function assetExists(url, base, distDir) {
  */
 function checkHtml(html, base, distDir) {
   const lineOf = makeLineOf(html);
-  const { tags, errors } = scanTags(html);
+  const { tokens: tokenList, errors } = tokenize(html);
   /** @type {string[]} */
   const problems = [...errors];
+
+  const policy = checkPolicy(tokenList, lineOf);
+  problems.push(...policy.problems);
+
   const counts = {
     script: 0,
     stylesheet: 0,
     modulepreload: 0,
     inline: 0,
-    csp: false,
+    csp: policy.status,
   };
 
-  // Offset of the first tag that loads or runs something.
-  let firstLoader = Infinity;
-  /** @type {number | null} */
-  let cspAt = null;
+  for (const token of tokenList) {
+    if (token.kind !== "tag" || token.tag.closing) continue;
+    const tag = token.tag;
 
-  for (const tag of tags) {
-    if (tag.closing) continue;
-
-    if (tag.name === "meta") {
-      const equiv = (tag.attrs.get("http-equiv") ?? "").toLowerCase();
-      const content = tag.attrs.get("content") ?? "";
-      if (
-        equiv === "content-security-policy" &&
-        content.trim() !== "" &&
-        tag.inHead &&
-        cspAt === null
-      ) {
-        cspAt = tag.start;
-      }
+    if (FOREIGN_ELEMENTS.has(tag.name)) {
+      problems.push(
+        `<${tag.name}> at line ${lineOf(tag.start)}: index.html may not contain svg or math, because inside them <title>, <style> and <textarea> hold markup rather than text, and a <script> there would run unseen by this check`,
+      );
       continue;
     }
 
     /** @type {{ kind: string, label: string, url: string } | null} */
     let resource = null;
     if (tag.name === "script") {
-      firstLoader = Math.min(firstLoader, tag.start);
       const src = tag.attrs.get("src");
       if (src === undefined) {
         counts.inline += 1;
@@ -466,14 +729,13 @@ function checkHtml(html, base, distDir) {
         resource = { kind: "script", label: "<script src>", url: src };
       }
     } else if (tag.name === "link") {
-      const rel = tokens(tag.attrs.get("rel") ?? "");
+      const rel = spaceSeparated(tag.attrs.get("rel") ?? "");
       const kind = rel.includes("stylesheet")
         ? "stylesheet"
         : rel.includes("modulepreload")
           ? "modulepreload"
           : null;
       if (kind !== null) {
-        firstLoader = Math.min(firstLoader, tag.start);
         if (kind === "stylesheet") counts.stylesheet += 1;
         else counts.modulepreload += 1;
         resource = {
@@ -488,26 +750,16 @@ function checkHtml(html, base, distDir) {
       const why = urlProblem(resource.url, base);
       if (why !== null) {
         problems.push(
-          `${resource.label} "${resource.url}" at line ${lineOf(tag.start)} ${why}`,
+          `${resource.label} ${quoted(resource.url)} at line ${lineOf(tag.start)} ${why}`,
         );
       } else if (!assetExists(resource.url, base, distDir)) {
         problems.push(
-          `${resource.label} "${resource.url}" names a file that is not in the build output`,
+          `${resource.label} ${quoted(resource.url)} names a file that is not in the build output`,
         );
       }
     }
   }
 
-  counts.csp = cspAt !== null;
-  if (cspAt === null) {
-    problems.push(
-      "no Content Security Policy <meta http-equiv> tag with a non-empty content attribute inside <head>",
-    );
-  } else if (cspAt > firstLoader) {
-    problems.push(
-      "the Content Security Policy <meta> tag comes after a <script> or <link>, which a browser does not apply it to",
-    );
-  }
   return { problems, counts };
 }
 
@@ -553,7 +805,7 @@ function checkBuild(distDir, base) {
         stylesheet: 0,
         modulepreload: 0,
         inline: 0,
-        csp: false,
+        csp: "missing",
       },
     };
   }
@@ -603,7 +855,7 @@ function runCheck(args) {
   const { counts, problems } = report;
   out(
     `${TOOL}: base ${base}: ${counts.script} script, ${counts.stylesheet} stylesheet and ${counts.modulepreload} modulepreload URL(s) checked, ` +
-      `${counts.inline} inline script(s), Content Security Policy meta ${counts.csp ? "present" : "missing"}`,
+      `${counts.inline} inline script(s), Content Security Policy meta ${counts.csp}`,
   );
   if (problems.length === 0) {
     out(`${TOOL}: OK`);
@@ -627,14 +879,45 @@ function runCheck(args) {
 // child process, and demands the exact exit code AND the gate's own verdict line,
 // so a crash (exit 1 from an uncaught exception) cannot pass for a rejection.
 
-const CSP_META =
-  '<meta http-equiv="Content-Security-Policy" content="default-src &#39;self&#39;; script-src &#39;self&#39;">';
+/**
+ * An attribute value escaped the way Vite writes it (escape-html).
+ * @param {string} value
+ */
+function escapeAttribute(value) {
+  let escaped = "";
+  for (const char of value) {
+    escaped +=
+      char === "&"
+        ? "&amp;"
+        : char === '"'
+          ? "&quot;"
+          : char === "'"
+            ? "&#39;"
+            : char === "<"
+              ? "&lt;"
+              : char === ">"
+                ? "&gt;"
+                : char;
+  }
+  return escaped;
+}
+
+/**
+ * A Content Security Policy <meta> tag as the build writes it.
+ * @param {string} [policy]
+ */
+function policyMeta(policy = CONTENT_SECURITY_POLICY) {
+  return `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(policy)}">`;
+}
+
+const CSP_META = policyMeta();
 
 /**
  * An index.html shaped like the build's output, with `overrides` for one
- * deviation per case.
+ * deviation per case. `beforeCsp` and `afterCsp` wrap the policy tag inside
+ * <head>; `head` replaces the "<!doctype html>...<head>" opening.
  * @param {string} base
- * @param {{ csp?: string, script?: string, extra?: string }} [overrides]
+ * @param {{ csp?: string, script?: string, extra?: string, beforeCsp?: string, afterCsp?: string, head?: string }} [overrides]
  */
 function fixtureHtml(base, overrides = {}) {
   const csp = overrides.csp ?? CSP_META;
@@ -642,10 +925,8 @@ function fixtureHtml(base, overrides = {}) {
     overrides.script ??
     `<script type="module" crossorigin src="${base}assets/index-abc123.js"></script>`;
   return [
-    "<!doctype html>",
-    '<html lang="en">',
-    "  <head>",
-    `    ${csp}`,
+    overrides.head ?? '<!doctype html>\n<html lang="en">\n  <head>',
+    `    ${overrides.beforeCsp ?? ""}${csp}${overrides.afterCsp ?? ""}`,
     '    <meta charset="UTF-8" />',
     `    ${script}`,
     `    <link rel="stylesheet" crossorigin href="${base}assets/index-abc123.css">`,
@@ -707,10 +988,55 @@ function selfTest() {
     }
   };
 
+  /**
+   * The policy tag wrapped in an element, or after something, that keeps a
+   * browser from applying it, though a reader that only asks "is it inside
+   * <head>?" would say it is: [where, before it, after it, what is named].
+   * @type {[string, string, string, string][]}
+   */
+  const misplaced = [
+    ["inside <noscript> in <head>", "<noscript>", "</noscript>", "<noscript>"],
+    ["inside <template>", "<template>", "</template>", "<template>"],
+    ["inside <noframes>", "<noframes>", "</noframes>", "<noframes>"],
+    ["inside <iframe>", "<iframe>", "</iframe>", "<iframe>"],
+    ["inside <noembed>", "<noembed>", "</noembed>", "<noembed>"],
+    ["inside <xmp>", "<xmp>", "</xmp>", "<xmp>"],
+    ["after <plaintext>", "<plaintext>", "", "<plaintext>"],
+    ["after a <div> in <head>", "<div></div>", "", "<div>"],
+    ["after stray text in <head>", "TaxReporter ", "", "text"],
+    ["after a <title>", "<title>x</title>", "", "<title>"],
+    [
+      "after a script",
+      `<script type="module" src="${base}assets/index-abc123.js"></script>`,
+      "",
+      "<script>",
+    ],
+    ["after a second <head>", "</head><body><head>", "", "</head>"],
+  ];
+
   try {
     run(
       "a build under the expected base is accepted",
       fixtureHtml(base),
+      base,
+      0,
+      "Content Security Policy meta present",
+    );
+    run(
+      "upper-case tag and attribute names are accepted",
+      fixtureHtml(base, {
+        head: "<!DOCTYPE html>\n<HTML LANG=en>\n  <HEAD>",
+        csp: `<META HTTP-EQUIV="Content-Security-Policy" CONTENT="${escapeAttribute(CONTENT_SECURITY_POLICY)}">`,
+      }),
+      base,
+      0,
+      "Content Security Policy meta present",
+    );
+    run(
+      "reordered, unquoted and slash-separated attributes are accepted",
+      fixtureHtml(base, {
+        csp: `<meta/content="${escapeAttribute(CONTENT_SECURITY_POLICY)}"/http-equiv=Content-Security-Polic&#121;>`,
+      }),
       base,
       0,
       "Content Security Policy meta present",
@@ -730,11 +1056,74 @@ function selfTest() {
       "no Content Security Policy",
     );
     run(
-      "a policy tag after a script is rejected",
+      "a policy tag further down <head> is rejected",
       fixtureHtml(base, { csp: "", extra: CSP_META }),
       base,
       1,
-      "comes after",
+      "<meta> at line 5 comes before the Content Security Policy <meta> tag at line 8",
+    );
+    for (const [where, before, after, named] of misplaced) {
+      run(
+        `a policy tag ${where} is rejected`,
+        fixtureHtml(base, { beforeCsp: before, afterCsp: after }),
+        base,
+        1,
+        `${named} at line 4 comes before the Content Security Policy <meta> tag at line 4`,
+      );
+    }
+    run(
+      "a policy tag after a repeated http-equiv whose first value is not the policy is rejected",
+      fixtureHtml(base, {
+        csp: `<meta http-equiv="refresh" http-equiv="Content-Security-Policy" content="${escapeAttribute(CONTENT_SECURITY_POLICY)}">`,
+      }),
+      base,
+      1,
+      "no Content Security Policy",
+    );
+    run(
+      "a permissive policy is rejected",
+      fixtureHtml(base, {
+        csp: policyMeta("script-src * 'unsafe-inline' 'unsafe-eval'"),
+      }),
+      base,
+      1,
+      `is not the policy in ${POLICY_MODULE}`,
+    );
+    run(
+      "a policy whose first content attribute is permissive is rejected",
+      fixtureHtml(base, {
+        csp: `<meta http-equiv="Content-Security-Policy" content="default-src *" content="${escapeAttribute(CONTENT_SECURITY_POLICY)}">`,
+      }),
+      base,
+      1,
+      `is not the policy in ${POLICY_MODULE}`,
+    );
+    run(
+      "a policy with only some of the directives is rejected",
+      fixtureHtml(base, {
+        csp: policyMeta("default-src 'self'; script-src 'self'"),
+      }),
+      base,
+      1,
+      `is not the policy in ${POLICY_MODULE}`,
+    );
+    run(
+      "a script inside an SVG <title> is rejected",
+      fixtureHtml(base, {
+        extra: "<svg><title><script>window.x = 1</script></title></svg>",
+      }),
+      base,
+      1,
+      "<svg> at line 8: index.html may not contain svg or math",
+    );
+    run(
+      "a script inside a MathML <style> is rejected",
+      fixtureHtml(base, {
+        extra: "<math><style><script>window.x = 1</script></style></math>",
+      }),
+      base,
+      1,
+      "<math> at line 8: index.html may not contain svg or math",
     );
     run(
       "an asset outside the base is rejected",

@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { CONTENT_SECURITY_POLICY } from "../../content-security-policy.mjs";
+
 // The check is a command-line script, so these tests run it the way the
 // website-build job does: as a child process on a build output directory, and
 // they demand the exact exit code and the message. Importing it would hide a
@@ -14,16 +16,36 @@ const SCRIPT = fileURLToPath(
   new URL("./check-pages-build.mjs", import.meta.url),
 );
 const BASE = "/broker-to-edavki/app/";
+const POLICY_MODULE = "apps/web/content-security-policy.mjs";
+const MISSING = "no Content Security Policy <meta http-equiv> tag";
+
+/** An attribute value escaped as Vite writes it (escape-html). */
+function escapeAttribute(value: string): string {
+  const entities: Record<string, string> = {
+    "&": "&amp;",
+    '"': "&quot;",
+    "'": "&#39;",
+    "<": "&lt;",
+    ">": "&gt;",
+  };
+  let escaped = "";
+  for (const char of value) escaped += entities[char] ?? char;
+  return escaped;
+}
+
+/** The policy as the build writes it into the content attribute. */
+const ESCAPED_POLICY = escapeAttribute(CONTENT_SECURITY_POLICY);
 
 /**
  * The shape `pnpm --filter @taxreporter/web build` emits with
- * TAXREPORTER_WEB_BASE=/broker-to-edavki/app/: character references in the
- * policy, a valueless `crossorigin`, a <noscript> block, no modulepreload.
+ * TAXREPORTER_WEB_BASE=/broker-to-edavki/app/: the policy first in <head> with
+ * character references in it, a valueless `crossorigin`, a <noscript> block, no
+ * modulepreload.
  */
 const BUILT_INDEX = `<!doctype html>
 <html lang="en" data-theme="dark">
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src &#39;self&#39;; script-src &#39;self&#39;; style-src &#39;self&#39;; img-src &#39;self&#39; data:; font-src &#39;self&#39;; connect-src &#39;self&#39;; worker-src &#39;self&#39; blob:; object-src &#39;none&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;">
+    <meta http-equiv="Content-Security-Policy" content="${ESCAPED_POLICY}">
 
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -221,28 +243,43 @@ describe("check-pages-build: the Content Security Policy meta tag", () => {
   ];
 
   it.each(cases)("is rejected when it %s", (_name, html) => {
-    expectRejected(
-      check(html),
-      "no Content Security Policy <meta http-equiv> tag",
-    );
+    expectRejected(check(html), MISSING);
   });
 
   it("is rejected when a script comes before it", () => {
-    const html = swap(CSP_LINE, "").replace(
-      SCRIPT_LINE,
+    const html = swap(
+      CSP_LINE,
       `${SCRIPT_LINE}\n${CSP_LINE}`,
+      swap(SCRIPT_LINE, ""),
     );
-    expectRejected(check(html), "comes after a <script> or <link>");
+    const outcome = check(html);
+    expectRejected(outcome, MISSING);
+    expect(outcome.stderr).toContain(
+      "<script> at line 4 comes before the Content Security Policy <meta> tag at line 5",
+    );
   });
 
   it("is rejected when a stylesheet comes before it", () => {
-    const html = swap(CSP_LINE, "").replace(
-      LINK_LINE,
+    const html = swap(
+      CSP_LINE,
       `${LINK_LINE}\n${CSP_LINE}`,
+      swap(LINK_LINE, ""),
     );
     expectRejected(
-      check(swap(SCRIPT_LINE, "", html)),
-      "comes after a <script> or <link>",
+      check(html),
+      "<link> at line 4 comes before the Content Security Policy <meta> tag at line 5",
+    );
+  });
+
+  it("is rejected further down <head>, after the other meta tags", () => {
+    const html = swap(
+      LINK_LINE,
+      `${LINK_LINE}\n${CSP_LINE}`,
+      swap(CSP_LINE, ""),
+    );
+    expectRejected(
+      check(html),
+      "<meta> at line 6 comes before the Content Security Policy <meta> tag at line 12",
     );
   });
 
@@ -251,6 +288,239 @@ describe("check-pages-build: the Content Security Policy meta tag", () => {
     expect(outcome.stderr).toContain("no Content Security Policy");
     expect(outcome.stderr).toContain("inline <script>");
     expect(outcome.status).toBe(1);
+  });
+});
+
+// Vite injects the tag with head-prepend, so the check demands exactly that:
+// before it, only a doctype, comments, whitespace, <html> and the first <head>.
+// Each shape below keeps the tag "inside <head>" to a reader that only tracks
+// <head> and </head>, while a browser applies no policy at all: the tag is raw
+// text (noscript with scripting on, noframes, noembed, iframe, xmp, plaintext),
+// inert (template), or in <body> because <head> closed early (a <div>, text) or
+// because a second <head> is ignored.
+describe("check-pages-build: the policy tag comes first in <head>", () => {
+  const META = CSP_LINE.trim();
+  const misplaced: readonly [string, string, string][] = [
+    ["inside <noscript>", `<noscript>${META}</noscript>`, "<noscript>"],
+    ["inside <template>", `<template>${META}</template>`, "<template>"],
+    ["inside <noframes>", `<noframes>${META}</noframes>`, "<noframes>"],
+    ["inside <iframe>", `<iframe>${META}</iframe>`, "<iframe>"],
+    ["inside <noembed>", `<noembed>${META}</noembed>`, "<noembed>"],
+    ["inside <xmp>", `<xmp>${META}</xmp>`, "<xmp>"],
+    ["after <plaintext>", `<plaintext>${META}`, "<plaintext>"],
+    ["after a <div>", `<div></div>${META}`, "<div>"],
+    ["after stray text", `TaxReporter ${META}`, "text"],
+    ["after a non-breaking space", `&nbsp;${META}`, "text"],
+    ["after a literal < that a browser reads as text", `< ${META}`, "text"],
+    ["after a <title>", `<title>x</title>${META}`, "<title>"],
+    ["after a <base>", `<base href="/">${META}`, "<base>"],
+    ["after a second <html>", `<html>${META}`, "<html>"],
+    ["after a second <head>", `<head>${META}`, "<head>"],
+    [
+      "after a misplaced doctype",
+      `<!doctype html>${META}`,
+      "a misplaced <!doctype>",
+    ],
+    [
+      "after an XML declaration",
+      `<?xml version="1.0"?>${META}`,
+      'a "<!" or "<?" declaration',
+    ],
+  ];
+
+  it.each(misplaced)("rejects the tag %s", (_name, line, named) => {
+    const outcome = check(swap(CSP_LINE, `    ${line}`));
+    expectRejected(outcome, MISSING);
+    expect(outcome.stderr).toContain(
+      `${named} at line 4 comes before the Content Security Policy <meta> tag at line 4`,
+    );
+    expect(outcome.stdout).toContain(
+      "Content Security Policy meta not first in <head>",
+    );
+  });
+
+  it("rejects a tag after a closed <head> and a second one, which a browser ignores", () => {
+    const html = swap("  <head>\n", "  <head></head><body><head>\n");
+    expectRejected(
+      check(html),
+      "</head> at line 3 comes before the Content Security Policy <meta> tag at line 4",
+    );
+  });
+
+  it("accepts comments and whitespace before the tag", () => {
+    const html = swap(
+      "<!doctype html>\n",
+      "<!-- built -->\n<!doctype html>\n<!-- x -->",
+      swap(CSP_LINE, `    <!-- policy -->\n\n${CSP_LINE}`),
+    );
+    const outcome = check(html);
+    expect(outcome.stdout).toContain("Content Security Policy meta present");
+    expect(outcome.status).toBe(0);
+  });
+
+  it("accepts a page that leaves <html> and <head> implied", () => {
+    const html = swap('<html lang="en" data-theme="dark">\n  <head>\n', "");
+    const outcome = check(html);
+    expect(outcome.stdout).toContain("check-pages-build: OK");
+    expect(outcome.status).toBe(0);
+  });
+
+  it("accepts upper-case tag and attribute names", () => {
+    const html = swap(
+      `<!doctype html>\n<html lang="en" data-theme="dark">\n  <head>\n${CSP_LINE}`,
+      `<!DOCTYPE HTML>\n<HTML LANG="en">\n  <HEAD>\n    <META HTTP-EQUIV="CONTENT-SECURITY-POLICY" CONTENT="${ESCAPED_POLICY}">`,
+    );
+    const outcome = check(html);
+    expect(outcome.stdout).toContain("check-pages-build: OK");
+    expect(outcome.status).toBe(0);
+  });
+
+  it("accepts reordered, unquoted, slash-separated and character-referenced attributes", () => {
+    const html = swap(
+      CSP_LINE,
+      `    <meta/content='${CONTENT_SECURITY_POLICY.replaceAll("'", "&apos;")}'/http-equiv=Content-Security-Polic&#x79;>`,
+    );
+    const outcome = check(html);
+    expect(outcome.stdout).toContain("check-pages-build: OK");
+    expect(outcome.status).toBe(0);
+  });
+
+  it("reads only the first of a repeated http-equiv, as a browser does", () => {
+    const html = swap(
+      'http-equiv="Content-Security-Policy"',
+      'http-equiv="refresh" http-equiv="Content-Security-Policy"',
+    );
+    expectRejected(check(html), MISSING);
+  });
+
+  it("does not read an http-equiv with a character reference it cannot decode", () => {
+    const html = swap(
+      'http-equiv="Content-Security-Policy"',
+      'http-equiv="Content-Security-Polic&yacute;"',
+    );
+    expectRejected(check(html), MISSING);
+  });
+});
+
+describe("check-pages-build: the policy is the one vite.config.ts injects", () => {
+  const wrong: readonly [string, string][] = [
+    ["a permissive policy", "script-src * 'unsafe-inline' 'unsafe-eval'"],
+    [
+      "a wildcard connect-src",
+      CONTENT_SECURITY_POLICY.replace("connect-src 'self'", "connect-src *"),
+    ],
+    [
+      "an extra directive",
+      `${CONTENT_SECURITY_POLICY}; script-src-elem 'unsafe-inline'`,
+    ],
+    [
+      "a missing directive",
+      CONTENT_SECURITY_POLICY.replace("; object-src 'none'", ""),
+    ],
+    [
+      "only default-src and script-src",
+      "default-src 'self'; script-src 'self'",
+    ],
+    ["the policy with a trailing semicolon", `${CONTENT_SECURITY_POLICY};`],
+  ];
+
+  it.each(wrong)("rejects %s", (_name, policy) => {
+    const outcome = check(swap(ESCAPED_POLICY, escapeAttribute(policy)));
+    expectRejected(outcome, `is not the policy in ${POLICY_MODULE}`);
+    expect(outcome.stdout).toContain(
+      "Content Security Policy meta not the expected policy",
+    );
+  });
+
+  it("accepts the policy with plain apostrophes, which a browser reads the same", () => {
+    const html = swap(ESCAPED_POLICY, CONTENT_SECURITY_POLICY);
+    const outcome = check(html);
+    expect(outcome.stdout).toContain("Content Security Policy meta present");
+    expect(outcome.status).toBe(0);
+  });
+
+  it("decodes character references once, so a double-escaped policy is a mismatch", () => {
+    const html = swap(
+      ESCAPED_POLICY,
+      ESCAPED_POLICY.replaceAll("&#39;", "&amp;#39;"),
+    );
+    expectRejected(check(html), `is not the policy in ${POLICY_MODULE}`);
+  });
+
+  it("rejects a policy holding a character reference it does not decode", () => {
+    const html = swap(
+      ESCAPED_POLICY,
+      ESCAPED_POLICY.replace("&#39;self&#39;", "&lsquo;self&rsquo;"),
+    );
+    expectRejected(check(html), `is not the policy in ${POLICY_MODULE}`);
+  });
+
+  it("reads only the first of a repeated content attribute, as a browser does", () => {
+    const html = swap(
+      `content="${ESCAPED_POLICY}"`,
+      `content="default-src *" content="${ESCAPED_POLICY}"`,
+    );
+    expectRejected(check(html), 'its content is "default-src *"');
+  });
+
+  it("quotes the policy so a newline in it cannot start a log line of its own", () => {
+    const html = swap(ESCAPED_POLICY, "x&#10;::error::injected");
+    const outcome = check(html);
+    expectRejected(
+      outcome,
+      String.raw`its content is "x&#10;::error::injected"`,
+    );
+    const raw = swap(ESCAPED_POLICY, "x\n::error::injected");
+    const rawOutcome = check(raw);
+    expectRejected(
+      rawOutcome,
+      String.raw`its content is "x\n::error::injected"`,
+    );
+    expect(
+      rawOutcome.stderr.split("\n").some((line) => line.startsWith("::")),
+    ).toBe(false);
+  });
+});
+
+// Inside svg and math, <title>, <style> and <textarea> are ordinary elements,
+// so a <script> in them runs. A reader that takes them for raw text skips it.
+describe("check-pages-build: no foreign content", () => {
+  const foreign: readonly [string, string, string][] = [
+    [
+      "a script in an SVG <title>",
+      "<svg><title><script>alert(1)</script></title></svg>",
+      "<svg>",
+    ],
+    [
+      "a script in an SVG <style>",
+      "<svg><style><script>alert(1)</script></style></svg>",
+      "<svg>",
+    ],
+    [
+      "a script in a MathML <textarea>",
+      "<math><textarea><script>alert(1)</script></textarea></math>",
+      "<math>",
+    ],
+    ["an upper-case <SVG>", "<SVG></SVG>", "<svg>"],
+    ["an empty <math>", "<math></math>", "<math>"],
+  ];
+
+  it.each(foreign)("rejects %s", (_name, element, named) => {
+    const outcome = check(
+      swap('<div id="root"></div>', `<div id="root"></div>${element}`),
+    );
+    expectRejected(
+      outcome,
+      `${named} at line 19: index.html may not contain svg or math`,
+    );
+  });
+
+  it("does not take the word svg inside a title for an element", () => {
+    const outcome = check(
+      swap("<title>TaxReporter</title>", "<title>a <svg> b</title>"),
+    );
+    expect(outcome.stdout).toContain("check-pages-build: OK");
+    expect(outcome.status).toBe(0);
   });
 });
 
@@ -546,7 +816,7 @@ describe("check-pages-build: usage", () => {
   it("proves it can fail: --self-test passes", () => {
     const outcome = run(["--self-test"]);
     expect(outcome.stdout).toContain(
-      "check-pages-build: self-test ran 11 case(s), 0 failed",
+      "check-pages-build: self-test ran 31 case(s), 0 failed",
     );
     expect(outcome.stdout).toContain("check-pages-build: SELF-TEST OK");
     expect(outcome.stderr).toBe("");
