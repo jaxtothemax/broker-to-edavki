@@ -8,9 +8,11 @@
 #                        under DOCS_ROOT fails the run. See that script's module
 #                        docstring for what is configurable here versus
 #                        hard-coded to the Astro Starlight shape.
-#   website-build        compiles and VERIFIES the site, then uploads it as the
-#                        Pages artifact (on PRs too, so the artifact a PR would
-#                        publish is inspectable)
+#   website-build        compiles and VERIFIES the site, builds and checks the web
+#                        app, then uploads the Pages artifact (on PRs too, so the
+#                        artifact a PR would publish is inspectable). The app is
+#                        in that artifact only when the repository variable
+#                        PUBLISH_WEB_APP is "true"; see "The web app" below.
 #   pages                publishes that already-verified artifact from main,
 #                        without rebuilding
 #
@@ -45,6 +47,18 @@
 # deploy), because it fails until the setting above is made; pull-request
 # builds use the default project-site origin and /<repo> base instead, which is
 # all a build check needs.
+#
+# The web app (apps/web, ADR 0009). website-build builds it on every run, with
+# its public path set to the docs base followed by app/ (so /<repo>/app/ on a
+# project site, /app/ on a custom domain), and apps/web/scripts/pages-build/
+# check-pages-build.mjs fails the job if the build lacks the Content Security
+# Policy meta tag, references a script or stylesheet outside that path, or has an
+# inline script. Publishing is OFF: the app is copied into the Pages artifact
+# only when the repository variable PUBLISH_WEB_APP equals "true" (Settings ->
+# Secrets and variables -> Actions -> Variables). The pages job deploys that
+# artifact on pushes to main, so setting the variable is the whole opt-in. Two
+# questions to settle first, both open: the page cannot send frame-ancestors on
+# Pages (#4), and the blob: worker bootstrap in Safari and Firefox (#3).
 
 name: docs
 
@@ -135,13 +149,41 @@ jobs:
       - id: pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      # The base path is decided in ONE place, for the docs and for the web app,
+      # so the two cannot disagree. configure-pages reports base_path "" when the
+      # site is served at the root (a custom domain or a user site), and
+      # `outputs.base_path || fallback` reads that "" as "not set" and falls back
+      # to /<repo>, which 404s every asset. So this keys on whether configure-pages
+      # RAN (it is skipped on pull requests), not on the value it returned. For
+      # this repository's project site both paths give /<repo>, the same string as
+      # before, so the docs build is unchanged.
+      #   docs: "" or "/<repo>", as configure-pages reports it
+      #   app:  where the web app lives, "/app/" or "/<repo>/app/"
+      - id: base
+        env:
+          PAGES_OUTCOME: ${{ steps.pages.outcome }}
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          FALLBACK_BASE_PATH: ${{ format('/{0}', github.event.repository.name) }}
+        run: |
+          if [ "$PAGES_OUTCOME" = "success" ]; then
+            docs_base="$PAGES_BASE_PATH"
+          else
+            docs_base="$FALLBACK_BASE_PATH"
+          fi
+          trimmed="$docs_base"
+          while [ "${trimmed#/}" != "$trimmed" ]; do trimmed="${trimmed#/}"; done
+          while [ "${trimmed%/}" != "$trimmed" ]; do trimmed="${trimmed%/}"; done
+          if [ -n "$trimmed" ]; then app_base="/${trimmed}/app/"; else app_base="/app/"; fi
+          printf 'docs=%s\n' "$docs_base" >> "$GITHUB_OUTPUT"
+          printf 'app=%s\n' "$app_base" >> "$GITHUB_OUTPUT"
+          echo "docs base path: '${docs_base}'; web app public path: '${app_base}'"
       # Expressions are resolved into env vars, never into the script itself.
-      # A skipped step has empty outputs, so pull requests fall back to the
-      # default project-site URL.
+      # A skipped configure-pages step has empty outputs, so pull requests fall
+      # back to the default project-site origin.
       - run: npm run build
         env:
           SITE_URL: ${{ steps.pages.outputs.origin || format('https://{0}.github.io', github.repository_owner) }}
-          BASE_PATH: ${{ steps.pages.outputs.base_path || format('/{0}', github.event.repository.name) }}
+          BASE_PATH: ${{ steps.base.outputs.docs }}
       - name: Verify every source page rendered
         run: |
           MIN_BYTES=2000
@@ -171,9 +213,61 @@ jobs:
             exit 1
           fi
           echo "Docs build verification passed: every source page rendered a non-trivial output file."
-      # The web app (apps/web, ADR 0009) will later be built into website/dist/app/
-      # before this upload, so one Pages artifact serves the docs at the site root
-      # and the app under /app/.
+      # ── The web app (apps/web, ADR 0009) ───────────────────────────────────
+      # Built and checked on EVERY run, pull requests included, so a wrong base
+      # path or a lost Content Security Policy is red in the PR that causes it.
+      # It joins the Pages artifact only when the repository variable
+      # PUBLISH_WEB_APP is "true" (last step below); otherwise the artifact is
+      # exactly the docs site. These steps come after the docs build and its
+      # verification on purpose: nothing here can change what the docs build saw.
+      # The job's default working directory is website/, so each `run:` below says
+      # `working-directory: .` to run at the repository root.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # Only apps/web and the workspace packages it imports. Vite bundles those
+      # from their TypeScript sources, so no package build is needed first.
+      - name: Install the workspace packages apps/web needs
+        working-directory: .
+        run: pnpm install --frozen-lockfile --filter "@taxreporter/web..."
+      - name: Build the web app
+        working-directory: .
+        env:
+          TAXREPORTER_WEB_BASE: ${{ steps.base.outputs.app }}
+        run: pnpm --filter @taxreporter/web build
+      # Self-test first, in this same job (scripts/CLAUDE.md), then the real check.
+      - name: Check the web app build for Pages
+        working-directory: .
+        env:
+          WEB_BASE: ${{ steps.base.outputs.app }}
+        run: |
+          node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
+          node apps/web/scripts/pages-build/check-pages-build.mjs apps/web/dist "$WEB_BASE"
+      # PUBLISH_WEB_APP must be a repository or organization variable: this job
+      # has no `environment:`, so a variable set on the github-pages environment
+      # is invisible here. It is read through env, never interpolated into the
+      # script. Unset, empty or anything but "true" leaves the artifact alone.
+      # To publish: set PUBLISH_WEB_APP to true; the next push to main deploys
+      # the app at /app/. Unset it and the next push removes the app again.
+      - name: Add the web app to the Pages artifact (only if PUBLISH_WEB_APP is true)
+        working-directory: .
+        env:
+          PUBLISH_WEB_APP: ${{ vars.PUBLISH_WEB_APP }}
+        run: |
+          if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then
+            echo "PUBLISH_WEB_APP is not \"true\": the web app was built and checked but is NOT in the Pages artifact."
+            exit 0
+          fi
+          if [ -e website/dist/app ]; then
+            echo "::error::website/dist/app already exists (a docs page at /app/?); refusing to overwrite it."
+            exit 1
+          fi
+          mkdir website/dist/app
+          cp -R apps/web/dist/. website/dist/app/
+          test -s website/dist/app/index.html
+          echo "PUBLISH_WEB_APP is \"true\": the web app is in the Pages artifact under app/."
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: website/dist
