@@ -169,7 +169,7 @@ conservative defaults taken for the risks; each default is one place in the code
      Dividends row of a derivative type, and its Account Activity row in any currency, are
      ignored as `interest`, and counted in `interestNotCovered`.
    - **Crypto.** Crypto held long without leverage is ignored with a new reason,
-     `crypto`. That reason is also in `IGNORED_REASONS` (#15).
+     `crypto`. That reason is also in `IGNORED_REASONS`, the record the compiler checks against the union (#15).
    - **Short or leveraged.** Stocks, ETF or Crypto that is short, or has leverage other
      than 1, is refused (`unsupportedAction`, `short` or `leveraged`).
    - **Unknown types.** An unknown Type, or a Long / Short value other than those two, is
