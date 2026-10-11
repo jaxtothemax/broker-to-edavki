@@ -12,6 +12,13 @@ import t212takeover from "../../../../packages/brokers/test/fixtures/trading212/
 import t212v3 from "../../../../packages/brokers/test/fixtures/trading212/t212-invest-v3-2025.csv?raw";
 import t212v4 from "../../../../packages/brokers/test/fixtures/trading212/t212-invest-v4-2026.csv?raw";
 import trade from "../../../../packages/brokers/test/fixtures/trade-republic/tr-transactions-2026.csv?raw";
+import {
+  initialWizardState,
+  payerDetails,
+  wizardReducer,
+  type WizardAction,
+  type WizardState,
+} from "../state/wizard";
 import { handleRequest, payersOf, taxpayerOf } from "./handle";
 import { LOCKED } from "./lockdown";
 import {
@@ -435,6 +442,156 @@ describe("handleRequest: no request leaves the engine", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("a Trading 212 dividend's payer, from the files to Doh-Div (#45)", () => {
+  const ADR = "US01609W1027";
+  const header = t212v4.split("\n")[0] ?? "";
+  // One Trading 212 account's dividends of an ADR, under the plain label
+  // and the labeled ones the broker also writes. Synthetic, amounts made up.
+  const dividend = (action: string, day: string) =>
+    `${action},2026-07-${day} 13:05:12+00:00,${ADR},BABA,"Alibaba Group Holding",,,4.0000000000,1.0500000000,USD,0.85155000,,,3.58,"EUR",,,,,,`;
+  const adr = file(
+    "from_2026-01-01_to_2026-10-10_test.csv",
+    [
+      header,
+      dividend("Dividend (Dividend)", "10"),
+      dividend("Dividend (Ordinary)", "13"),
+      dividend("Dividend (Dividends paid by us corporations)", "14"),
+      dividend("Dividend (Dividends paid by foreign corporations)", "15"),
+      dividend("Dividend (Bonus)", "16"),
+      dividend("Dividend (Property income distribution)", "17"),
+      dividend("Dividend (Demerger)", "20"),
+    ].join("\n"),
+  );
+  // The page keeps each file's bytes by its id; here the id is its name.
+  const known = new Map([adr, ...files].map((f) => [f.name, f] as const));
+  const bytesFor = (ids: readonly string[]) =>
+    ids.map((id) => {
+      const found = known.get(id);
+      if (found === undefined) throw new Error(`no file ${id}`);
+      return found;
+    });
+  const add = (...request: RequestFile[]): WizardAction => ({
+    type: "addFiles",
+    files: request.map((f) => ({
+      id: f.name,
+      name: f.name,
+      size: f.bytes.byteLength,
+    })),
+  });
+  const own = (...request: RequestFile[]) =>
+    wizardReducer(
+      wizardReducer(initialWizardState, { type: "startOwn" }),
+      add(...request),
+    );
+
+  /** A read as App.tsx runs one: started, answered, the answer to the wizard. */
+  async function readIn(
+    state: WizardState,
+    request: number,
+  ): Promise<WizardState> {
+    const fileIds = state.files.map((f) => f.id);
+    const reply = await handleRequest(
+      {
+        ...base,
+        accounts: state.accounts,
+        id: request,
+        kind: "read",
+        files: bytesFor(fileIds),
+      },
+      loadRates,
+    );
+    if (reply.kind !== "read") throw new Error(`no read: ${reply.kind}`);
+    return wizardReducer(
+      wizardReducer(state, { type: "readStarted", request, fileIds }),
+      { type: "readDone", request, reply },
+    );
+  }
+
+  /** The returns as the dashboard asks for them, with the page's drafts. */
+  async function prepareFrom(state: WizardState): Promise<PrepareReply> {
+    if (state.reading.status !== "read") throw new Error("not read");
+    const reply = await handleRequest(
+      {
+        ...base,
+        accounts: state.accounts,
+        id: 99,
+        kind: "prepare",
+        files: bytesFor(state.reading.fileIds),
+        taxpayer,
+        payers: payerDetails(state),
+      },
+      loadRates,
+    );
+    if (reply.kind !== "prepare") throw new Error(`no prepare: ${reply.kind}`);
+    return reply;
+  }
+
+  const payerOf = (state: WizardState, isin: string) =>
+    payerDetails(state).find((p) => p.isin === isin);
+  const unknownPayers = (reply: PrepareReply) =>
+    reply.preview.findings.filter((f) => f.code === "payerUnknown");
+
+  it("starts as Trading 212 for an ADR under every dividend label, and Doh-Div asks for nothing more", async () => {
+    const state = await readIn(own(adr), 1);
+    expect(payerDetails(state)).toEqual([
+      {
+        isin: ADR,
+        name: "TRADING 212",
+        address: "LONDON",
+        country: "GB",
+        id: "",
+        sourceCountry: "",
+      },
+    ]);
+    const reply = await prepareFrom(state);
+    expect(unknownPayers(reply)).toEqual([]);
+    expect(reply.div.blocking).toBe(0);
+    expect(reply.div.xml).toContain("TRADING 212");
+    // Every payment is on the form, the labeled ones too.
+    const paid = reply.preview.dividends.filter((d) => d.isin === ADR);
+    expect(paid).toHaveLength(7);
+    for (const row of paid) expect(row.payer).toBe("TRADING 212");
+  });
+
+  it("stays Trading 212 when another Trading 212 export is added and the accounts are answered", async () => {
+    const one = await readIn(own(adr), 1);
+    const two = await readIn(
+      wizardReducer(one, add(files[1] as RequestFile)),
+      2,
+    );
+    const separate = await readIn(
+      wizardReducer(two, { type: "setAccounts", accounts: "separate" }),
+      3,
+    );
+    expect(separate.accounts).toBe("separate");
+    for (const state of [two, separate]) {
+      expect(payerOf(state, ADR)).toMatchObject({
+        name: "TRADING 212",
+        address: "LONDON",
+        country: "GB",
+      });
+      expect(unknownPayers(await prepareFrom(state))).toEqual([]);
+    }
+  });
+
+  it("is left to the user when another broker paid the same security, so Doh-Div asks for it", async () => {
+    // One payer per security: Coca-Cola's dividends came through Trading 212
+    // and Interactive Brokers, so no one broker is preset (#45; who the
+    // payer is stays open in #44). The finding is right, by design.
+    const state = await readIn(own(...files), 1);
+    expect(payerOf(state, "US1912161007")).toMatchObject({
+      address: "",
+      country: "US",
+    });
+    expect(unknownPayers(await prepareFrom(state))).toContainEqual(
+      expect.objectContaining({
+        severity: "blocking",
+        params: { isin: "US1912161007" },
+      }),
+    );
   });
 });
 
