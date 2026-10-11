@@ -202,36 +202,52 @@ For an exchange trade the date is therefore the day the trade was concluded, whi
 - **The FURS opis (15th edition, August 2026)**, searched in full, including Q&A 6.1–6.3.
 - **The Doh-KDVP navodila, tax years 2025+, in Slovenian and English.**
 - **Doh-KDVP's own date fields.** In `Doh_KDVP_9.xsd`, `F1` and `F6` are `xs:date`, documented only as "Datum pridobitve" and "Datum odsvojitve".
-- **The schema Slovenian brokers report trades in.** `KP_KDVP_2.xsd` carries what Slovenian brokers report to FURS for pre-filling Doh-KDVP. Its `Date` attributes are `xs:date`, documented as "Datum pridobitve" and "Datum odsvojitve". The KP-KDVP usmeritve name the field only "Datum". Neither the return nor the brokers' report to FURS has room for a time or a time zone.
+- **The schema Slovenian brokers report trades in.** `KP_KDVP_2.xsd` carries what Slovenian brokers report to FURS for pre-filling Doh-KDVP. Its `Date` attributes are `xs:date`, documented as "Datum pridobitve" and "Datum odsvojitve". The KP-KDVP usmeritve name the field only "Datum". Both the return and the brokers' report to FURS take a calendar date, no time of day (`xs:date` allows an optional time-zone designator after the date, but no time).
 - **Not counted as checked.** The annex to the regulation on brokers' reports (*Pravilnik o dostavi podatkov …*; the annex in Uradni list RS 107/2025, and PISRS publication 1409/2026 of 9 Sep 2026) was downloaded, but its text did not extract readably.
 - **Web searches** limited to fu.gov.si, gov.si, edavki.durs.si, pisrs.si and uradni-list.si, plus an open-web search. They found nothing beyond the above, and no secondary source on the time-zone question either.
 
 **What the primary texts suggest, kept apart from the rule:**
 
-- The navodila tie the date to the evidence (*"razviden iz prodajne ali druge pogodbe oziroma iz drugih dokazil"*). For a broker trade, that evidence is the broker's confirmation or statement. This leans toward the date the broker prints *(inference)*.
-- Brokers print different things ([06](06-brokers-ibkr-t212-revolut.md) summary table):
-  - IBKR prints the exchange's business date in US Eastern time.
-  - Trading 212 prints only a UTC timestamp.
+- The navodila tie the disposal date to the evidence. Column 6 takes the date *"razviden iz prodajne ali druge pogodbe oziroma iz drugih dokazil"*, and columns 3 and 7 take quantities *"razvidna iz obračuna o opravljenem poslu"*. The acquisition date has no such clause. Column 1 reads only *"V stolpec 1 se vpiše datum pridobitve vrednostnega papirja oziroma investicijskega kupona po kronološkem zaporedju"*. The navodila's other lists word their date columns the same way. For a sale through a broker, that evidence is the broker's confirmation or statement, so the disposal date leans toward the date the broker prints *(inference)*. For an acquisition, the navodila name no evidence for the date.
+- Brokers print different things:
+  - IBKR prints the exchange's business date in US Eastern time ([06](06-brokers-ibkr-t212-revolut.md) summary table).
+  - Trading 212 prints only a UTC timestamp (the same table).
+  - Trade Republic prints a UTC timestamp and the local Berlin date in its comma revision. In its semicolon revision it prints only the date ([07 §4.2](07-brokers-eu-and-others.md#42-trade-republic)).
 - A UTC timestamp has no "printed date" apart from its UTC date. The navodila therefore do not settle that case, even on this reading.
 
 **What the app does today** (a fact; no change is proposed here):
 
 - `taxDate` (`packages/core/src/dates.ts`) takes the Ljubljana calendar date of the event's instant where there is one. It flags `moved` when that differs from the broker's date (ADR 0011 §7).
 - IBKR events carry no instant (`at: { instant: null, brokerDate: date }` in `packages/brokers/src/ibkr.ts`; ADR 0012 item 8, following [06](06-brokers-ibkr-t212-revolut.md)). Their date is therefore IBKR's exchange date.
-- Trading 212 events carry a UTC instant, so they take the Ljubljana date.
-- So the same trade can get two tax dates, depending on the broker. Take a trade at 23:30 UTC on 31 December. That is 18:30 in New York and 00:30 on 1 January in Ljubljana.
+- Trading 212 events carry a UTC instant, so they take the Ljubljana date. Where that differs from the UTC date the file shows, the adapter adds the warning `dateMovedToLjubljana`.
+- Trade Republic events are dated by `dateOf` in `packages/brokers/src/trade-republic.ts`, which reads the two revisions differently ([07 §4.2](07-brokers-eu-and-others.md#42-trade-republic)):
+  - **Comma revision.** A row carries a UTC instant and the printed `date`, which is the Berlin date. `dateOf` keeps the Ljubljana date only when `taxDate` does not report `moved`, that is, only when it equals the printed date. Otherwise the row is not moved but refused, with the blocking diagnostic `invalidTime` (pinned by the test "refuses a row it cannot date, or whose date and time disagree" in `trade-republic.test.ts`). A row refused first for its type keeps that refusal instead. Berlin and Ljubljana keep the same clock, so under today's rule this refuses only a row whose own two fields disagree.
+  - **Semicolon revision.** `datetime` is the date at midnight UTC on every row, so the row carries no instant, and `date` alone dates it, as IBKR's date does. A row whose `datetime` is not that midnight is refused with `invalidTime`.
+- So the same trade can get two tax dates, depending on the broker. Take a trade at 23:30 UTC on 31 December. That is 18:30 in New York and 00:30 on 1 January in Ljubljana and in Berlin.
   - From IBKR it is dated 31 December.
   - From Trading 212 it is dated 1 January, which is a different tax year (art. 104) and holding period.
+  - From Trade Republic's comma revision it is dated 1 January too, because its printed Berlin date would be 1 January and agrees with the Ljubljana date.
   - The BSI rate changes only when the later day has its own list. 1 January has none, so that example still takes the 31 December list ([03 §9](03-bsi-exchange-rates.md#9-weekends-holidays-and-target-closing-days)).
+- **A change to the date rule also changes Trade Republic's refusal check.** `dateOf` refuses whatever `taxDate` reports as `moved`. The rule therefore decides which Trade Republic rows are refused, not only how rows are dated. Two examples, worked from the code as it stands *(inference; nothing tests a rule other than today's)*:
+  - Under a rule that took the UTC date, the trade above would be dated 31 December from IBKR and Trading 212. From Trade Republic, whose printed date is 1 January, it would be `moved`, so it would be refused.
+  - Under a rule that took the broker's printed date, it would be dated 31 December from IBKR and Trading 212 (Trading 212's printed date is its UTC date), and 1 January from Trade Republic.
+  - So under each of the three rules (today's and these two), the same trade gets two tax dates, or is refused, depending on the broker.
 - Only trades late in the day are affected. A New York trade takes a different date in Ljubljana from 18:00 New York time. In the weeks when only one of the US and the EU has changed its clocks, that starts at 19:00. A UTC timestamp takes a different date from 23:00 UTC in winter, and from 22:00 UTC in summer.
-- [06](06-brokers-ibkr-t212-revolut.md) lists the same question among its open questions.
+- [06](06-brokers-ibkr-t212-revolut.md#open-questions) lists the same question among its open questions.
 
 **Confidence.**
 
 - Trade date, not settlement date: **high** (statute, FURS opis and navodila).
 - Which calendar dates a trade near midnight: **no primary source.** The Ljubljana-date policy is a design default, not a sourced rule. Neither it nor the broker's printed date is supported or ruled out by any text found.
 
-**Recommendation to the maintainer.** Ask FURS in writing; the draft is below. Until FURS answers, keep ADR 0011 §7's default and its `moved` warning: no primary source supports a different rule. Any change needs architect review and golden-file updates. The trade-versus-settlement half needs no question.
+**Recommendation to the maintainer.** Ask FURS in writing; the draft is below. Until FURS answers, keep ADR 0011 §7's default and its `moved` warning: no primary source supports a different rule. The trade-versus-settlement half needs no question.
+
+A change to the rule is not "one policy change plus golden files", as ADR 0011 §7 and #13 put it. Besides `taxDate` itself, two things read its `moved` flag:
+
+- Trade Republic's refusal check (above). Changing the rule changes which Trade Republic rows are refused.
+- Trading 212's `dateMovedToLjubljana` warning. Its name and its message ("Slovenian dates are used") assume today's rule.
+
+Any change therefore needs architect review, a decision on Trade Republic's check, and golden-file updates. #65 tracks pointing ADR 0011 §7, two code comments and [07](07-brokers-eu-and-others.md) at this subsection.
 
 **Draft question to FURS (Slovenian).** It contains no personal data. The maintainer sends it; nothing has been sent.
 
@@ -735,7 +751,7 @@ An independent verifier re-checked all 25 critical claims against the PISRS cons
 - the FURS opis, Q&A 6.2 Q17 and 6.3 Q13;
 - the Doh-KDVP navodila, in Slovenian and English.
 
-It confirms §4.3 (trade date, not settlement date) and adds the opis's location for the settlement quote in [01 §8](01-furs-doh-kdvp.md#8-modeling-rules-for-a-correct-filing). Its other half is "not found": no text read says which calendar dates a trade near midnight. It lists what was searched, including two regulation annexes that did not extract readably and are not counted. The same day, an Open questions entry was added and the merger-date entry was pointed to §4.3.1.
+It confirms §4.3 (trade date, not settlement date) and adds the opis's location for the settlement quote in [01 §8](01-furs-doh-kdvp.md#8-modeling-rules-for-a-correct-filing). Its other half is "not found": no text read says which calendar dates a trade near midnight. It lists what was searched, including two regulation annexes that did not extract readably and are not counted. The same day, an Open questions entry was added and the merger-date entry was pointed to §4.3.1. Its account of what the app does today was read from the code of all three adapters (IBKR, Trading 212 and Trade Republic), not from a primary source.
 
 **Claims not confirmed:** none.
 
@@ -789,7 +805,7 @@ It confirms §4.3 (trade date, not settlement date) and adds the opis's location
 
 ## Open questions
 
-- Which calendar dates a trade concluded near midnight, when the broker prints the exchange's date in US Eastern time or only a UTC timestamp: the broker's printed date, the exchange's local date, or the Ljubljana date (§4.3.1, #13)? The date also picks the tax year, the BSI rate and the holding period. No primary source found answers it (searched 2026-10-11). The app's Ljubljana-date default (ADR 0011 §7) is a design choice, and IBKR events keep the exchange's date. A draft written question to FURS, in Slovenian and English, is in §4.3.1. (Trade date versus settlement date is settled: the trade date, §4.3.1.)
+- Which calendar dates a trade concluded near midnight, when the broker prints the exchange's date in US Eastern time or only a UTC timestamp: the broker's printed date, the exchange's local date, or the Ljubljana date (§4.3.1, #13)? The date also picks the tax year, the BSI rate and the holding period. No primary source found answers it (searched 2026-10-11). The app's Ljubljana-date default (ADR 0011 §7) is a design choice. IBKR events keep the exchange's date, and Trade Republic refuses a timed row whose Ljubljana date differs from its printed Berlin date, so a change to the rule also changes which Trade Republic rows are refused. A draft written question to FURS, in Slovenian and English, is in §4.3.1. (Trade date versus settlement date is settled: the trade date, §4.3.1.)
 - Lots bought on the same day: is the time of acquisition the order Art. 103(1) means, and what applies when an export gives no time (§4.4)? No FURS example covers it.
 - Which BSI rate to use when no reference rate is published that day (weekends, TARGET holidays)? BSI says rates have no prescribed validity period, and no FURS primary text was found. Prior art (ib-edavki) uses the last earlier published rate. This should be cross-checked with the BSI research note and ideally with a FURS written answer. ([03 §9](03-bsi-exchange-rates.md#9-weekends-holidays-and-target-closing-days): BSI's own lookup returns the last list on or before the day; verified as website behavior, not law.)
 - Boundary-day counting for "po dopolnjenih 5/10 letih" and "po 15 letih imetništva": does a sale on the exact anniversary date already get the lower rate or exemption? eDavki computes the tax, so test with real filings.

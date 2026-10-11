@@ -1,6 +1,6 @@
 # Broker export formats: Interactive Brokers, Trading 212, Revolut
 
-> Researched: 2026-10-07 · Verification: not independently verified · Updated: 2026-10-09 (one real Trading 212 export inspected: the `0E-10` zero, dividend prices to 6 decimals, the V4 header and a takeover's rows, §4.2–§4.4; the tax rule for takeovers and mergers paid in shares linked from §3.5 and §4.3; `Dividend (Bonus)` and `Dividend (Demerger)` rows from a second, full-history export, §4.3)
+> Researched: 2026-10-07 · Verification: not independently verified · Updated: 2026-10-11 (the open question on trades after midnight points to 04 §4.3.1) and 2026-10-09 (one real Trading 212 export inspected: the `0E-10` zero, dividend prices to 6 decimals, the V4 header and a takeover's rows, §4.2–§4.4; the tax rule for takeovers and mergers paid in shares linked from §3.5 and §4.3; `Dividend (Bonus)` and `Dividend (Demerger)` rows from a second, full-history export, §4.3)
 >
 > Research for building TaxReporter. It is not tax advice, and FURS publications and the law win over anything written here. Where this page overlaps a verified doc (01–03), the verified doc wins; such places are cross-referenced inline. See the [README](README.md#confidence-and-verification-legend) for the legend.
 
@@ -476,7 +476,7 @@ The researcher rated these critical claims below high confidence:
 - Precise semantics of Trading 212 `Currency conversion` rows (`Total` vs `Currency conversion from/to amount`) in multi-currency accounts; no real sample row was found.
 - Whether IBKR `CashTransaction@actionID` reliably links a dividend to its Withholding Tax row in current Flex output (would replace ib-edavki's heuristic matching).
 - How IBKR represented the IBCE→IBIE (2024) and IBUK→IBCE (2021) position migrations in Flex (Transfers type INTERNAL vs re-booked trades), and whether original acquisition dates are preserved; needs a real migrated-account export.
-- Correct Slovenian date for US extended-hours trades executed after 00:00 Ljubljana time (exchange trade date vs local calendar date). This is a tax-rule question to confirm with FURS guidance.
+- Correct Slovenian date for US extended-hours trades executed after 00:00 Ljubljana time (exchange trade date vs local calendar date). This is a tax-rule question to confirm with FURS guidance. Primary sources searched on 2026-10-11 do not answer it. [04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone) records the search and a draft written question to FURS (#13).
 - Tax classification of Revolut RETURN OF CAPITAL, POSITION CLOSURE (warrants), BOND COUPON and REWARD rows, and of T212 `Dividend (Tax exempted)`/`Stock distribution`/`Spin off` events (out of scope here; parsers should block until classified).
 
 ## Sources

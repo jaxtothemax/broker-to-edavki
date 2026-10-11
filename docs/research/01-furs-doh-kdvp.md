@@ -369,6 +369,14 @@ These were **valid**: `F2=K`, `F8=-3`, boolean `1`, F10 omitted, all F8 omitted,
 
 An independent verifier re-checked the 21 critical claims against the live XSDs, the XSLT, the 2025 navodila and form, the FURS opis and usmeritve, the eDavki help pages and the Wayback snapshots. 20 were confirmed. None was refuted.
 
+**Added after verification (2026-10-11):** for #13, the §8 bullet "Currency and date", which is marked (corrected after verification), gained three additions. Its corrected fact, the trade date and not the settlement date, is unchanged:
+
+- where the opis states the settlement quote: Q&A 6.2 Q17;
+- the navodila's column 6 wording, *"razviden iz prodajne ali druge pogodbe oziroma iz drugih dokazil"* (the Slovenian edition for tax years 2025+, the file pinned in §5.2);
+- a sentence, with a link to [04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone), saying that no primary source was found on which calendar date a trade near midnight takes.
+
+The same day, an Open questions entry on that question was added. These rest on the sources that 04 §4.3.1 lists, the FURS opis (15th edition, August 2026) and the Doh-KDVP navodila, and were not independently verified beyond them.
+
 **Claims not confirmed:**
 
 | Claim | Verdict | Correction / note | Evidence |
