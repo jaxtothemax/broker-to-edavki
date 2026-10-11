@@ -848,7 +848,9 @@ function readCash(
     // fields (ADR 0019 §6, #67). A dividend refused for its label gives that
     // reason even when it cannot be dated. The finding names no ISIN, date or
     // effect on a holding, so it is never scoped (ADR 0017) and withholds
-    // both returns of every year. Every row read as an event is still dated.
+    // both returns of every year. IBKR's reach is the statement's end date, so
+    // no row moves it. A dividend or withholding event is still dated below;
+    // the cash rows IBKR ignores are never dated.
     if (type === "Dividends") {
       const label = dividendLabel(a.get("description"));
       if (label !== null && !DIVIDEND_LABELS.has(label)) {
