@@ -1,8 +1,9 @@
 /**
  * Adding broker exports. The engine worker reads each file as it is added
  * (ADR 0013): a file's row then says which broker's export it is and which
- * days it covers, or why it cannot be read. Two or more Trading 212 files
- * raise the question of whether they are one account, answered in place.
+ * days it covers, or why it cannot be read. Two or more files of a broker
+ * whose exports do not name their account (Trading 212, eToro) raise the
+ * question of whether they are one account, answered in place.
  */
 import {
   ArrowRightIcon,
@@ -197,7 +198,7 @@ function AccountQuestion({
           <label key={value} className="choice">
             <input
               type="radio"
-              name="trading212-accounts"
+              name="unnamed-accounts"
               value={value}
               checked={accounts === value}
               onChange={() => {

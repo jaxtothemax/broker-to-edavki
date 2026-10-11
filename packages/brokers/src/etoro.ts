@@ -9,7 +9,9 @@
  * - **Recognized by its five sheets**, by their exact English names. It
  *   reads Closed Positions, Account Activity and Dividends; Account Summary,
  *   which holds the holder's name and username, and Financial Summary are
- *   skipped whole and never inflated. Any other sheet, or a hidden one it
+ *   skipped whole, their rows never read. (The workbook's shared strings
+ *   are inflated whole, but a string is reached only through a cell of a
+ *   sheet that is read.) Any other sheet, or a hidden one it
  *   reads, refuses the file (ADR 0014 §6).
  * - **Columns by their exact header** on row 1, in any order, each once;
  *   a column outside the revision's list refuses the file, as does an older
@@ -323,7 +325,11 @@ function textOf(cell: Cell | undefined): string | null {
 
 /** A number cell at 15 digits, or text in the plain grammar; else null. */
 function numberOf(cell: Cell | undefined): Decimal | null {
-  if (cell?.kind === "number") return Decimal.parse(cell.value);
+  // A number cell is held to the digits a text number may have: its
+  // 15-digit value can still lie far past any amount (1e30, 1e-30).
+  if (cell?.kind === "number") {
+    return NUMBER.test(cell.value) ? Decimal.parse(cell.value) : null;
+  }
   if (cell?.kind === "string" && NUMBER.test(cell.text)) {
     return Decimal.parse(cell.text);
   }
@@ -716,7 +722,9 @@ function read(book: Workbook, context: ReadContext): ImportResult {
   const opens = new Map<string, Activity[]>();
   for (const row of activity) {
     if (row.type === OPEN && row.id !== null) {
-      opens.set(row.id, [...(opens.get(row.id) ?? []), row]);
+      const list = opens.get(row.id);
+      if (list === undefined) opens.set(row.id, [row]);
+      else list.push(row);
     }
   }
   const named = [
@@ -761,7 +769,9 @@ function read(book: Workbook, context: ReadContext): ImportResult {
   const closedById = new Map<string, Closed[]>();
   for (const row of closed) {
     if (row.id === null) continue;
-    closedById.set(row.id, [...(closedById.get(row.id) ?? []), row]);
+    const list = closedById.get(row.id);
+    if (list === undefined) closedById.set(row.id, [row]);
+    else list.push(row);
   }
   const openOf = (id: string) => (opens.get(id) ?? [])[0] as Activity;
 
@@ -1056,6 +1066,27 @@ function read(book: Workbook, context: ReadContext): ImportResult {
 
   // Dividends, each paired with the one Account Activity row that paid it.
   const paid = new Set<Activity>();
+  // The dollar Account Activity dividends by position, day and amount, so
+  // each payment finds its own row by one lookup, however many rows a
+  // crafted file gives one position (bounded work, CLAUDE.md).
+  const unpaid = new Map<string, Activity[]>();
+  // How many of them, on any day, pay each amount: a payment whose amount
+  // a row pays on another day is a date mismatch, not a missing row.
+  const unpaidAnyDay = new Map<string, number>();
+  for (const [id, rows] of dividendsById) {
+    for (const a of rows) {
+      const day = a.at?.brokerDate ?? null;
+      if (a.amount === null || day === null) continue;
+      if (quoteOf(a.details)?.currency !== USD) continue;
+      const amount = a.amount.toString();
+      const slot = `${id}|${day}|${amount}`;
+      const list = unpaid.get(slot);
+      if (list === undefined) unpaid.set(slot, [a]);
+      else list.push(a);
+      const any = `${id}|${amount}`;
+      unpaidAnyDay.set(any, (unpaidAnyDay.get(any) ?? 0) + 1);
+    }
+  }
   for (const payment of payments) {
     const block = blockAt(payment.source);
     const cell = (column: string) => cellOf(dividendTable, payment.row, column);
@@ -1075,15 +1106,18 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     const at = where(isin, date);
     // The Account Activity rows of the position that paid this amount, in
     // dollars (ADR 0020 §10): one is this dividend's, on its day.
-    const candidates = (dividendsById.get(id) ?? []).filter(
-      (a) =>
-        !paid.has(a) &&
-        net !== null &&
-        a.amount?.equals(net) === true &&
-        quoteOf(a.details)?.currency === USD,
-    );
-    const onDay = candidates.filter((a) => a.at?.brokerDate === date);
-    const pair = onDay.length === 1 ? onDay[0] : undefined;
+    // Exactly one unpaid row pairs; two alike are ambiguous, and pair none.
+    const amount = net === null ? null : net.toString();
+    const slot =
+      amount === null ? undefined : unpaid.get(`${id}|${date}|${amount}`);
+    const onDay = slot?.length ?? 0;
+    const anyDay =
+      amount === null ? 0 : (unpaidAnyDay.get(`${id}|${amount}`) ?? 0);
+    const pair = onDay === 1 ? slot?.[0] : undefined;
+    if (pair !== undefined && slot !== undefined && amount !== null) {
+      slot.length = 0;
+      unpaidAnyDay.set(`${id}|${amount}`, anyDay - 1);
+    }
     const type = textOf(cell("Type")) ?? "";
     // The activity row this row pays out is this row's to account for:
     // left out with it, or covered by its refusal.
@@ -1175,8 +1209,7 @@ function read(book: Workbook, context: ReadContext): ImportResult {
       block("dividendInconsistent", {
         broker: ETORO,
         ...at,
-        mismatch:
-          onDay.length === 0 && candidates.length > 0 ? "date" : "pairing",
+        mismatch: onDay === 0 && anyDay > 0 ? "date" : "pairing",
       });
       continue;
     }
@@ -1198,7 +1231,9 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     }
     if (early !== date || late !== date) nearMidnight += 1;
     const security = securityOf(isin, quote.ticker, type);
-    const key = keyOf("dividend", [id, date]);
+    // The net amount too: a position paid twice on one day (a regular and
+    // a special dividend) is two dividends, never one key twice.
+    const key = keyOf("dividend", [id, date, net]);
     const clock = { instant: null, brokerDate: date };
     events.push({
       kind: "dividend",
@@ -1214,7 +1249,7 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     if (withheld.isPositive()) {
       events.push({
         kind: "withholding",
-        key: keyOf("withholding", [id, date]),
+        key: keyOf("withholding", [id, date, net]),
         broker: ETORO,
         account,
         source: payment.source,
@@ -1307,7 +1342,12 @@ function read(book: Workbook, context: ReadContext): ImportResult {
 function group(rows: readonly Activity[]): Map<string, Activity[]> {
   const byId = new Map<string, Activity[]>();
   for (const row of rows) {
-    if (row.id !== null) byId.set(row.id, [...(byId.get(row.id) ?? []), row]);
+    if (row.id === null) continue;
+    // Appended in place: copying the list per row would make a file that
+    // names one position on many rows quadratic.
+    const list = byId.get(row.id);
+    if (list === undefined) byId.set(row.id, [row]);
+    else list.push(row);
   }
   return byId;
 }

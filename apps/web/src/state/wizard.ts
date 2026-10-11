@@ -109,7 +109,11 @@ export interface WizardState {
   readonly mode: Mode;
   readonly files: readonly AddedFile[];
   readonly details: Details;
-  /** Whether Trading 212 files, which do not name their account, are one. */
+  /**
+   * Whether the files of each broker whose exports do not name their
+   * account (Trading 212, eToro) are one account: one answer for all of
+   * them (ADR 0020).
+   */
   readonly accounts: AccountChoice;
   readonly payers: Readonly<Record<string, PayerDraft>>;
   /** What each payer draft started as, to tell a typed one from a preset. */
@@ -360,7 +364,7 @@ function demoFiles(): AddedFile[] {
 
 export type BlockingReason =
   | "needFiles"
-  /** A file refused before reading: not CSV or XML, or too large. */
+  /** A file refused before reading: not CSV, XML or XLSX, or too large. */
   | "unsupportedFile"
   | "stillReading"
   | "readFailed"

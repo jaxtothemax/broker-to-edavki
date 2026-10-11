@@ -928,6 +928,83 @@ describe("etoro, dividends", () => {
     }),
   ];
 
+  it("holds a number cell to the digits a text number may have", () => {
+    for (const amount of ["1E+30", "1E-30"]) {
+      const result = read({
+        ...ROUND_TRIP,
+        closed: [{ ...ROUND_TRIP.closed[0], Amount: n(amount) }],
+      });
+      expect(codes(result), amount).toContain("invalidNumber");
+    }
+  });
+
+  it("reads two dividends of one position on one day as two", () => {
+    // A regular and a special dividend, paid the same day: two keys.
+    const result = read({
+      ...ROUND_TRIP,
+      activity: [
+        ...ROUND_TRIP.activity,
+        dividendPaid("1002", "15/02/2024 12:00:00", "AAPL/USD", "0.5"),
+      ],
+      dividends: [
+        ...swapPayment({}),
+        payment({
+          date: "15/02/2024",
+          id: "1002",
+          net: "0.5",
+          rate: "0%",
+          withheld: n("0"),
+          isin: APPLE,
+        }),
+      ],
+    });
+    expect(codes(result)).toEqual([]);
+    const dividends = result.events.filter((e) => e.kind === "dividend");
+    expect(dividends).toHaveLength(2);
+    expect(new Set(dividends.map((d) => d.key)).size).toBe(2);
+    expect(
+      validateLedger(result.events, result.diagnostics).diagnostics.map(
+        (d) => d.code,
+      ),
+    ).not.toContain("duplicateKeyInFile");
+  });
+
+  it("pairs dividends in linear time, however many rows name one position", () => {
+    // A crafted file: thousands of payments and activity rows of one
+    // position. Pairing by lookup keeps it fast; a scan per payment would
+    // take seconds.
+    const count = 12_000;
+    const days = Array.from({ length: count }, (_, i) => {
+      const day = new Date(Date.UTC(2024, 1, 15) + i * 86_400_000);
+      const dd = String(day.getUTCDate()).padStart(2, "0");
+      const mm = String(day.getUTCMonth() + 1).padStart(2, "0");
+      return `${dd}/${mm}/${String(day.getUTCFullYear())}`;
+    });
+    const spec: Statement = {
+      ...ROUND_TRIP,
+      activity: [
+        ...ROUND_TRIP.activity.slice(0, 4),
+        ...days.map((day) =>
+          dividendPaid("1002", `${day} 12:00:00`, "AAPL/USD", "0.11"),
+        ),
+      ],
+      dividends: days.map((day) =>
+        payment({
+          date: day,
+          id: "1002",
+          net: "0.11",
+          rate: "0%",
+          withheld: n("0"),
+          isin: APPLE,
+        }),
+      ),
+    };
+    const bytes = statement(spec);
+    const started = Date.now();
+    importXlsx(bytes, context, [etoro]);
+    expect(Date.now() - started).toBeLessThan(4000);
+  });
+
   it("refuses a tax that is not the stated rate", () => {
     expect(
       mismatch({ ...ROUND_TRIP, dividends: swapPayment({ rate: "30 %" }) }),
@@ -1092,6 +1169,14 @@ describe("etoro, privacy", () => {
         { ...ROUND_TRIP.closed[0], "Copied From": CANARY, Notes: CANARY },
       ],
     };
+    // The canary is planted in Account Summary's name and username too,
+    // where eToro writes the holder's: that sheet is never read.
+    const book = openWorkbook(statement(spec)) as Workbook;
+    const summary = book
+      .rows(1)
+      .rows.flatMap((row) => [...row.cells.values()].map((cell) => cell.text));
+    expect(summary).toContain(CANARY);
+    expect(summary).toContain(`${CANARY}-user`);
     const result = read(spec);
     const shown = (events: readonly LedgerEvent[]) =>
       JSON.stringify(events, (_, v: unknown) =>

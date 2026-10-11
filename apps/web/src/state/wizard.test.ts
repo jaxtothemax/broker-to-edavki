@@ -16,6 +16,7 @@ import {
   canEnter,
   initialWizardState,
   isPayerIncomplete,
+  isSupportedFile,
   isValidTaxNumber,
   labelsOf,
   normalizeTaxNumber,
@@ -581,6 +582,15 @@ describe("own files", () => {
     expect(failed.preparing.status).toBe("failed");
     const back = wizardReducer(failed, { type: "back" });
     expect(back.preparing).toEqual({ status: "idle" });
+  });
+
+  it("takes CSV, XML and XLSX files by name, in any case, and nothing else", () => {
+    for (const name of ["a.csv", "b.XML", "statement.xlsx", "c.XLSX"]) {
+      expect(isSupportedFile(name), name).toBe(true);
+    }
+    for (const name of ["d.pdf", "e.xls", "f.xlsx.pdf", "g.zip", "xlsx"]) {
+      expect(isSupportedFile(name), name).toBe(false);
+    }
   });
 
   it("blocks the files step while an unsupported file is listed", () => {

@@ -86,7 +86,9 @@ conservative defaults taken for the risks; each default is one place in the code
    - Keys come from eToro's position ID, without an ordinal (ADR 0011 §5):
      - `keyOf("trade", ["open", id])` and `keyOf("trade", ["close", id])`, so a
        position's two trades never share a key;
-     - `keyOf("dividend", [id, date])` and `keyOf("withholding", [id, date])`.
+     - `keyOf("dividend", [id, date, net])` and `keyOf("withholding", [id, date, net])`:
+       the net amount too, so a position paid twice on one day (a regular and a special
+       dividend) gives two dividends, never one key twice.
    - Every statement covers the account from its opening (decision 4), so the result
      carries `wholeHistory`, and the pipeline refuses a second such file of the same
      account (`secondStatement`, both files named). It asks the user to keep the latest,
@@ -196,7 +198,10 @@ conservative defaults taken for the risks; each default is one place in the code
       (`dividendInconsistent`, `rate`). Known answer: 0.11 net, 0.0122 tax ("10 %") gives
       a gross of 0.1222.
     - **Pairing.** Each row pairs with exactly one Account Activity `Dividend` row: same
-      position, same amount, same day, its own Details ending in `/USD`. Otherwise it is refused (`pairing`, `date`).
+      position, same amount, same day, its own Details ending in `/USD`. Otherwise it is
+      refused (`pairing`, or `date` when the amount is paid on another day). Pairing looks
+      the row up by position, day and amount, so the work stays linear however many rows a
+      crafted file gives one position.
     - **The 2025.11 layout.** Currency must be USD, Net dividends must equal the dollar
       amount (`netAmount`), and the franking columns must be empty or `-` (else
       `unsupportedAction`, `franked`).
@@ -246,7 +251,15 @@ conservative defaults taken for the risks; each default is one place in the code
   thousands separators. The refusal was kept.
 - **Version.** `docs/spec/v0.1.md` puts eToro in v0.2, while the start screen says
   "planned after v0.1". No version is claimed: the roadmap keeps eToro under Planned, in
-  the future tense.
+  the future tense, and the start screen lists it only as planned (`V01_BROKERS`).
+- **Number cells** are held to the digits a text number may have (15 whole, 12 decimal):
+  a 15-digit value can still lie far past any amount (`1e30`).
+- **One account answer for every broker that asks.** The account question covers each
+  broker whose exports do not name their account (Trading 212, eToro), with one answer for
+  all of them. A user with two Trading 212 files of one account and statements of two
+  eToro accounts has no true answer: "same" refuses the second statement
+  (`secondStatement`), "separate" refuses the shared trades (`accountsShareEvents`). It
+  fails closed, never counting twice; a per-broker answer is #61.
 
 ## Consequences
 
@@ -259,7 +272,13 @@ conservative defaults taken for the risks; each default is one place in the code
 - A second statement of the same account is refused rather than merged. A user with two
   eToro accounts answers the account question.
 - Account Summary is never read, so no name or username can reach the ledger, a finding
-  or an export. A canary test checks it.
+  or an export. A canary test checks it. (The workbook's shared strings are inflated
+  whole, as for any workbook, but a string is reached only through a cell of a sheet that
+  is read.)
+- **Merging ships it.** Merging this registers the adapter, makes the app accept `.xlsx`,
+  and adds `changelog.d/8.added.md` to the next release's notes. Nothing else gates a
+  release: until a real statement passes (R1), the pull request stays unmerged, or the
+  owner decides to ship it marked unverified.
 
 ## Open questions
 
@@ -278,6 +297,10 @@ conservative defaults taken for the risks; each default is one place in the code
   would refuse real positions.
 - **Asset type.** Does Account Activity's Asset type use Closed Positions' Type
   vocabulary (Stocks, ETF, CFD)?
+- **Day or month first.** Dates are read day first (`DD/MM/YYYY`). A month-first
+  statement is mostly caught (a day past 12 is no month, and the date-order gate), but one
+  whose every day is 12 or less would be read with day and month swapped, consistently
+  across its sheets, so no cross-check would notice. An untouched export settles the order.
 - **The owner's answers.** R1 to R3 above.
 
 ## On Acceptance
