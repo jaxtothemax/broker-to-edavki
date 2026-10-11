@@ -11,13 +11,21 @@
  * from dedicated workers as well, and a probe below proves it, in each browser
  * the suite runs in. WebSockets are not requests to that event, so they are
  * recorded through `context.routeWebSocket`, which also answers every socket
- * itself: none ever connects. A foreign request is aborted in the main test,
- * so were the policy ever lost the synthetic data would still reach no host,
- * while the recorder still lists it and the check still fails. The policy is
- * injected only by the production build, so these run against `vite preview`,
- * as playwright.config.ts does.
+ * itself: none ever connects. The main test also runs its browser behind a
+ * sinkhole proxy that refuses every request and exempts only the app's own
+ * host, so were the policy ever lost the synthetic data would still reach no
+ * host, while the recorder still lists the request and the check still fails.
+ * The policy is injected only by the production build, so these run against
+ * `vite preview`, as playwright.config.ts does.
+ *
+ * The sinkhole is a proxy and not request interception (`context.route`) on
+ * purpose: the engine worker starts from a blob: URL, and with interception on
+ * WebKit cannot load that URL at all, even for a request the handler lets
+ * through (WebKitBlobResource error 1). The import is then never read. No test
+ * that starts the engine worker may register a route.
  */
 import { readdirSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -266,21 +274,71 @@ async function answerForeign(context: BrowserContext): Promise<void> {
 }
 
 /**
- * Aborts every request to another origin, so were the policy ever lost the
- * synthetic data would reach no real host. The recorder (context.on("request"))
- * still lists the request, so the offender check still fails the test.
+ * A proxy that answers every request with 502 and never forwards one. The
+ * browser is pointed at it with the app's own host exempt, so were the policy
+ * ever lost a request to another host would end here and reach no real host.
+ * The recorder (context.on("request")) still lists the request, so the
+ * offender check still fails the test. It listens on loopback only.
  */
-async function abortForeign(
-  context: BrowserContext,
-  origin: string,
-): Promise<void> {
-  await context.route(
-    (url) => destination(url.href, origin) === "foreign",
-    async (route) => {
-      await route.abort();
-    },
-  );
+interface Sinkhole {
+  readonly proxy: { readonly server: string; readonly bypass: string };
+  /** What the proxy was asked for: "GET http://host/path", "CONNECT host:443". */
+  readonly asked: string[];
 }
+
+async function withSinkhole(
+  bypass: string,
+  run: (sinkhole: Sinkhole) => Promise<void>,
+): Promise<void> {
+  const asked: string[] = [];
+  const server = createServer((request, response) => {
+    asked.push(`${request.method ?? ""} ${request.url ?? ""}`);
+    // A body, so a navigation to a sunk host finishes in every browser.
+    response
+      .writeHead(502, { "content-type": "text/plain", connection: "close" })
+      .end("sinkhole");
+  });
+  // https goes through a tunnel: only the host and port are ever seen.
+  server.on("connect", (request, socket) => {
+    asked.push(`CONNECT ${request.url ?? ""}`);
+    socket.on("error", () => undefined);
+    socket.end("HTTP/1.1 502 Bad Gateway\r\nconnection: close\r\n\r\n");
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  try {
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("the sinkhole has no port");
+    }
+    await run({
+      proxy: { server: `http://127.0.0.1:${String(address.port)}`, bypass },
+      asked,
+    });
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  }
+}
+
+/**
+ * A test whose browser has no route to any host but the app's own: the proxy
+ * is the context's, so a foreign request is sunk, whatever the page does.
+ */
+const sealed = test.extend<{ sinkhole: Sinkhole }>({
+  sinkhole: async ({ baseURL }, use) => {
+    const host = new URL(originOf(baseURL)).hostname;
+    await withSinkhole(host, use);
+  },
+  proxy: async ({ sinkhole }, use) => {
+    await use(sinkhole.proxy);
+  },
+});
 
 /** A `fetch` the page makes to the foreign host; whether it was sent. */
 function fetchForeign(
@@ -345,73 +403,128 @@ async function fetchFromWorker(page: Page, target: string): Promise<void> {
   }, target);
 }
 
-test("an import to the results makes no outbound request", async ({
-  baseURL,
-  context,
-  page,
-}) => {
-  const origin = originOf(baseURL);
-  const seen = await record(context);
-  await abortForeign(context, origin);
-  const name = `${SENTINELS.firstName} ${SENTINELS.lastName}`;
-  const older = `${SENTINELS.fileStem}-2025.csv`;
-  const newer = `${SENTINELS.fileStem}-2026.csv`;
+// Registers no route (see the file comment): the engine worker's blob: would
+// not load in WebKit, and nothing would be read.
+sealed(
+  "an import to the results makes no outbound request",
+  async ({ baseURL, context, page, sinkhole }) => {
+    const origin = originOf(baseURL);
+    const seen = await record(context);
+    const name = `${SENTINELS.firstName} ${SENTINELS.lastName}`;
+    const older = `${SENTINELS.fileStem}-2025.csv`;
+    const newer = `${SENTINELS.fileStem}-2026.csv`;
 
-  await page.goto("/");
-  await page.locator("input[value=en]").check({ force: true });
-  expect(await connectSources(page)).toContain("'self'");
+    await page.goto("/");
+    await page.locator("input[value=en]").check({ force: true });
+    expect(await connectSources(page)).toContain("'self'");
 
-  await page.getByRole("button", { name: "Use my files" }).click();
-  await page.locator('input[type="file"]').setInputFiles([
-    {
-      name: older,
-      mimeType: "text/csv",
-      buffer: fixtureBytes("t212-invest-v3-2025.csv"),
-    },
-    {
-      name: newer,
-      mimeType: "text/csv",
-      buffer: fixtureBytes("t212-invest-v4-2026.csv"),
-    },
-  ]);
-  await expect(page.getByText("Trading 212, 6 Jan 2026")).toBeVisible();
-  // The sentinels must reach the app, or their absence from the requests
-  // would prove nothing.
-  await expect(page.locator(".file-name")).toHaveText([older, newer]);
+    await page.getByRole("button", { name: "Use my files" }).click();
+    await page.locator('input[type="file"]').setInputFiles([
+      {
+        name: older,
+        mimeType: "text/csv",
+        buffer: fixtureBytes("t212-invest-v3-2025.csv"),
+      },
+      {
+        name: newer,
+        mimeType: "text/csv",
+        buffer: fixtureBytes("t212-invest-v4-2026.csv"),
+      },
+    ]);
+    await expect(page.getByText("Trading 212, 6 Jan 2026")).toBeVisible();
+    // The sentinels must reach the app, or their absence from the requests
+    // would prove nothing.
+    await expect(page.locator(".file-name")).toHaveText([older, newer]);
 
-  await page.locator(".actions-row .btn-primary").click();
-  await page.locator("#details-taxNumber").fill(SENTINELS.taxNumber);
-  await page.locator("#details-name").fill(name);
-  await page.locator("#details-address").fill(`${SENTINELS.street} 7`);
-  const preview = page.locator(".xml-preview");
-  await expect(preview).toContainText(SENTINELS.taxNumber);
-  await expect(preview).toContainText(name);
-  await expect(preview).toContainText(SENTINELS.street);
+    await page.locator(".actions-row .btn-primary").click();
+    await page.locator("#details-taxNumber").fill(SENTINELS.taxNumber);
+    await page.locator("#details-name").fill(name);
+    await page.locator("#details-address").fill(`${SENTINELS.street} 7`);
+    const preview = page.locator(".xml-preview");
+    await expect(preview).toContainText(SENTINELS.taxNumber);
+    await expect(preview).toContainText(name);
+    await expect(preview).toContainText(SENTINELS.street);
 
-  await page.getByRole("button", { name: "See results" }).click();
-  await expect(heading(page)).toHaveText("Overview");
-  await expect(page.getByText("Your results are ready.")).toBeAttached();
-  await expect(
-    page.getByRole("button", { name: "Download Doh-KDVP" }),
-  ).toBeVisible();
-  // Give a late beacon its chance before the requests are counted.
-  await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "See results" }).click();
+    await expect(heading(page)).toHaveText("Overview");
+    await expect(page.getByText("Your results are ready.")).toBeAttached();
+    await expect(
+      page.getByRole("button", { name: "Download Doh-KDVP" }),
+    ).toBeVisible();
+    // Give a late beacon its chance before the requests are counted.
+    await page.waitForLoadState("networkidle");
 
-  // The engine worker really ran, and the recorder counted its requests: the
-  // page never asks for the engine's bundle, only the worker's import does.
-  const engineStarted = () =>
-    seen.some((request) => ENGINE_BUNDLE.test(request.url));
-  await expect
-    .poll(engineStarted, {
-      message: "the recorder never saw the engine worker's bundle load",
-    })
-    .toBe(true);
+    // The engine worker really ran, and the recorder counted its requests: the
+    // page never asks for the engine's bundle, only the worker's import does.
+    const engineStarted = () =>
+      seen.some((request) => ENGINE_BUNDLE.test(request.url));
+    await expect
+      .poll(engineStarted, {
+        message: "the recorder never saw the engine worker's bundle load",
+      })
+      .toBe(true);
 
-  expect(offenders(seen, origin, builtPaths(), PERMITTED_FETCH_PATHS)).toEqual(
-    [],
-  );
-  expect(leaks(seen, ALL_SENTINELS)).toEqual([]);
-});
+    expect(
+      offenders(seen, origin, builtPaths(), PERMITTED_FETCH_PATHS),
+    ).toEqual([]);
+    expect(leaks(seen, ALL_SENTINELS)).toEqual([]);
+    // A second witness besides the recorder: nothing reached the proxy either.
+    expect(sinkhole.asked).toEqual([]);
+  },
+);
+
+sealed(
+  "a request to another host is sunk, and the check fails on it",
+  async ({ baseURL, context, page, sinkhole }) => {
+    // The check behind the main test's safety net: were the proxy not wired in,
+    // or a browser to ignore it, the main test would pass with no host sunk and
+    // a lost policy would send the synthetic data out.
+    const origin = originOf(baseURL);
+    const seen = await record(context);
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    // The app's own origin is exempt: it must not reach the proxy.
+    expect(sinkhole.asked).toEqual([]);
+
+    // A navigation, unlike a fetch, is not held back by the page's policy, so
+    // this asks the proxy in both schemes whatever the policy says.
+    const plain = `${FOREIGN.replace("https:", "http:")}/sunk`;
+    const secure = `${FOREIGN}/sunk`;
+    for (const target of [plain, secure]) {
+      await page.goto(target, { timeout: 10_000 }).catch(() => undefined);
+    }
+    await expect
+      .poll(() => sinkhole.asked.join("\n"), {
+        message: "the proxy never saw the requests to another host",
+      })
+      .toContain(`GET ${plain}`);
+    await expect
+      .poll(() => sinkhole.asked.join("\n"), {
+        message: "the proxy never saw the tunnel to another host",
+      })
+      .toContain(`CONNECT ${new URL(FOREIGN).hostname}:443`);
+    // Everything it was asked for is for the foreign host, none for the app.
+    expect(
+      sinkhole.asked.filter(
+        (line) => !line.includes(new URL(FOREIGN).hostname),
+      ),
+    ).toEqual([]);
+
+    await expect
+      .poll(() => seen.map((request) => request.url), {
+        message: "the recorder missed a request to another host",
+      })
+      .toEqual(expect.arrayContaining([plain, secure]));
+    const outside = offenders(
+      seen,
+      origin,
+      builtPaths(),
+      PERMITTED_FETCH_PATHS,
+    ).join("\n");
+    expect(outside).toContain(plain);
+    expect(outside).toContain(secure);
+  },
+);
 
 test("the built page's policy keeps connections to its own origin", async ({
   page,
@@ -544,6 +657,8 @@ test("requests are judged by origin, and a fetch by its exact path", () => {
   expect(where("data:image/svg+xml,%3Csvg%3E")).toBe("local");
   expect(where(`blob:${origin}/6f1c`)).toBe("local");
   expect(where("blob:https://example.invalid/6f1c")).toBe("foreign");
+  expect(where("https://cross-origin.invalid/leak")).toBe("foreign");
+  expect(where("http://cross-origin.invalid/leak")).toBe("foreign");
   expect(where("http://127.0.0.1:4175/assets/app.js")).toBe("foreign");
   expect(where("https://127.0.0.1:4174/assets/app.js")).toBe("foreign");
   expect(where("ws://127.0.0.1:4174/socket")).toBe("foreign");
