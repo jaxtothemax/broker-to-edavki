@@ -947,7 +947,7 @@ describe("tradeRepublic: the types and classes real exports show", () => {
     ]);
   });
 
-  it("takes an amount gross, or net of fee and tax to the cent, never a band a tax widens", () => {
+  it("takes an amount gross, net of the tax, or net of fee and tax to the cent, never a band a tax widens", () => {
     // 2 at 180.50 is 361.00, with a fee of 1.00 and a tax of 1.44.
     expect(codes(rows(row({ tax: "-1.44" })))).toEqual([]);
     // A purchase net of the tax, the fee beside it, or net of both, as a
@@ -961,7 +961,7 @@ describe("tradeRepublic: the types and classes real exports show", () => {
         "tradeInconsistent",
       ]);
     }
-    // A sale net of both: less cash in, never more. Its tax is German
+    // A sale net of the tax, or of both: less cash in, never more. Its tax is German
     // tax, counted in the warning.
     const sale = { type: "SELL", shares: "-2.0000000000", tax: "-1.44" };
     for (const amount of ["358.56", "359.56"]) {
