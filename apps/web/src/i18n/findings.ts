@@ -237,7 +237,7 @@ export const findingsEn: FindingMessages = {
   foreignTaxNegative: (p) =>
     at(p, `more foreign tax was refunded than withheld. Check the export.`),
   payerUnknown: (p) =>
-    `${p.isin}: Doh-Div needs the payer's name, address and country. Add them to file this dividend.`,
+    `${p.isin}: Doh-Div needs the payer's name, address and country. Add them on the Details step to file this dividend.`,
   sourceCountryUnknown: (p) =>
     `${p.isin}: the country the dividend comes from cannot be told from its ISIN. Add it with the payer's details.`,
   slovenianPayer: (p) =>
@@ -646,7 +646,7 @@ export const findingsSl: FindingMessages = {
       `vrnjenega je bilo več tujega davka, kot ga je bilo odtegnjenega. Preverite izvoz.`,
     ),
   payerUnknown: (p) =>
-    `${p.isin}: za Doh-Div so potrebni ime, naslov in država izplačevalca. Dodajte jih, da lahko dividendo prijavite.`,
+    `${p.isin}: za Doh-Div so potrebni ime, naslov in država izplačevalca. Dodajte jih v koraku s podatki, da lahko dividendo prijavite.`,
   sourceCountryUnknown: (p) =>
     `${p.isin}: iz kode ISIN ni mogoče razbrati, iz katere države je dividenda. Dodajte jo s podatki o izplačevalcu.`,
   slovenianPayer: (p) =>
