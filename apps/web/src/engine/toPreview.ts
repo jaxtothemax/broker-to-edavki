@@ -251,6 +251,7 @@ function toDividend(
   return {
     date: d.date,
     symbol: tickerOf(d.security.symbol),
+    name: plainText(d.security.name ?? ""),
     payer: plainText(
       filled(
         d.record?.payer.name ?? payerNames.get(isin),

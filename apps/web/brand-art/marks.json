@@ -1,0 +1,58 @@
+{
+  "$comment": "Unaltered published wordmarks, vendored as cleaned SVG. See README.md. Edit by hand, then run: node apps/web/scripts/build-brand-marks.mjs",
+  "normalizedWith": "svgo 3.3.2 (preset-default, convertStyleToAttrs, removeDimensions); renders match the originals to anti-aliasing",
+  "marks": [
+    {
+      "id": "vanguard",
+      "title": "Vanguard",
+      "file": "vanguard.svg",
+      "names": ["vanguard"],
+      "source": {
+        "url": "https://commons.wikimedia.org/wiki/File:Vanguard.svg",
+        "license": "Public domain (Wikimedia Commons: PD textlogo, with trademark)",
+        "retrieved": "2026-10-11",
+        "originalSha256": "a57d967a90170c60454b132814d73231f16fb96319460c6f882800f4ba21211f"
+      },
+      "sha256": "022efdc973131fce754ebd69d0a05b8728e670a356269601732b5d14a6c1d5d7"
+    },
+    {
+      "id": "ishares",
+      "title": "iShares",
+      "file": "ishares.svg",
+      "names": ["ishares"],
+      "source": {
+        "url": "https://commons.wikimedia.org/wiki/File:Logo-ishares_2019.svg",
+        "license": "Public domain (Wikimedia Commons: PD textlogo, with trademark)",
+        "retrieved": "2026-10-11",
+        "originalSha256": "5b23833a34cd5b7ca33df62c7e29652c5ff3f38ae343739351c1b499d55ad1ab"
+      },
+      "sha256": "37006736e2b881ebf445b2e7a7e4b8c1bb5c34833ae3686e08e9e2621bba0335"
+    },
+    {
+      "id": "vaneck",
+      "title": "VanEck",
+      "file": "vaneck.svg",
+      "names": ["vaneck", "van eck"],
+      "source": {
+        "url": "https://commons.wikimedia.org/wiki/File:Vaneck.svg",
+        "license": "Public domain (Wikimedia Commons: PD textlogo, with trademark)",
+        "retrieved": "2026-10-11",
+        "originalSha256": "f1c5c34c6456c1a14d9ea3a81088c3e0793d89f678f8763b6e0c5e08639e20bb"
+      },
+      "sha256": "9a93e7b7bcb65d06f2019daee82e25afbd9b56bdfed945447d9c4122f3b1e01b"
+    },
+    {
+      "id": "amundi",
+      "title": "Amundi",
+      "file": "amundi.svg",
+      "names": ["amundi"],
+      "source": {
+        "url": "https://commons.wikimedia.org/wiki/File:Amundi_logo.svg",
+        "license": "Public domain (Wikimedia Commons: PD textlogo, with trademark)",
+        "retrieved": "2026-10-11",
+        "originalSha256": "1c07dd03453fb119e3c73746ccad385bca08946d1922f919a45821f3a940f2e0"
+      },
+      "sha256": "e02017ebc159fdcb690c94a9e2cb69e8b114c32501c406db71af2a50949b2526"
+    }
+  ]
+}

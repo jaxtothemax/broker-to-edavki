@@ -324,6 +324,7 @@ const isDividend = (v: unknown): v is DividendRow =>
   isRecord(v) &&
   isDate(v["date"]) &&
   isString(v["symbol"]) &&
+  isString(v["name"]) &&
   isString(v["payer"]) &&
   isAnIsin(v["isin"]) &&
   isString(v["country"]) &&

@@ -103,6 +103,8 @@
   --ticker-ring: 70% 60% / 0.24;
   --ticker-text: 85% 78%;
   --logo-ring: rgb(255 255 255 / 0.14);
+  /* A wordmark is drawn for white paper, in both themes. */
+  --logo-paper: #ffffff;
   --form-name-gradient: linear-gradient(120deg, #a7f3d0, #34d399 45%, #10b981);
   --shadow-card:
     inset 0 1px 0 rgb(255 255 255 / 0.035), 0 24px 48px -28px rgb(0 0 0 / 0.85);
@@ -164,6 +166,7 @@
   --ticker-ring: 60% 40% / 0.2;
   --ticker-text: 70% 27%;
   --logo-ring: rgb(12 14 20 / 0.08);
+  --logo-paper: #ffffff;
   --form-name-gradient: linear-gradient(120deg, #047857, #059669 55%, #065f46);
   --shadow-card:
     0 1px 2px rgb(16 24 40 / 0.04), 0 12px 32px -18px rgb(16 24 40 / 0.16);
@@ -643,6 +646,19 @@ input {
   width: 55%;
   height: 55%;
   fill: currentColor;
+}
+
+/* A fund house's published wordmark on white paper, as drawn and unaltered.
+   Wide marks fill the tile's width, so the tile stays the size of the others
+   and a column of marks lines up. */
+.logo-wordmark {
+  background: var(--logo-paper);
+}
+
+.logo-wordmark svg {
+  width: 82%;
+  height: auto;
+  max-height: 82%;
 }
 
 .icon-tile {
@@ -2678,20 +2694,24 @@ button.step-item:hover {
   font-weight: var(--fw-semibold);
 }
 
-.payer {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+/* In a table the security's name wraps at spaces: `anywhere` lets the column
+   shrink until a word is cut into pieces. */
+.security-cell {
+  min-width: 9.25rem;
 }
 
-.payer :is(.ticker, .logo) {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-sm);
+.security-cell .security-name {
+  overflow-wrap: break-word;
 }
 
-.payer .ticker {
-  font-size: 10px;
+/* The payer column holds a file name and a row; it breaks anywhere rather
+   than at every hyphen, which left one or two characters per line. */
+.payer-cell {
+  min-width: 10.5rem;
+}
+
+.payer-cell .mono {
+  overflow-wrap: anywhere;
 }
 
 .cap-note {

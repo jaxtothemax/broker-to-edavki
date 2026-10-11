@@ -21,6 +21,10 @@ function render(node: ReactNode, locale: Locale = "en"): string {
   );
 }
 
+function failMissing(): never {
+  throw new Error("the demo has no dividends");
+}
+
 const text = (html: string) =>
   html
     .replace(/<[^>]+>/g, " ")
@@ -112,6 +116,69 @@ describe("DividendsPanel", () => {
 
   it("shows the holiday fallback list for the 1 May payment", () => {
     expect(text(html)).toContain("BSI list of 30 Apr 2026");
+  });
+
+  describe("the security column", () => {
+    // A broker that holds the shares is the payer on the form; the company
+    // whose dividend it was must still be readable.
+    const row = {
+      ...(demoPreview.dividends[0] ?? failMissing()),
+      symbol: "TSTA",
+      name: "Examplecorp Holdings Ltd",
+      isin: "US0000000002",
+      payer: "TRADING 212",
+      broker: "trading212" as const,
+    };
+    const panel = (dividends: typeof demoPreview.dividends, locale?: Locale) =>
+      render(
+        <DividendsPanel
+          dividends={dividends}
+          totals={demoPreview.dividendsEstimate}
+        />,
+        locale,
+      );
+
+    it("names the company and its ticker apart from the payer", () => {
+      const html = panel([row]);
+      expect(text(html)).toContain("Security");
+      expect(text(html)).toContain("Payer");
+      expect(html).toContain(
+        '<span class="security-symbol">TSTA</span><span class="security-name">Examplecorp Holdings Ltd</span>',
+      );
+      expect(html).toContain('<span class="strong">TRADING 212</span>');
+      expect(html).toContain('class="ticker"');
+    });
+
+    it("does not repeat the broker when the broker is the payer", () => {
+      expect(text(panel([row]))).not.toContain("Trading 212 ");
+      const other = text(panel([{ ...row, payer: "Examplecorp Holdings" }]));
+      expect(other).toContain("Examplecorp Holdings Trading 212");
+    });
+
+    it("falls back to the name, then the ISIN, when the export has no ticker", () => {
+      const noTicker = panel([{ ...row, symbol: "" }]);
+      expect(noTicker).toContain(
+        '<span class="security-symbol">Examplecorp Holdings Ltd</span></span>',
+      );
+      const bare = panel([{ ...row, symbol: "", name: "" }]);
+      expect(bare).toContain('<span class="security-symbol">US0000000002<');
+    });
+
+    it("shows a fund house's wordmark on every fund it issues", () => {
+      const fund = panel([
+        { ...row, name: "Vanguard Test World (Acc)", symbol: "TSTB" },
+      ]);
+      expect(fund).toContain("logo-wordmark");
+      expect(fund).not.toContain('class="ticker"');
+    });
+
+    it("keeps the total row under the first four columns", () => {
+      expect(panel([row])).toContain('<th scope="row" colSpan="4">');
+    });
+
+    it("is worded in Slovenian too", () => {
+      expect(text(panel([row], "sl"))).toContain(sl.review.colSecurity);
+    });
   });
 });
 

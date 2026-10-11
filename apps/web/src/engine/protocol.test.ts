@@ -231,6 +231,15 @@ describe("isReply on the review", () => {
         securities: [{ ...security, lots: [{ ...lot, bucket: "forever" }] }],
       },
       { ...preview, dividends: [{ ...dividend, treatyRate: "15%" }] },
+      { ...preview, dividends: [{ ...dividend, name: 7 }] },
+      {
+        ...preview,
+        dividends: [
+          Object.fromEntries(
+            Object.entries(dividend).filter(([key]) => key !== "name"),
+          ),
+        ],
+      },
       {
         ...preview,
         dividends: [{ ...dividend, source: { file: 1, row: 2 } }],

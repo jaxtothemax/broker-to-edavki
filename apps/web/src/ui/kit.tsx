@@ -21,6 +21,7 @@ import {
 import type { ExplainProps } from "../explain/anchors";
 import { formatEur, formatEurParts, isNegative } from "../i18n/format";
 import { useI18n } from "../i18n/i18n";
+import { brandMarkOf } from "./brandMark";
 import { LOGOS } from "./logos";
 
 /** Joins class names, skipping the ones a condition turned off. */
@@ -149,10 +150,11 @@ export function hueOf(text: string): number {
 }
 
 /**
- * A ticker tile standing in for a company logo: logos would mean bundling
- * trademarks or fetching them from a third party, and the app does neither.
- * The tile itself is decorative. Where the symbol is not written out next to
- * it, `labelled` gives screen readers the symbol instead.
+ * A ticker tile for a security with no logo of its own: the app ships only the
+ * logos it can identify a security with (ui/logos.ts, ui/brandMarks.ts) and
+ * never fetches one, which would tell a third party what the user holds. The
+ * tile itself is decorative. Where the symbol is not written out next to it,
+ * `labelled` gives screen readers the symbol instead.
  */
 export function Ticker({
   symbol,
@@ -181,33 +183,55 @@ export function Ticker({
 }
 
 /**
- * The mark beside a security or payer: the company's logo when the app ships
- * one for its ISIN (ui/logos.ts), otherwise its ticker tile. Decorative like
- * the tile; `labelled` gives screen readers the symbol where it is not
- * written out next to the mark.
+ * The mark beside a security: the company's own logo when the app ships one
+ * for its ISIN (ui/logos.ts), else its fund house's wordmark when the name
+ * leads with one (ui/brandMarks.ts: every Vanguard fund shows Vanguard), else
+ * its ticker tile. Decorative like the tile; `labelled` gives screen readers
+ * the symbol where it is not written out next to the mark.
  */
 export function SecurityMark({
   isin,
   symbol,
+  name,
   labelled = false,
 }: {
   readonly isin: string;
   readonly symbol: string;
+  readonly name: string;
   readonly labelled?: boolean;
 }) {
   const logo = LOGOS[isin];
-  if (logo === undefined) return <Ticker symbol={symbol} labelled={labelled} />;
+  const wordmark = logo === undefined ? brandMarkOf(name) : undefined;
+  if (logo === undefined && wordmark === undefined) {
+    return <Ticker symbol={symbol} labelled={labelled} />;
+  }
   return (
     <>
-      <span
-        className={cx("logo", logo.darkGlyph && "logo-dark-glyph")}
-        aria-hidden
-        style={{ "--logo-color": logo.color } as CSSProperties}
-      >
-        <svg viewBox="0 0 24 24" focusable="false">
-          <path d={logo.path} />
-        </svg>
-      </span>
+      {logo !== undefined ? (
+        <span
+          className={cx("logo", logo.darkGlyph && "logo-dark-glyph")}
+          aria-hidden
+          style={{ "--logo-color": logo.color } as CSSProperties}
+        >
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d={logo.path} />
+          </svg>
+        </span>
+      ) : null}
+      {wordmark !== undefined ? (
+        <span className="logo logo-wordmark" aria-hidden>
+          <svg viewBox={wordmark.viewBox} focusable="false">
+            {wordmark.paths.map((path) => (
+              <path
+                key={path.d}
+                d={path.d}
+                fill={path.fill}
+                fillRule={path.evenOdd ? "evenodd" : "nonzero"}
+              />
+            ))}
+          </svg>
+        </span>
+      ) : null}
       {labelled ? <span className="visually-hidden">{symbol}</span> : null}
     </>
   );

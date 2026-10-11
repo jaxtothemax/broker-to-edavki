@@ -398,6 +398,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-02-12",
       symbol: "AAPL",
+      name: "Apple Inc.",
       payer: "Apple Inc.",
       isin: "US0378331005",
       country: "US",
@@ -419,6 +420,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-05-14",
       symbol: "AAPL",
+      name: "Apple Inc.",
       payer: "Apple Inc.",
       isin: "US0378331005",
       country: "US",
@@ -440,6 +442,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-08-13",
       symbol: "AAPL",
+      name: "Apple Inc.",
       payer: "Apple Inc.",
       isin: "US0378331005",
       country: "US",
@@ -461,6 +464,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-01-15",
       symbol: "O",
+      name: "Realty Income Corp.",
       payer: "Realty Income Corp.",
       isin: "US7561091049",
       country: "US",
@@ -482,6 +486,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-02-13",
       symbol: "O",
+      name: "Realty Income Corp.",
       payer: "Realty Income Corp.",
       isin: "US7561091049",
       country: "US",
@@ -503,6 +508,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-03-13",
       symbol: "O",
+      name: "Realty Income Corp.",
       payer: "Realty Income Corp.",
       isin: "US7561091049",
       country: "US",
@@ -524,6 +530,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-05-01",
       symbol: "T",
+      name: "AT&T Inc.",
       payer: "AT&T Inc.",
       isin: "US00206R1023",
       country: "US",
@@ -545,6 +552,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-03-20",
       symbol: "ULVR",
+      name: "Unilever PLC",
       payer: "Unilever PLC",
       isin: "GB00B10RZP78",
       country: "GB",
@@ -566,6 +574,7 @@ export const demoPreview: ReturnPreview = {
     {
       date: "2026-05-08",
       symbol: "ALV",
+      name: "Allianz SE",
       payer: "Allianz SE",
       isin: "DE0008404005",
       country: "DE",

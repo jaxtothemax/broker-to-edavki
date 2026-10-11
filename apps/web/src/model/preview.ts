@@ -114,6 +114,8 @@ export interface SecurityResult {
 export interface DividendRow {
   readonly date: IsoDate;
   readonly symbol: string;
+  /** The security's name as the export gives it, "" when it gives none. */
+  readonly name: string;
   readonly payer: string;
   readonly isin: string;
   /** ISO 3166-1 alpha-2 country the income comes from, not the payer's. */
