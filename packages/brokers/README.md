@@ -63,7 +63,10 @@ file covers. The contract that makes an adapter safe to merge:
   `keyBuilder()`, or from `keyOf()` where the broker gives each row an ID it never reuses.
 - **Dates come from core's `taxDate`**, never from a rule of the adapter's own.
 - **Text copied from the file reaches a finding only through `untrusted()`.** No file name, account
-  number or order ID may reach a key, a finding or a log.
+  number or order ID may reach a finding or a log. A key takes such an ID only inside a SHA-256
+  hash, so none survives in it as written (`keyOf()` hashes IBKR's transaction ID). A key is still
+  a pseudonym, so it stays on the user's device and out of findings, exports and the LLM payload
+  (`packages/core/src/keys.ts`, ADR 0011 §5).
 - **The file is hostile.** Input is bounded, nothing in it is executed, and XML is read with
   `src/xml.ts`, which refuses a DOCTYPE and so resolves no entities. An adapter does not touch the
   network.

@@ -18,12 +18,18 @@ is held to the same checks as any other. Claude Code is an
 - **python3** on your `PATH`. Several of the checks that run before a push need it (version
   lockstep, docs links, NUL bytes, invisible characters). A missing python3 fails the push;
   it is not skipped.
+- **PyYAML** for that python3 (`pip install pyyaml`). Two pre-push checks read the CI
+  workflows with it, `check-selftest-parity` and `check-artifact-asserts`. Without it each
+  exits 2, which means "could not check" and not a pass, so the push fails.
 
-Optional, and each skipped with a message when absent: **gitleaks** (secret scan on commit),
-**shellcheck** (the shell-script check), **xmllint** (checking generated XML against the
-FURS schemas by hand), and the GitHub CLI **gh** (the duplicate-pull-request check).
+Optional: **gitleaks** (secret scan on commit) and **shellcheck** (the shell-script check) are
+skipped with a message when absent. **xmllint** (checking generated XML against the FURS
+schemas by hand) is not run by any hook. The GitHub CLI **gh** (the duplicate-pull-request
+check) is skipped without any message: the check exits quietly, so nothing tells you it did
+not run.
 
-`make doctor` reports what your machine is missing.
+`make doctor` reports most of what your machine is missing. It checks for python3 but not for
+PyYAML, so a clean `make doctor` does not mean the push checks can run.
 
 ---
 
@@ -114,8 +120,13 @@ moved to `<name>.bak`.
   runs `make format-check`, `make lint` and `make typecheck`.
 - **`pre-push`** runs `make pre-push-checks`, which mirrors every CI check that can run
   locally, so a red result shows up before the push rather than on the PR. It needs python3
-  (see above). It skips, with a message, the checks whose tool is missing: `gh`,
-  `shellcheck`, or `node` and `pnpm`.
+  with PyYAML (see above). A missing tool is handled check by check, not alike:
+  - Without `shellcheck`, the shell-script check skips with a message.
+  - Without `node`, `check-added-files-covered` and `check-app-fixture-gates` skip with a
+    message, and so does `check-licenses` without `node` or `pnpm`.
+  - Without `gh`, the duplicate-pull-request check exits quietly with no message.
+  - The Pages build check (`check-pages-build`) has no skip: without `node` it fails, and so
+    does the push.
 
 Both hooks need the dependencies installed first. `git commit --no-verify` and
 `git push --no-verify` skip them, but CI runs the same checks again and a failing check
@@ -321,9 +332,11 @@ this repository, an MR is a GitHub pull request. They use the GitHub CLI, so run
 applies.
 
 Working on several issues at once? `scripts/wt new <issue>` creates an isolated git worktree.
-It also tries to label the issue `status:wip` so that a parallel session does not pick it up,
-which only people with triage rights on the repository can do; elsewhere it warns and carries
-on.
+It also tries to label the issue `status:wip` and comment on it, so that a parallel session
+does not pick it up. It sends both to the repository that `origin` points at. In a fork that
+is your fork, never the project, so the project's issue is not touched and the check-out
+protects nothing there. A fork usually has issues turned off, and then `gh` fails and
+`scripts/wt` warns and carries on. The worktree itself works the same either way.
 
 ---
 

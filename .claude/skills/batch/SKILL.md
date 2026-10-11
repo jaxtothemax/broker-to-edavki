@@ -87,8 +87,9 @@ Then filter, in this order:
    shows the label; to exclude claimed issues up front, query with
    `--search 'milestone:"<M>" label:"<L>" -label:"status:wip"'` instead of the
    `--milestone`/`--label` flags. Read the check-out
-   comment (`🔒 checked out …`) before assuming a label is stale: it names the branch and
-   worktree holding the issue. A label with no live worktree behind it is a stale lock —
+   comment (`🔒 checked out …`) before assuming a label is stale: it names the branch
+   holding the issue, not the worktree's path (`scripts/wt` keeps that off the issue).
+   `scripts/wt list` shows the worktree. A label with no live worktree behind it is a stale lock —
    ask the user before taking it over; never `--force` it on your own.
 2. **Drop anything blocked** on an unmerged branch or an unanswered 🔴 question.
 3. **Prefer issues with an identified root cause.** An issue whose body names the file
