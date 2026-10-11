@@ -89,6 +89,7 @@ From source, before the first release:
 | Trading 212         | History export, CSV (four header revisions)                                                                 | Purchases, sales, dividends with the tax withheld, splits | Payments in lieu of dividends, tax-exempt dividends, spin-offs, transfers, stock distributions                                          |
 | Interactive Brokers | Activity Flex Query, XML ([how to set it up](website/src/content/docs/guides/run-from-source.md#setting-up-the-ibkr-flex-query)) | Trades, dividends with the tax withheld, splits that keep the ISIN | Payments in lieu of dividends, other corporate actions, cancellations and corrections, short sales, option exercises                             |
 | Trade Republic      | Transaction export, CSV (offered since April 2026; both revisions, with commas or semicolons)                          | Purchases, sales, savings plans                         | Dividends and fund distributions, until a real export confirms their tax ([#12](https://github.com/jaxtothemax/broker-to-edavki/issues/12)); returns of capital; trades with a foreign-currency leg; free shares; corporate actions and deliveries; bonds, crypto and gold; Junior (child) accounts |
+| eToro (not yet checked against a real export) | Account statement, XLSX, current layout, from the account's opening ([ADR 0020](docs/adr/0020-etoro-account-statement.md)) | US-dollar shares and ETFs held long, closed or still open; dividends with the tax withheld; CFDs and crypto left out with a note | A statement that starts later, older layouts, short or leveraged positions, partial closes, other currencies, a trade too near midnight to date |
 
 The project's tests use synthetic exports that follow each format as far as the research
 reconstructs it from public samples, not real accounts' data. Each reader still has to be
@@ -98,8 +99,10 @@ and the command-line tool write the same XML for the same files and payer detail
 starts Trading 212's dividend payers as Trading 212; the command line takes them from its payers
 file, [#43](https://github.com/jaxtothemax/broker-to-edavki/issues/43)). Next, in
 order of how many Slovenian investors use them: eToro, XTB, DEGIRO, Revolut, Lightyear, Saxo and
-Robinhood. The spreadsheet (XLSX) reader that eToro, XTB and Saxo need is built; their adapters
-wait on real, anonymized exports.
+Robinhood. The spreadsheet (XLSX) reader that eToro, XTB and Saxo need is built. eToro's adapter
+is written but stays unreleased until a real, untouched statement confirms it
+([#8](https://github.com/jaxtothemax/broker-to-edavki/issues/8)); XTB's and Saxo's wait on real,
+anonymized exports.
 
 ## Known assumptions
 
@@ -237,7 +240,8 @@ a paid service.
   XML are shared, so it never touches them.
   [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-broker-adapter) lists what a new adapter needs,
   [packages/brokers/README.md](packages/brokers/README.md) shows the interface to implement and
-  where to register it, and the Trading 212, IBKR and Trade Republic adapters are worked examples.
+  where to register it, and the Trading 212, IBKR, Trade Republic and eToro adapters are worked
+  examples.
 - **Check the tax rules.** Each rule cites its primary source (the law, FURS instructions and
   schemas, Banka Slovenije) in [docs/research/](docs/research/); where one is still missing, an
   open issue tracks it (the trade-date rule, [#13](https://github.com/jaxtothemax/broker-to-edavki/issues/13)). If you know Slovenian tax

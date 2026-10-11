@@ -6,9 +6,15 @@
 > **Implementation status (2026-10-09):** on `main`, not yet in a release. The DEFLATE decoder and CRC-32 (`packages/brokers/src/{inflate,crc32}.ts`), the ZIP
 > reader (`zip.ts`), the OOXML profile of the XML scanner (`xml.ts`), the number and serial
 > readers (`xlsx-values.ts`), the workbook reader (`xlsx.ts`) and the dispatch (`adapter.ts`)
-> are in. No XLSX adapter is, so no workbook is recognized yet; the sheet classification of
-> decision 6 lands with the first adapter, eToro's, and the web app does not accept `.xlsx`
-> until then.
+> are in.
+>
+> **Update (2026-10-11, #8):** the first XLSX adapter, eToro's account statement
+> ([ADR 0020](0020-etoro-account-statement.md), Proposed), brings decision 6's sheet
+> classification (`unknownSheet`, `hiddenSheet`, `hiddenCells`), and the web app accepts
+> `.xlsx`. The adapter is tested on synthetic statements only. This ADR's precondition, one
+> real, anonymized export before an adapter ships, is **not** set aside: the eToro adapter
+> waits for one. Decision 7's example of eToro's `1,071.56` is text the adapter refuses: it
+> reads no thousands separator (ADR 0020 §2).
 
 ## Context
 
