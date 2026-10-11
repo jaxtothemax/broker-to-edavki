@@ -844,6 +844,29 @@ function readCash(
       ignore("interest", source);
       continue;
     }
+    // What a row is comes before its date and before every check on its
+    // fields (ADR 0019 §6, #67). A dividend refused for its label gives that
+    // reason even when it cannot be dated. The finding names no ISIN, date or
+    // effect on a holding, so it is never scoped (ADR 0017) and withholds
+    // both returns of every year. IBKR's reach is the statement's end date, so
+    // no row moves it. A dividend or withholding event is still dated below;
+    // the cash rows IBKR ignores are never dated.
+    if (type === "Dividends") {
+      const label = dividendLabel(a.get("description"));
+      if (label !== null && !DIVIDEND_LABELS.has(label)) {
+        const known = OTHER_LABELS.get(label);
+        if (known === undefined) {
+          block(
+            "unknownAction",
+            { broker: IBKR, action: untrusted(label) },
+            source,
+          );
+        } else {
+          block("unsupportedAction", { broker: IBKR, action: known }, source);
+        }
+        continue;
+      }
+    }
     const date = ibDate(a.get("dateTime") ?? a.get("reportDate"));
     const where = {
       ...(isIsin(isin) ? { isin } : {}),
@@ -880,22 +903,6 @@ function readCash(
     if (!CURRENCY.test(currency)) {
       block("invalidCurrency", {}, source);
       continue;
-    }
-    if (type === "Dividends") {
-      const label = dividendLabel(a.get("description"));
-      if (label !== null && !DIVIDEND_LABELS.has(label)) {
-        const known = OTHER_LABELS.get(label);
-        if (known === undefined) {
-          block(
-            "unknownAction",
-            { broker: IBKR, action: untrusted(label) },
-            source,
-          );
-        } else {
-          block("unsupportedAction", { broker: IBKR, action: known }, source);
-        }
-        continue;
-      }
     }
     const row = {
       record,

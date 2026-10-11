@@ -9,6 +9,7 @@ import {
   fileIdOf,
   forExport,
   matchFifo,
+  scopeLedger,
   validateLedger,
   type LedgerEvent,
 } from "@taxreporter/core";
@@ -443,5 +444,154 @@ describe("statements it refuses rather than guesses", () => {
     expect(ledger.diagnostics.map((d) => d.code)).toEqual([
       "duplicateKeyInFile",
     ]);
+  });
+});
+
+describe("what a row is comes before its date (ADR 0019 §6, #67)", () => {
+  // Not a date in the file's shape, an empty one, and a shape that names no
+  // real day.
+  const UNDATABLE = ["2026-04-01", "", "20260230;202000"];
+  const DATED = "20260401;202000";
+  const rows = (...items: string[]) =>
+    statement(`<CashTransactions>${items.join("")}</CashTransactions>`);
+  const distribution = (label: string) =>
+    `KO(US1912161007) DISTRIBUTION (${label})`;
+  const refused = (
+    dateTime: string,
+    label: string,
+    extra: Record<string, string> = {},
+  ) =>
+    read(rows(cash({ description: distribution(label), dateTime, ...extra })));
+  const findings = (result: ImportResult) =>
+    result.diagnostics
+      .filter((d) => d.severity === "blocking")
+      .map((d) => [d.code, d.params]);
+  const OTHER = [
+    ["Return of Capital", "returnOfCapital"],
+    ["Capital Gain", "capitalGainDistribution"],
+    ["Interest", "interestDistribution"],
+    ["Limited Partnership", "partnershipDistribution"],
+    ["Non-Dividend Distribution", "nonDividendDistribution"],
+  ] as const;
+
+  it("refuses a dividend its label refuses for that, though it cannot be dated", () => {
+    for (const dateTime of UNDATABLE) {
+      for (const [label, action] of OTHER) {
+        const result = refused(dateTime, label);
+        expect(findings(result), `${label} at "${dateTime}"`).toEqual([
+          ["unsupportedAction", { broker: "ibkr", action }],
+        ]);
+        // No row is dropped: the refusal accounts for it.
+        expect(result.events).toEqual([]);
+      }
+    }
+  });
+
+  it("refuses a dividend whose label it does not know, though it cannot be dated", () => {
+    for (const dateTime of UNDATABLE) {
+      const result = refused(dateTime, "Scrip Dividend");
+      expect(findings(result), `"${dateTime}"`).toEqual([
+        [
+          "unknownAction",
+          { broker: "ibkr", action: { untrusted: "Scrip Dividend" } },
+        ],
+      ]);
+      expect(result.events).toEqual([]);
+    }
+  });
+
+  it("gives a dated row the refusal it had", () => {
+    for (const [label, action] of OTHER) {
+      expect(findings(refused(DATED, label)), label).toEqual([
+        ["unsupportedAction", { broker: "ibkr", action }],
+      ]);
+    }
+    expect(findings(refused(DATED, "Scrip Dividend"))).toEqual([
+      [
+        "unknownAction",
+        { broker: "ibkr", action: { untrusted: "Scrip Dividend" } },
+      ],
+    ]);
+  });
+
+  it("classifies the label before the checks on the row's other fields", () => {
+    const faults: [Record<string, string>, string][] = [
+      [{ isin: "" }, "invalidIsin"],
+      [{ dateTime: "20270601;101500" }, "rowAfterStatement"],
+      [{ transactionID: "" }, "invalidDividend"],
+      [{ amount: "x" }, "invalidNumber"],
+      [{ amount: "0" }, "invalidNumber"],
+      [{ currency: "" }, "invalidCurrency"],
+    ];
+    for (const [fault, code] of faults) {
+      const name = JSON.stringify(fault);
+      const codes = (label: string) => blocking(refused(DATED, label, fault));
+      // A row that is not refused for its label keeps the reason it had.
+      expect(blocking(read(rows(cash(fault)))), name).toEqual([code]);
+      expect(codes("Return of Capital"), name).toEqual(["unsupportedAction"]);
+      expect(codes("Scrip Dividend"), name).toEqual(["unknownAction"]);
+    }
+  });
+
+  it("still dates every row it reads as an event", () => {
+    const labels = ["Ordinary Dividend", "Bonus Dividend", "Special Dividend"];
+    for (const dateTime of UNDATABLE) {
+      for (const label of labels) {
+        expect(findings(refused(dateTime, label)), label).toEqual([
+          ["invalidTime", {}],
+        ]);
+      }
+      // A dividend with no label to classify, and a tax, which has none.
+      const plain = cash({
+        description: "KO(US1912161007) CASH DIVIDEND USD 0.53 PER SHARE",
+        dateTime,
+      });
+      expect(blocking(read(rows(plain)))).toEqual(["invalidTime"]);
+      const tax = cash({
+        type: "Withholding Tax",
+        amount: "-2.39",
+        transactionID: "800000102",
+        description: "KO(US1912161007) - US TAX",
+        dateTime,
+      });
+      expect(blocking(read(rows(tax)))).toEqual(["invalidTime"]);
+    }
+  });
+
+  it("scopes no refusal, so an undated one withholds every return (ADR 0017)", () => {
+    // The adapter states no effect on a holding (`shares`), dated or not, so
+    // the rule has nothing to scope (#52); and the file's reach is the
+    // statement's own end, which no row moves.
+    for (const dateTime of [...UNDATABLE, DATED]) {
+      const result = read(
+        rows(
+          cash({ description: distribution("Return of Capital"), dateTime }),
+          cash({
+            description: distribution("Scrip Dividend"),
+            transactionID: "800000102",
+            dateTime,
+          }),
+        ),
+      );
+      expect(result.reach.map((r) => r.lastDate)).toEqual(["2026-12-31"]);
+      for (const [, params] of findings(result)) {
+        expect(params).not.toHaveProperty("isin");
+        expect(params).not.toHaveProperty("date");
+        expect(params).not.toHaveProperty("shares");
+      }
+      const ledger = validateLedger(result.events, result.diagnostics);
+      const refusals = ledger.diagnostics.filter(
+        (d) => d.code === "unsupportedAction" || d.code === "unknownAction",
+      );
+      expect(refusals).toHaveLength(2);
+      for (const year of [2025, 2026, 2030]) {
+        const scope = scopeLedger(ledger, year);
+        for (const refusal of refusals) {
+          const name = String(year);
+          expect(scope.kdvp, `Doh-KDVP ${name}`).toContainEqual(refusal);
+          expect(scope.div, `Doh-Div ${name}`).toContainEqual(refusal);
+        }
+      }
+    }
   });
 });
