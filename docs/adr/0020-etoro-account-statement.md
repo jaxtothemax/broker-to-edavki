@@ -196,7 +196,7 @@ conservative defaults taken for the risks; each default is one place in the code
       (`dividendInconsistent`, `rate`). Known answer: 0.11 net, 0.0122 tax ("10 %") gives
       a gross of 0.1222.
     - **Pairing.** Each row pairs with exactly one Account Activity `Dividend` row: same
-      position, same amount, same day. Otherwise it is refused (`pairing`, `date`).
+      position, same amount, same day, its own Details ending in `/USD`. Otherwise it is refused (`pairing`, `date`).
     - **The 2025.11 layout.** Currency must be USD, Net dividends must equal the dollar
       amount (`netAmount`), and the franking columns must be empty or `-` (else
       `unsupportedAction`, `franked`).
