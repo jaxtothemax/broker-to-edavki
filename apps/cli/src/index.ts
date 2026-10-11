@@ -94,9 +94,10 @@ const REFUSAL: Readonly<Record<IntakeRefusal | FileRefusal, string>> = {
   changedWhileReading: "changed while it was being read",
   overSession: `was not read: the files together are larger than one run takes (over ${String(LIMITS.sessionBytes / 1024 / 1024)} MiB)`,
   zip: "is a ZIP archive, not a broker export",
-  spreadsheet: "is an old Excel file; export CSV from your broker",
-  pdf: "is a PDF; export CSV from your broker",
-  gzip: "is compressed; export CSV from your broker",
+  spreadsheet:
+    "is an old Excel file (XLS); export CSV, XML or XLSX from your broker",
+  pdf: "is a PDF; export CSV, XML or XLSX from your broker",
+  gzip: "is compressed; export CSV, XML or XLSX from your broker",
   utf16: "is UTF-16 text; export it again from your broker, unchanged",
   utf32: "is UTF-32 text; export it again from your broker, unchanged",
   binary: "contains binary data",

@@ -114,7 +114,9 @@ describe("findingText", () => {
         code: "fileRefused",
         params: { reason: "pdf" },
       }),
-    ).toBe("This file is a PDF: export CSV or XML from your broker instead.");
+    ).toBe(
+      "This file is a PDF: export CSV, XML or XLSX from your broker instead.",
+    );
     expect(
       say({
         severity: "blocking",

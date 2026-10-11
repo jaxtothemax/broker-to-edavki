@@ -1073,10 +1073,14 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     const net = numberOf(cell("Net Dividend Received (USD)"));
     const withheld = numberOf(cell("Withholding Tax Amount (USD)"));
     const at = where(isin, date);
-    // The Account Activity rows of the position that paid this amount: one
-    // is this dividend's, on its day.
+    // The Account Activity rows of the position that paid this amount, in
+    // dollars (ADR 0020 §10): one is this dividend's, on its day.
     const candidates = (dividendsById.get(id) ?? []).filter(
-      (a) => !paid.has(a) && net !== null && a.amount?.equals(net) === true,
+      (a) =>
+        !paid.has(a) &&
+        net !== null &&
+        a.amount?.equals(net) === true &&
+        quoteOf(a.details)?.currency === USD,
     );
     const onDay = candidates.filter((a) => a.at?.brokerDate === date);
     const pair = onDay.length === 1 ? onDay[0] : undefined;

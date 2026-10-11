@@ -486,7 +486,7 @@ export const en: Messages = {
     steps: [
       {
         title: "Add your exports",
-        body: "Trading 212 and Trade Republic CSV, Interactive Brokers Flex Query XML and the eToro account statement (XLSX). Add every year back to your oldest open purchase.",
+        body: "Trading 212 and Trade Republic CSV and Interactive Brokers Flex Query XML first. Add every year back to your oldest open purchase.",
       },
       {
         title: "Check your details",
@@ -552,7 +552,7 @@ export const en: Messages = {
       "Until these are fixed, the returns are not written. You can still continue and look at the results.",
     accountsTitle: (brokers) => `Are these ${brokers} files from one account?`,
     accountsBody: (brokers) =>
-      `${brokers} exports do not say which account they come from. Overlapping files of one account are read once; files of separate accounts are all counted.`,
+      `${brokers} exports do not say which account they come from. Say whether these files come from one account or from several, so that nothing is counted twice or left out.`,
     accountsSame: "Yes, one account",
     accountsSeparate: "No, separate accounts",
     announceReading: "Reading your files.",
@@ -1035,7 +1035,7 @@ export const sl: Messages = {
     steps: [
       {
         title: "Dodajte izvoze",
-        body: "CSV iz Trading 212 in Trade Republic, XML iz poročila Flex Query pri Interactive Brokers in izpisek računa eToro (XLSX). Dodajte vsa leta do najstarejšega odprtega nakupa.",
+        body: "Najprej CSV iz Trading 212 in Trade Republic ter XML iz poročila Flex Query pri Interactive Brokers. Dodajte vsa leta do najstarejšega odprtega nakupa.",
       },
       {
         title: "Preverite podatke",
@@ -1102,7 +1102,7 @@ export const sl: Messages = {
     accountsTitle: (brokers) =>
       `Ali so te datoteke ${brokers} iz enega računa?`,
     accountsBody: (brokers) =>
-      `Izvozi ${brokers} ne navajajo, iz katerega računa so. Datoteke istega računa, ki se prekrivajo, so prebrane enkrat; datoteke ločenih računov se upoštevajo vse.`,
+      `Izvozi ${brokers} ne navajajo, iz katerega računa so. Povejte, ali so te datoteke iz enega računa ali iz več, da nič ni upoštevano dvakrat ali izpuščeno.`,
     accountsSame: "Da, en račun",
     accountsSeparate: "Ne, ločeni računi",
     announceReading: "Branje datotek.",

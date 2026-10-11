@@ -449,11 +449,11 @@ export const wordsEn: FindingWords = {
   },
   refusals: {
     tooLarge: "is larger than any broker export (over 64 MiB)",
-    zip: "is a ZIP archive, not a broker export: export CSV or XML from your broker instead",
+    zip: "is a ZIP archive, not a broker export: export CSV, XML or XLSX from your broker instead",
     spreadsheet:
-      "is an old Excel file: export CSV or XML from your broker instead",
-    pdf: "is a PDF: export CSV or XML from your broker instead",
-    gzip: "is compressed: export CSV or XML from your broker instead",
+      "is an old Excel file (XLS): export CSV, XML or XLSX from your broker instead",
+    pdf: "is a PDF: export CSV, XML or XLSX from your broker instead",
+    gzip: "is compressed: export CSV, XML or XLSX from your broker instead",
     utf16: "is UTF-16 text: export it again from your broker, unchanged",
     utf32: "is UTF-32 text: export it again from your broker, unchanged",
     binary: "contains binary data",
@@ -936,11 +936,11 @@ export const wordsSl: FindingWords = {
   refusals: {
     tooLarge:
       "je večja od katerega koli izvoza borznega posrednika (več kot 64 MiB)",
-    zip: "je arhiv ZIP, ne izvoz posrednika: pri posredniku raje izvozite CSV ali XML",
+    zip: "je arhiv ZIP, ne izvoz posrednika: pri posredniku raje izvozite CSV, XML ali XLSX",
     spreadsheet:
-      "je stara datoteka Excel: pri posredniku raje izvozite CSV ali XML",
-    pdf: "je PDF: pri posredniku raje izvozite CSV ali XML",
-    gzip: "je stisnjena: pri posredniku raje izvozite CSV ali XML",
+      "je stara datoteka Excel (XLS): pri posredniku raje izvozite CSV, XML ali XLSX",
+    pdf: "je PDF: pri posredniku raje izvozite CSV, XML ali XLSX",
+    gzip: "je stisnjena: pri posredniku raje izvozite CSV, XML ali XLSX",
     utf16:
       "je besedilo UTF-16: pri posredniku jo izvozite znova, nespremenjeno",
     utf32:

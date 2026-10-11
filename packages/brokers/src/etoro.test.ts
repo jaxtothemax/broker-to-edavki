@@ -947,6 +947,17 @@ describe("etoro, dividends", () => {
     expect(mismatch({ ...ROUND_TRIP, dividends: [] })).toEqual(["unpaired"]);
   });
 
+  it("pairs a dividend only with an activity row that pays it in dollars", () => {
+    expect(
+      mismatch({
+        ...ROUND_TRIP,
+        activity: ROUND_TRIP.activity.map((row) =>
+          row.Type === "Dividend" ? { ...row, Details: "AAPL/GBX" } : row,
+        ),
+      }),
+    ).toEqual(["pairing", "unpaired"]);
+  });
+
   it("refuses a dividend not in dollars", () => {
     expect(
       mismatch({
