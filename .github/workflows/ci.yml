@@ -213,8 +213,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm --dir apps/web exec playwright test
-      # Traces and screenshots of the demo only: the tests never load a real
-      # export, and playwright.config.ts keeps git details out of the report.
+      # Traces and screenshots of the demo, and of the synthetic fixtures with the
+      # fake sentinel strings (Zxq...) that no-outbound-requests.spec.ts types in:
+      # the tests never load a real export, and playwright.config.ts keeps git
+      # details out of the report.
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
