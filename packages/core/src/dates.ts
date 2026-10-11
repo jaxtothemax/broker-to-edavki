@@ -102,9 +102,9 @@ export interface TaxDate {
  * The date policy, the one place the rule lives (ADR 0011). For now: the
  * Ljubljana calendar date of the broker's instant where it gives one, else
  * the date it shows (IBKR's exchange date, used as is; research 06 §2).
- * Which clock decides a trade or payment date has no FURS source yet
- * (research 06, open questions); changing it is a change here and to the
- * golden files, nothing more. Null when the broker's clock is unusable.
+ * Which clock decides a trade or payment date has no FURS source yet, and
+ * changing it takes more than a change here and to the golden files
+ * (research 04 §4.3.1). Null when the broker's clock is unusable.
  */
 export function taxDate(at: BrokerTime): TaxDate | null {
   if (at.instant !== null) {
