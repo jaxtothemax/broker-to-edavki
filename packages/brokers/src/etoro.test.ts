@@ -668,6 +668,48 @@ describe("etoro, lots", () => {
     ).toEqual(["activity"]);
   });
 
+  it("allows a cent and a millionth of the rate between the figures, and no more", () => {
+    // 1.650619 at 181.75 is 300.00000325; a cent and 181.75 millionths
+    // is 0.01018175. The profit keeps the close side as it was.
+    const base = ROUND_TRIP.closed[0];
+    const at = (amount: string, profit: string) =>
+      read({
+        ...ROUND_TRIP,
+        closed: [{ ...base, Amount: n(amount), "Profit(USD)": n(profit) }],
+      });
+    expect(codes(at("299.9898215", "0.9301785"))).toEqual([]);
+    expect(
+      blocking(at("299.9898214", "0.9301786")).map((d) =>
+        d.code === "tradeInconsistent" ? d.params.check : d.code,
+      ),
+    ).toEqual(["amount"]);
+  });
+
+  it("refuses a closed position so near midnight that the clock decides the sale's day", () => {
+    // Summer, UTC+2: 23:30 is the 16th at UTC+0 and the 17th at UTC+3.
+    const close = "16/07/2024 23:30:00";
+    const [deposit_, openA, openB, , paid] = ROUND_TRIP.activity;
+    const result = read({
+      ...ROUND_TRIP,
+      activity: [
+        deposit_,
+        openA,
+        openB,
+        paid,
+        closing("1001", close, "AAPL/USD", "300.92", n("1.6506190000000001")),
+      ] as Row[],
+      closed: [{ ...ROUND_TRIP.closed[0], "Close Date": close }],
+    });
+    expect(blocking(result)).toEqual([
+      refusal(
+        "dateUncertain",
+        { broker: ETORO, isin: APPLE, date: "2024-07-17" },
+        "closedPositions",
+        2,
+      ),
+    ]);
+  });
+
   it("refuses short and leveraged shares, and leaves out crypto and CFDs", () => {
     const base = ROUND_TRIP.closed[0];
     const with_ = (change: Row) =>
@@ -743,6 +785,31 @@ describe("etoro, lots", () => {
       ),
     });
     expect(codes(gbx)).toEqual(["unconfirmedAction"]);
+    const closedPence = read({
+      ...ROUND_TRIP,
+      closed: [
+        { ...ROUND_TRIP.closed[0], "FX rate at close (USD)": n("1.27") },
+      ],
+    });
+    expect(codes(closedPence)).toEqual(["unconfirmedAction"]);
+    // A position still open in pence, and its dividend, paid in dollars:
+    // both refused, never converted.
+    const open = read({
+      ...ROUND_TRIP,
+      activity: ROUND_TRIP.activity.map((row) =>
+        row["Position ID"] === "1002" && row.Type === "Open Position"
+          ? { ...row, Details: "BARC.L/GBX" }
+          : row,
+      ),
+    });
+    const nonUsd = { broker: ETORO, action: "nonUsd" };
+    expect(blocking(open)).toHaveLength(2);
+    expect(blocking(open)).toContainEqual(
+      refusal("unconfirmedAction", nonUsd, "accountActivity", 4),
+    );
+    expect(blocking(open)).toContainEqual(
+      refusal("unconfirmedAction", nonUsd, "dividends", 2),
+    );
   });
 
   it("refuses a position still open that paid an overnight fee", () => {
@@ -830,6 +897,37 @@ describe("etoro, the day of a trade", () => {
         opened("1005", `${day} ${time}`, "AAPL/USD", "100", "0.5"),
       ],
     });
+
+  it("refuses crypto still open that paid an overnight fee, as it refuses shares", () => {
+    const result = read({
+      ...ROUND_TRIP,
+      activity: [
+        ...ROUND_TRIP.activity,
+        opened(
+          "1003",
+          "20/02/2024 15:00:00",
+          "BTC/USD",
+          "100",
+          "0.002",
+          "Crypto",
+        ),
+        activityRow("Overnight fee", "21/02/2024 22:00:00", {
+          amount: n("-0.05"),
+          id: "1003",
+          details: "BTC/USD",
+          asset: "Crypto",
+        }),
+      ],
+    });
+    expect(blocking(result)).toEqual([
+      refusal(
+        "unsupportedAction",
+        { broker: ETORO, action: "leveragedOrShort" },
+        "accountActivity",
+        7,
+      ),
+    ]);
+  });
 
   it("dates a trade whose day no clock from UTC to UTC+3 changes", () => {
     // Winter, UTC+1 in Ljubljana: 22:30 is on its day at UTC+0 and +3.
@@ -1005,6 +1103,49 @@ describe("etoro, dividends", () => {
     expect(Date.now() - started).toBeLessThan(4000);
   });
 
+  it("sets a CFD's dividend adjustment aside as interest, in any currency", () => {
+    // Interest under ZDoh-2 art. 81, on Doh-Obr (research 04 §2.4, FURS IFI
+    // brochure §6), not part of the contract's D-IFI result.
+    for (const details of ["NVDA/USD", "BARC.L/GBX"]) {
+      const result = read({
+        ...ROUND_TRIP,
+        activity: [
+          ...ROUND_TRIP.activity,
+          opened("1003", "20/02/2024 15:00:00", details, "100", "2", "CFD"),
+          dividendPaid("1003", "21/02/2024 12:00:00", details, "0.3"),
+        ],
+        dividends: [
+          ...swapPayment({}),
+          payment({
+            date: "21/02/2024",
+            id: "1003",
+            net: "0.3",
+            rate: "0%",
+            withheld: n("0"),
+            isin: "",
+            type: "CFD",
+          }),
+        ],
+      });
+      expect(codes(result), details).toEqual([]);
+      expect(
+        result.events.filter(
+          (e) => e.kind === "ignored" && e.reason === "interest",
+        ),
+        details,
+      ).toHaveLength(2);
+      expect(
+        result.diagnostics.filter((d) => d.code === "interestNotCovered"),
+        details,
+      ).toEqual([
+        diagnostic("warning", "interestNotCovered", {
+          broker: ETORO,
+          count: 1,
+        }),
+      ]);
+    }
+  });
+
   it("refuses a tax that is not the stated rate", () => {
     expect(
       mismatch({ ...ROUND_TRIP, dividends: swapPayment({ rate: "30 %" }) }),
@@ -1087,7 +1228,7 @@ describe("etoro, Account Activity", () => {
       ["Withdraw Fee", "fee"],
       ["Withdrawal Conversion Fee", "fee"],
       ["Overnight fee", "fee"],
-      ["Overnight refund", "fee"],
+      ["Overnight refund", "interest"],
       ["SDRT", "fee"],
       ["Interest Payment", "interest"],
       ["Adjustment", null],
@@ -1124,8 +1265,10 @@ describe("etoro, Account Activity", () => {
         );
       }
     });
+    // The interest payment and the overnight refund, a contract's
+    // financing income: both interest on Doh-Obr.
     expect(result.diagnostics).toContainEqual(
-      diagnostic("warning", "interestNotCovered", { broker: ETORO, count: 1 }),
+      diagnostic("warning", "interestNotCovered", { broker: ETORO, count: 2 }),
     );
     expect(unaccounted(spec, result)).toEqual([]);
     // Each skipped sheet is one ignored row.
@@ -1154,6 +1297,49 @@ describe("etoro, privacy", () => {
     };
     etoro.read(spy, context);
     expect(asked.sort()).toEqual([2, 3, 4]);
+  });
+
+  it("reads none of a skipped sheet, its shared strings or its damage", () => {
+    // As a spreadsheet saves it: the name and username in the shared-string
+    // table, and the Financial Summary's part damaged. Neither is read.
+    const summary =
+      '<row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c><c r="B1" t="s"><v>0</v></c></row>' +
+      '<row r="2"><c r="A2" t="inlineStr"><is><t>Username</t></is></c><c r="B2" t="s"><v>1</v></c></row>';
+    const bytes = statement({
+      ...ROUND_TRIP,
+      strings: [`<t>${CANARY}</t>`, `<t>${CANARY}-user</t>`],
+      sheets: (sheets) =>
+        sheets.map((sheet) =>
+          sheet.name === "Account Summary"
+            ? { ...sheet, data: summary }
+            : sheet.name === "Financial Summary"
+              ? { ...sheet, data: "<row><c><v>1</c></row" }
+              : sheet,
+        ),
+    });
+    const book = openWorkbook(bytes) as Workbook;
+    const asked: number[] = [];
+    const result = etoro.read(
+      {
+        sheets: book.sheets,
+        date1904: book.date1904,
+        rows(position) {
+          asked.push(position);
+          return book.rows(position);
+        },
+      },
+      context,
+    );
+    expect(asked.sort()).toEqual([2, 3, 4]);
+    expect(codes(result)).toEqual([]);
+    expect(JSON.stringify(result.diagnostics.map(forExport))).not.toContain(
+      "CANARY",
+    );
+    expect(
+      JSON.stringify(result.events, (_, v: unknown) =>
+        Decimal.isDecimal(v) ? v.toPlain(12, "halfUp") : v,
+      ),
+    ).not.toContain("CANARY");
   });
 
   it("lets no name, username or cash row's details reach a finding or an event", () => {

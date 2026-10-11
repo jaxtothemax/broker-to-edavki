@@ -44,7 +44,7 @@
  *   instruments not in US dollars, and every value or row it does not know.
  *
  * Every refusal is unscoped (ADR 0017): no eToro row's reach on a holding
- * has been analysed. No position ID, `Copied From`, `Notes` or cash row's
+ * has been analyzed. No position ID, `Copied From`, `Notes` or cash row's
  * `Details` reaches a finding.
  */
 import {
@@ -94,7 +94,7 @@ const READ: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
- * The sheets skipped whole, never inflated: Account Summary names the
+ * The sheets skipped whole, their rows never read: Account Summary names the
  * holder and the username (CLAUDE.md, "Privacy"), and both only total what
  * the read sheets hold in detail.
  */
@@ -250,8 +250,10 @@ const INTEREST = "Interest Payment";
 /**
  * Account Activity's other rows, a closed list (ADR 0020 §9): cash that
  * is part of neither return, and costs, which the normed costs cover
- * (research 04 §4.2). Overnight fees and refunds belong to leveraged or
- * short positions; SDRT is the UK's stamp duty on a purchase.
+ * (research 04 §4.2). Overnight fees belong to leveraged or short
+ * positions; a refund of one is a contract's financing income, interest on
+ * Doh-Obr (research 04 §2.4, FURS IFI brochure §6), counted with interest.
+ * SDRT is the UK's stamp duty on a purchase.
  */
 const CASH: ReadonlyMap<string, IgnoredReason> = new Map([
   ["Deposit", "deposit"],
@@ -259,7 +261,7 @@ const CASH: ReadonlyMap<string, IgnoredReason> = new Map([
   ["Withdraw Fee", "fee"],
   ["Withdrawal Conversion Fee", "fee"],
   ["Overnight fee", "fee"],
-  ["Overnight refund", "fee"],
+  ["Overnight refund", "interest"],
   ["SDRT", "fee"],
 ]);
 const OVERNIGHT = new Set(["Overnight fee", "Overnight refund"]);
@@ -966,19 +968,20 @@ function read(book: Workbook, context: ReadContext): ImportResult {
       derivatives += 1;
       return;
     }
-    if (type === CRYPTO) {
-      ignore(open.source, "crypto");
-      return;
-    }
-    if (!REAL.has(type)) {
+    if (type !== CRYPTO && !REAL.has(type)) {
       block("unknownAction", { broker: ETORO, action: untrusted(type) });
       return;
     }
     // Account Activity gives an open position no direction or leverage.
     // An overnight fee is charged only on a leveraged or short one, so a
-    // position that paid one is refused, never taken as shares owned.
+    // position that paid one is refused, never taken as shares or crypto
+    // owned, as a closed one with leverage or short is (ADR 0020 §8).
     if (overnight.has(id)) {
       block("unsupportedAction", { broker: ETORO, action: "leveragedOrShort" });
+      return;
+    }
+    if (type === CRYPTO) {
+      ignore(open.source, "crypto");
       return;
     }
     const quote = quoteOf(open.details);
@@ -1066,25 +1069,29 @@ function read(book: Workbook, context: ReadContext): ImportResult {
 
   // Dividends, each paired with the one Account Activity row that paid it.
   const paid = new Set<Activity>();
-  // The dollar Account Activity dividends by position, day and amount, so
-  // each payment finds its own row by one lookup, however many rows a
-  // crafted file gives one position (bounded work, CLAUDE.md).
+  // The Account Activity dividends by position, day, amount and whether
+  // in dollars, so each payment finds its own row by a lookup or two,
+  // however many rows a crafted file gives one position (bounded work,
+  // CLAUDE.md). A share's dividend pairs in dollars only (ADR 0020 §10); a
+  // contract's adjustment in any currency, as it is set aside either way.
   const unpaid = new Map<string, Activity[]>();
-  // How many of them, on any day, pay each amount: a payment whose amount
-  // a row pays on another day is a date mismatch, not a missing row.
+  // How many dollar rows, on any day, pay each amount: a payment whose
+  // amount a row pays on another day is a date mismatch, not a missing row.
   const unpaidAnyDay = new Map<string, number>();
   for (const [id, rows] of dividendsById) {
     for (const a of rows) {
       const day = a.at?.brokerDate ?? null;
       if (a.amount === null || day === null) continue;
-      if (quoteOf(a.details)?.currency !== USD) continue;
+      const usd = quoteOf(a.details)?.currency === USD;
       const amount = a.amount.toString();
-      const slot = `${id}|${day}|${amount}`;
+      const slot = `${id}|${day}|${amount}|${usd ? USD : "other"}`;
       const list = unpaid.get(slot);
       if (list === undefined) unpaid.set(slot, [a]);
       else list.push(a);
-      const any = `${id}|${amount}`;
-      unpaidAnyDay.set(any, (unpaidAnyDay.get(any) ?? 0) + 1);
+      if (usd) {
+        const any = `${id}|${amount}`;
+        unpaidAnyDay.set(any, (unpaidAnyDay.get(any) ?? 0) + 1);
+      }
     }
   }
   for (const payment of payments) {
@@ -1104,31 +1111,41 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     const net = numberOf(cell("Net Dividend Received (USD)"));
     const withheld = numberOf(cell("Withholding Tax Amount (USD)"));
     const at = where(isin, date);
-    // The Account Activity rows of the position that paid this amount, in
-    // dollars (ADR 0020 §10): one is this dividend's, on its day.
-    // Exactly one unpaid row pairs; two alike are ambiguous, and pair none.
+    const type = textOf(cell("Type")) ?? "";
+    const contract = DERIVATIVES.has(type);
+    // The Account Activity row of the position that paid this amount, on
+    // its day: in dollars for a share (ADR 0020 §10), in any currency for a
+    // contract. Exactly one unpaid row pairs; two alike are ambiguous, and
+    // pair none.
     const amount = net === null ? null : net.toString();
-    const slot =
-      amount === null ? undefined : unpaid.get(`${id}|${date}|${amount}`);
-    const onDay = slot?.length ?? 0;
+    const slotOf = (currency: string) =>
+      amount === null
+        ? []
+        : (unpaid.get(`${id}|${date}|${amount}|${currency}`) ?? []);
+    const slots = contract ? [slotOf(USD), slotOf("other")] : [slotOf(USD)];
+    const onDay = slots.reduce((sum, slot) => sum + slot.length, 0);
     const anyDay =
       amount === null ? 0 : (unpaidAnyDay.get(`${id}|${amount}`) ?? 0);
-    const pair = onDay === 1 ? slot?.[0] : undefined;
+    const slot = onDay === 1 ? slots.find((s) => s.length === 1) : undefined;
+    const pair = slot?.[0];
     if (pair !== undefined && slot !== undefined && amount !== null) {
       slot.length = 0;
-      unpaidAnyDay.set(`${id}|${amount}`, anyDay - 1);
+      if (quoteOf(pair.details)?.currency === USD) {
+        unpaidAnyDay.set(`${id}|${amount}`, anyDay - 1);
+      }
     }
-    const type = textOf(cell("Type")) ?? "";
     // The activity row this row pays out is this row's to account for:
     // left out with it, or covered by its refusal.
     if (pair !== undefined) {
       paid.add(pair);
-      ignore(pair.source, DERIVATIVES.has(type) ? "derivative" : "pairedRow");
+      ignore(pair.source, contract ? "interest" : "pairedRow");
     }
-    if (DERIVATIVES.has(type)) {
-      // A contract's dividend adjustment: on D-IFI, with its contract.
-      ignore(payment.source, "derivative");
-      derivatives += 1;
+    if (contract) {
+      // A contract's dividend adjustment is interest on Doh-Obr, not part of
+      // the contract's D-IFI result (research 04 §2.4, FURS IFI brochure
+      // §6): set aside, and counted with interest.
+      ignore(payment.source, "interest");
+      interest += 1;
       continue;
     }
     if (!REAL.has(type)) {
@@ -1286,6 +1303,7 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     const cash = CASH.get(type);
     if (cash !== undefined) {
       ignore(row.source, cash);
+      if (cash === "interest") interest += 1;
     } else if (type === INTEREST) {
       ignore(row.source, "interest");
       interest += 1;

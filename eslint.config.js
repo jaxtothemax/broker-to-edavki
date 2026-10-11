@@ -46,7 +46,13 @@ export default defineConfig(
         {
           patterns: [
             {
-              group: ["@taxreporter/*/testing", "@taxreporter/*/testing/*"],
+              group: [
+                "@taxreporter/*/testing",
+                "@taxreporter/*/testing/*",
+                "./testing/*",
+                "../testing/*",
+                "../../testing/*",
+              ],
               message:
                 "Test helpers only: import them from a *.test.ts file, never from application code.",
             },

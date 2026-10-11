@@ -47,9 +47,9 @@ conservative defaults taken for the risks; each default is one place in the code
 1. **Recognition (D1).** The adapter matches a workbook that has all five sheets, by their
    exact English names.
    - It reads Closed Positions, Account Activity and Dividends.
-   - It skips Account Summary and Financial Summary whole. Neither is ever inflated:
-     Account Summary holds the holder's name and username. Each skipped sheet becomes one
-     ignored row, with the reason `summary`.
+   - It skips Account Summary and Financial Summary whole: their rows are never read
+     (Account Summary holds the holder's name and username). Each skipped sheet becomes
+     one ignored row, with the reason `summary`.
    - Any other sheet, a chart sheet included, refuses the file (`unknownSheet`, by
      position). So does a read sheet that is hidden (`hiddenSheet`).
    - Hidden rows or columns in a read sheet raise a warning (`hiddenCells`).
@@ -163,7 +163,11 @@ conservative defaults taken for the risks; each default is one place in the code
 8. **Derivatives and crypto (D8).**
    - **Derivatives.** Types CFD, OPT, FUT, FOP and Crypto Margin are ignored as
      `derivative`, with one `derivativesNotCovered` warning that counts them. This covers
-     closed and still-open positions, and a dividend of that type.
+     closed and still-open positions.
+   - **A contract's dividend adjustment** is interest under ZDoh-2 art. 81, on Doh-Obr,
+     not part of the contract's D-IFI result (research 04 §2.4, FURS IFI brochure §6). A
+     Dividends row of a derivative type, and its Account Activity row in any currency, are
+     ignored as `interest`, and counted in `interestNotCovered`.
    - **Crypto.** Crypto held long without leverage is ignored with a new reason,
      `crypto`. That reason is also in `IGNORED_REASONS` (#15).
    - **Short or leveraged.** Stocks, ETF or Crypto that is short, or has leverage other
@@ -181,7 +185,8 @@ conservative defaults taken for the risks; each default is one place in the code
    | `Interest Payment` | `interest`, with one `interestNotCovered` warning |
    | `Deposit` | `deposit` |
    | `Withdraw Request` | `withdrawal` |
-   | `Withdraw Fee`, `Withdrawal Conversion Fee`, `Overnight fee`, `Overnight refund`, `SDRT` | `fee`: costs, which the normed costs cover (research 04 §4.2) |
+   | `Withdraw Fee`, `Withdrawal Conversion Fee`, `Overnight fee`, `SDRT` | `fee`: costs, which the normed costs cover (research 04 §4.2) |
+   | `Overnight refund` | `interest`, counted in `interestNotCovered`: a contract's financing income is interest on Doh-Obr (research 04 §2.4) |
    | anything else | refused (`unknownAction`), the type shown only through `untrusted()` |
 
    Types seen in other parsers but not in D9 are refused until a source says what they
@@ -243,8 +248,9 @@ conservative defaults taken for the risks; each default is one place in the code
   - **Default.** Following D5, it is taken as a long, unleveraged purchase, and one
     warning per file says so (`openPositionsAssumed`).
   - **Overnight fees.** eToro charges an overnight fee only on a leveraged or short
-    position, so an open Stocks or ETF position that paid one or had one refunded is
-    refused (`unsupportedAction`, `leveragedOrShort`).
+    position, so an open Stocks, ETF or Crypto position that paid one or had one refunded
+    is refused (`unsupportedAction`, `leveragedOrShort`), as a closed one with leverage or
+    short is (decision 8).
   - **Residual risk.** A leveraged or short position opened too recently to pay a fee
     would be read wrongly.
 - **ADR 0014 §7 cites eToro's `1,071.56`** as text an adapter might accept. D2 refuses
@@ -297,6 +303,11 @@ conservative defaults taken for the risks; each default is one place in the code
   would refuse real positions.
 - **Asset type.** Does Account Activity's Asset type use Closed Positions' Type
   vocabulary (Stocks, ETF, CFD)?
+- **A ticker used twice.** A still-open position's ISIN comes from the file's other rows
+  through its ticker. A ticker that names two ISINs in the file is refused, but one reused
+  after a delisting, whose only ISIN in the file is the earlier company's, would give the
+  open position that ISIN. A whole history makes it unlikely, not impossible; an untouched
+  export with a renamed or reused ticker would show how eToro writes it.
 - **Day or month first.** Dates are read day first (`DD/MM/YYYY`). A month-first
   statement is mostly caught (a day past 12 is no month, and the date-order gate), but one
   whose every day is 12 or less would be read with day and month swapped, consistently

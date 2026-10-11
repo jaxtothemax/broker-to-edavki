@@ -19,7 +19,8 @@ file.
 - **eToro, not yet checked against a real export:** the account statement (XLSX), from the
   day you opened the account to today, exported from eToro and not opened or saved in a
   spreadsheet program. TaxReporter reads US-dollar shares and ETFs held long, closed or still
-  open, and their dividends. It leaves out CFDs and crypto with a note. A statement that
+  open, and their dividends. It leaves out CFDs with a note, sets crypto aside, and counts a
+  CFD's dividend adjustments with interest, which belongs on another return. A statement that
   starts later, a short or leveraged position, a position closed in part, a share in another
   currency, or a trade too close to midnight to date stops both returns, and the finding
   says why. The reader was written from other tools' code and one published sample, never

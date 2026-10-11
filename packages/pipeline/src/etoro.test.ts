@@ -187,4 +187,18 @@ describe("a second statement of one eToro account", () => {
       "secondStatement",
     );
   });
+
+  it("still blocks the trades both hold when one account's files are called separate", () => {
+    // The same positions in two "accounts" are one account taken for two:
+    // the shared trades block, so nothing counts twice (ADR 0011).
+    const separate = readExports({
+      files: [etoro, later],
+      accounts: "separate",
+    });
+    expect(
+      separate.ledger.diagnostics
+        .filter((d) => d.severity === "blocking")
+        .map((d) => d.code),
+    ).toContain("accountsShareEvents");
+  });
 });

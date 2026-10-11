@@ -122,6 +122,24 @@ describe("isFinding", () => {
     ).toBe(true);
   });
 
+  it("takes an eToro finding at a sheet named by its part", () => {
+    // The adapter's parts are letters only, as the reply allows.
+    for (const part of ["closedPositions", "accountActivity", "dividends"]) {
+      expect(
+        isFinding({
+          severity: "blocking",
+          code: "secondStatement",
+          params: { broker: "etoro", first: { file: 0 }, second: { file: 1 } },
+          source: { file: 0, row: 2, part },
+        }),
+        part,
+      ).toBe(true);
+    }
+    expect(
+      isFinding({ ...finding, source: { file: 0, row: 2, part: "sheet2" } }),
+    ).toBe(false);
+  });
+
   it("drops an unknown code, severity or parameter shape", () => {
     for (const bad of [
       { ...finding, code: "toString" },

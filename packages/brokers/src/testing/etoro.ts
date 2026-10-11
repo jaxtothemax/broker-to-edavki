@@ -292,6 +292,8 @@ export interface Statement {
   readonly dividendHeader?: readonly string[];
   /** Changes to the five sheets: add one, hide one, rename one. */
   readonly sheets?: (sheets: SheetSpec[]) => SheetSpec[];
+  /** A shared-string table, each entry an `<si>`'s contents, as Excel saves. */
+  readonly strings?: readonly string[];
 }
 
 const table = (header: readonly string[], rows: readonly Row[]) =>
@@ -328,5 +330,8 @@ export function statement(spec: Statement = ROUND_TRIP): Uint8Array {
     },
     { name: "Financial Summary", data: FINANCIAL },
   ];
-  return makeWorkbook({ sheets: spec.sheets?.(sheets) ?? sheets });
+  return makeWorkbook({
+    sheets: spec.sheets?.(sheets) ?? sheets,
+    ...(spec.strings === undefined ? {} : { strings: spec.strings }),
+  });
 }
