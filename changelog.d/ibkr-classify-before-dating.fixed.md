@@ -1,0 +1,1 @@
+- **Interactive Brokers dividend rows whose date cannot be read** now give the reason for their label when the importer refuses it, such as a return of capital or a label it does not know, instead of saying the date cannot be read. The row stays blocking, a refusal that cannot be dated still withholds every return, and no computed figure changes.
