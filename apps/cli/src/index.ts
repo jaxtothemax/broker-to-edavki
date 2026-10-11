@@ -192,20 +192,21 @@ type ReturnStatus = "written" | "withheld" | "nothingToFile";
 
 /**
  * One return's line of the summary. A return that is not written still shows
- * its estimate, as the web app does, but says the figure leaves out what
- * stops the return and may change.
+ * its estimate, as the web app does, but says the figure may change once
+ * what stops the return is fixed: whether it does depends on the finding, so
+ * the line promises no more than that.
  */
 function returnLine(
   name: string,
   status: ReturnStatus,
   what: string,
-  estimate: string,
+  figure: string,
 ): string {
   if (status === "nothingToFile") return `${name}: nothing to file.`;
   if (status === "withheld") {
-    return `${name}: not written. ${estimate}, worked out without what stops it, so it may change.`;
+    return `${name}: not written. Estimated ${figure}, which may change once what stops it is fixed.`;
   }
-  return `${name}: ${what}, ${estimate}.`;
+  return `${name}: ${what}, estimated ${figure}.`;
 }
 
 /**
@@ -530,14 +531,20 @@ export function main(
   const divDue = div.estimate.taxDueEur.toFixed(2, "halfUp");
   // What became of each return, by the rule the web app uses: written; or
   // needed but not written (a finding blocks it, a file was refused, or the
-  // write failed), when its estimate is worked out without what stops it and
-  // may change; or nothing to file, which is not a failure.
+  // write failed), whose estimate may change once that is fixed; or nothing
+  // to file, which is not a failure.
   const blockingOf = (found: readonly Diagnostic[]) =>
     found.filter((d) => d.severity === "blocking").length;
+  // A file left out may hold this year's sales or payments, and a refused
+  // file never reaches the ledger, so nothing in it could say the return is
+  // needed: with one refused, neither return may be called "nothing to file".
+  // The web app likewise never shows a status while a refused file is listed
+  // (state/wizard.ts, blockingReason).
+  const anyRefused = refused.length > 0;
   const status = (name: string, needed: boolean): ReturnStatus =>
     written.some((path) => path.endsWith(name))
       ? "written"
-      : needed
+      : needed || anyRefused
         ? "withheld"
         : "nothingToFile";
   const returns = {
@@ -620,7 +627,7 @@ export function main(
       kdvp.form === null
         ? ""
         : count(kdvp.form.lists.length, "security", "securities"),
-      `estimated tax ${kdvpTax} EUR`,
+      `tax ${kdvpTax} EUR`,
     ),
     returnLine(
       `Doh-Div ${String(year)}`,
@@ -628,7 +635,7 @@ export function main(
       div.form === null
         ? ""
         : count(div.form.dividends.length, "payment", "payments"),
-      `estimated tax still due ${divDue} EUR`,
+      `tax still due ${divDue} EUR`,
     ),
   );
   for (const path of written) lines.push(`Wrote ${path}`);
