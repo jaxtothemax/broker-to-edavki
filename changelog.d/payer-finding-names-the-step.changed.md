@@ -1,1 +1,1 @@
-- **The Doh-Div finding that asks for a payer's name, address and country** now says they go on the Details step. No figure on a written return changes.
+- **The Doh-Div findings that ask for a payer's name, address and country, or for its source country,** now say they go on the Details step. No figure on a written return changes.

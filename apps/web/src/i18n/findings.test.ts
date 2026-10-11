@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { findingsEn, findingsSl, wordsEn, wordsSl } from "./findings";
+import { en } from "./messages";
 
 /** Parameters that name themselves, so every slot shows in the text. */
 const named = new Proxy(
@@ -97,6 +98,25 @@ describe("the findings catalog", () => {
         column: "C",
       }),
     ).toMatch(/ \(list 2, celica C12\)\. /);
+  });
+
+  it("names the Details step in every finding that asks for a payer's details", () => {
+    const payer = { isin: "IE00TEST0001" } as never;
+    expect(findingsEn.payerUnknown(payer)).toContain(
+      `on the ${en.stepper.details} step`,
+    );
+    expect(findingsSl.payerUnknown(payer)).toContain("v koraku s podatki");
+    expect(findingsEn.sourceCountryUnknown(payer)).toContain(
+      `on the ${en.stepper.details} step`,
+    );
+    expect(findingsSl.sourceCountryUnknown(payer)).toContain(
+      "v koraku s podatki",
+    );
+    const typed = { code: "X", path: "taxpayer.taxNumber" } as never;
+    expect(findingsEn.formIssue(typed)).toContain(
+      `on the ${en.stepper.details} step`,
+    );
+    expect(findingsSl.formIssue(typed)).toContain("v koraku s podatki");
   });
 
   it("has the same closed lists in both languages", () => {

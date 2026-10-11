@@ -239,7 +239,7 @@ export const findingsEn: FindingMessages = {
   payerUnknown: (p) =>
     `${p.isin}: Doh-Div needs the payer's name, address and country. Add them on the Details step to file this dividend.`,
   sourceCountryUnknown: (p) =>
-    `${p.isin}: the country the dividend comes from cannot be told from its ISIN. Add it with the payer's details.`,
+    `${p.isin}: the country the dividend comes from cannot be told from its ISIN. Add it on the Details step, with the payer's details.`,
   slovenianPayer: (p) =>
     at(
       p,
@@ -648,7 +648,7 @@ export const findingsSl: FindingMessages = {
   payerUnknown: (p) =>
     `${p.isin}: za Doh-Div so potrebni ime, naslov in država izplačevalca. Dodajte jih v koraku s podatki, da lahko dividendo prijavite.`,
   sourceCountryUnknown: (p) =>
-    `${p.isin}: iz kode ISIN ni mogoče razbrati, iz katere države je dividenda. Dodajte jo s podatki o izplačevalcu.`,
+    `${p.isin}: iz kode ISIN ni mogoče razbrati, iz katere države je dividenda. Dodajte jo v koraku s podatki, med podatki o izplačevalcu.`,
   slovenianPayer: (p) =>
     at(
       p,
