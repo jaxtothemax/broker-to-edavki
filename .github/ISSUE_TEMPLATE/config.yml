@@ -4,13 +4,13 @@
 # fields triage and the agents rely on (acceptance criteria, environment) and
 # with its type label already applied.
 #
-# The security link points at GitHub's private vulnerability reporting, which
-# must be enabled in Settings -> Security. Issue-form config cannot read the
-# repository name at runtime, so OWNER/REPO below is a placeholder:
-# scripts/customize.sh reports it as a TODO, with the exact value derived from
-# the origin remote, until it is replaced.
+# The security link points at GitHub's private vulnerability reporting for this
+# repository (Settings -> Security), which SECURITY.md describes as the way to
+# report a vulnerability. Issue-form config cannot read the repository name at
+# runtime, so the URL names it. A fork that keeps this file must change it to
+# its own repository.
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/OWNER/REPO/security/advisories/new
+    url: https://github.com/jaxtothemax/broker-to-edavki/security/advisories/new
     about: Report vulnerabilities privately through GitHub's private vulnerability reporting. Never open a public issue for them.

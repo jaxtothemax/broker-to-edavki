@@ -1,6 +1,6 @@
 # Broker export formats: Interactive Brokers, Trading 212, Revolut
 
-> Researched: 2026-10-07 · Verification: not independently verified · Updated: 2026-10-11 (the open question on trades after midnight, and the date rule in §2, point to 04 §4.3.1) and 2026-10-09 (one real Trading 212 export inspected: the `0E-10` zero, dividend prices to 6 decimals, the V4 header and a takeover's rows, §4.2–§4.4; the tax rule for takeovers and mergers paid in shares linked from §3.5 and §4.3; `Dividend (Bonus)` and `Dividend (Demerger)` rows from a second, full-history export, §4.3)
+> Researched: 2026-10-07 · Verification: not independently verified · Updated: 2026-10-11 (the open question on trades after midnight, and the date rule in §2, point to 04 §4.3.1; wording only: §4.2 and §4.3 describe the shapes of rows seen in real exports, not a specific account's) and 2026-10-09 (one real Trading 212 export inspected: the `0E-10` zero, dividend prices to 6 decimals, the V4 header and a takeover's rows, §4.2–§4.4; the tax rule for takeovers and mergers paid in shares linked from §3.5 and §4.3; `Dividend (Bonus)` and `Dividend (Demerger)` rows from a second, full-history export, §4.3)
 >
 > Research for building TaxReporter. It is not tax advice, and FURS publications and the law win over anything written here. Where this page overlaps a verified doc (01–03), the verified doc wins; such places are cross-referenced inline. See the [README](README.md#confidence-and-verification-legend) for the legend.
 
@@ -253,7 +253,7 @@ If `fromDate` is 8 digits, assume the default date format; otherwise reject the 
 | `Currency conversion from amount` / `to amount` (+ currencies) | Multi-currency accounts (2025+) |
 | `Merchant name`, `Merchant category` | 212 card spending. Ignore |
 
-Seen in one real export, generated in October 2026 for the year 2025 (not committed; its header is in the fixture `t212-invest-v4-2026-takeover.csv`):
+The shapes of rows seen in a real export of the V4 revision, generated in October 2026 for the year 2025 (the export is not committed; its header is in the fixture `t212-invest-v4-2026-takeover.csv`):
 
 - **A zero kept to 10 decimals is written `0E-10`** [H], the scientific form a decimal library gives a zero with more than six places. Both rows of a takeover paid in shares were priced this way, while the 2-decimal columns, `Total` and `Withholding tax`, wrote zero as `0.00`. Read the form as 0 in `No. of shares` and `Price / share`, the columns kept to 10 decimals (a dividend's price to 6, below). By the same rule a value under 0.000001 would be written like `1.234E-7`; neither that nor the form in another column has been seen, so the parser refuses both.
 - **Dividend prices have 6 decimals** [H], not 10. The net-of-WHT rule held: on US dividends the tax withheld was 15% of `shares × price / 0.85`.
@@ -273,14 +273,14 @@ Seen in one real export, generated in October 2026 for the year 2025 (not commit
 **`Dividend (Bonus)` and `Dividend (Demerger)`** [H, from a second real export: a full history of yearly files, which also showed the zero form above] are cash rows shaped like any dividend: shares, a price per share net of the tax withheld, and a `Withholding tax` column. In those files:
 
 - `Dividend (Bonus)` rows were per-share cash payments from US companies, never payments in shares. One was a special cash dividend whose row price, with the tax withheld, reconstructed a round-number gross, so the net-price rule of this section held.
-- `Dividend (Demerger)` rows were cash paid instead of a fraction of a spin-off share, to holders of a few shares. Neither had tax withheld.
+- `Dividend (Demerger)` rows were cash paid instead of a fraction of a spin-off share, on small positions. Neither had tax withheld.
 - The special dividend, checked against the company's notice, was booked a few days after its payment date, so the row's time is again when Trading 212 booked it (see the takeover notes below).
 
 The reader counts both as ordinary dividends, with a warning on each row ([04 §9](04-si-tax-rules.md#9-special-cases)).
 
 **Takeovers paid in shares** appear as a `Market sell` with a price of 0 and a `Total` of 0; the new shares arrive via `Stock distribution`, or not at all. Treat this as a hard error requiring manual input. The tax rule, a disposal valued at the market price, is in [04 §9.1](04-si-tax-rules.md#91-takeovers-and-mergers-paid-in-shares); which price and which date apply are still open questions there.
 
-In the real 2025 export of §4.2, the takeover matched that description, with these details [H]:
+In the real export of §4.2, the rows of a takeover matched that description, in this shape [H]:
 
 - The two rows came 15 seconds apart, both priced `0E-10`, with a `Total` of `0.00` and no exchange rate.
 - The `Stock distribution` quantity was the sale's times the published exchange ratio.

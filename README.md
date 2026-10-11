@@ -18,6 +18,7 @@ your broker already gives you, on your own device, and shows you where every num
 > [!IMPORTANT]
 > **Check every figure before you file.** TaxReporter can be wrong. The return you file is your
 > responsibility, not that of the people who make TaxReporter. Read
+> [Known assumptions](#known-assumptions) and
 > [Check every figure yourself](#check-every-figure-yourself) before you rely on it.
 
 ## Who it's for
@@ -29,8 +30,8 @@ your broker already gives you, on your own device, and shows you where every num
 - **Active investors with more than one broker.** Sales are matched first in, first out per
   security across every broker and account you add, the way the law requires, not per file.
   Trades in dollars, pounds or francs, stock splits and dividends with foreign tax withheld are
-  handled. Anything TaxReporter does not understand, such as a spin-off, is refused with an
-  explanation instead of guessed.
+  handled. A corporate action TaxReporter does not handle, such as a spin-off, is refused with
+  an explanation instead of guessed.
 - **Accountants preparing returns for clients.** The command-line tool writes the same XML for
   the same files every time, one client at a time, and client data never leaves the office
   computer.
@@ -52,7 +53,8 @@ broker exports ─► read ─► one ledger ─► Banka Slovenije rates ─►
 2. **Each file is read on your device.** TaxReporter recognizes a file by its content, never by
    its name. Every row becomes an event in one ledger, an ignored row with its reason (a
    deposit, for example), or a finding that stops the return until you resolve it. No row is
-   dropped silently, and nothing is guessed.
+   dropped silently, and a row TaxReporter does not understand is refused, not guessed. The
+   assumptions it does make are listed under [Known assumptions](#known-assumptions).
 3. **Every amount is converted at the Banka Slovenije rate** valid on its day: the trade date for
    a purchase or sale (never the settlement date), the payment date for a dividend. A weekend or
    holiday uses the last list published before it, and a currency missing from the daily list
@@ -74,7 +76,7 @@ broker exports ─► read ─► one ledger ─► Banka Slovenije rates ─►
    TaxReporter cannot read yet hold back only the returns they can change: a Trading 212
    takeover paid in shares in 2025, whose export books the new shares right after the sale,
    holds back 2025, and 2026 only if either security is sold in 2026 (ADR 0017). Other brokers' corporate actions still hold back every return until
-   they are handled (#52).
+   they are handled ([#52](https://github.com/jaxtothemax/broker-to-edavki/issues/52)).
 6. **You check it, then import it into eDavki yourself.** TaxReporter shows an estimate of the
    tax and the source of every figure. It never files anything.
 
@@ -98,6 +100,36 @@ file, [#43](https://github.com/jaxtothemax/broker-to-edavki/issues/43)). Next, i
 order of how many Slovenian investors use them: eToro, XTB, DEGIRO, Revolut, Lightyear, Saxo and
 Robinhood. The spreadsheet (XLSX) reader that eToro, XTB and Saxo need is built; their adapters
 wait on real, anonymized exports.
+
+## Known assumptions
+
+TaxReporter refuses what it does not understand, but it rests on a few assumptions that no
+primary source has settled yet. These are the ones known today, each with an open issue that
+says what would settle it. Check the parts of your return they touch.
+
+- **Trade date ([#13](https://github.com/jaxtothemax/broker-to-edavki/issues/13)).** Where an
+  export gives the time of a trade, TaxReporter dates the trade by the Ljubljana calendar date of
+  that time, a design choice, because no FURS or ZDoh-2 text found says which date a trade near
+  midnight has, so such a trade can land a day away from the date your broker shows, and on
+  another day's exchange rate.
+- **Funds ([#30](https://github.com/jaxtothemax/broker-to-edavki/issues/30)).** A Trading 212
+  security counts as a fund (for Doh-KDVP and for the Doh-Div dividend type) only if its name
+  contains "ETF" or "UCITS", so a fund named otherwise goes on the return as an ordinary share
+  without any warning, and the other readers have not yet been checked for the same gap.
+- **Cash instead of a fraction of a spin-off share
+  ([#41](https://github.com/jaxtothemax/broker-to-edavki/issues/41)).** Trading 212 books it as
+  `Dividend (Demerger)` and TaxReporter counts it as an ordinary dividend, with a warning on each
+  row, although the research rates that as low confidence and it may instead be a partial sale of
+  the old shares.
+- **Dividend payer ([#44](https://github.com/jaxtothemax/broker-to-edavki/issues/44)).** The web
+  app starts Trading 212's dividends with Trading 212 itself as the payer on Doh-Div, on the
+  strength of one eDavki record, because no FURS text found says who the payer is when a foreign
+  broker passes a dividend on, so check the payer of every dividend (the command line takes payers
+  only from your payers file).
+
+The research behind the tax rules was checked by an AI agent, and no tax professional has
+reviewed it yet; its [README](docs/research/README.md) says so, and lists the
+[open conflicts](docs/research/README.md#open-conflicts-to-settle-before-implementing) that remain.
 
 ## Check every figure yourself
 
@@ -126,8 +158,10 @@ TaxReporter runs in your browser or as a command-line tool on your computer. The
 no account and no tracking, and your broker files are never uploaded. In the browser, files are
 read in a background worker: its network and storage functions are removed before it reads
 anything, the app's strict Content Security Policy lets it load only the app's own files, and
-closing the tab forgets them. A browser test that proves no
-request leaves during an import is still to come ([#2](https://github.com/jaxtothemax/broker-to-edavki/issues/2)). See [ADR 0002](docs/adr/0002-local-first-processing-on-the-users-device.md)
+closing the tab forgets them. A browser test
+([`apps/web/e2e/no-outbound-requests.spec.ts`](apps/web/e2e/no-outbound-requests.spec.ts),
+[#2](https://github.com/jaxtothemax/broker-to-edavki/issues/2)) fails if importing files or
+reaching the results sends a request outside the app's own origin. See [ADR 0002](docs/adr/0002-local-first-processing-on-the-users-device.md)
 and [Privacy and security](website/src/content/docs/guides/privacy-and-security.md).
 
 An optional AI "second opinion" is planned: it will run only with your own API key, after you
@@ -141,9 +175,45 @@ There is no release to install yet. To run it from source you need Node.js 24 an
 git clone https://github.com/jaxtothemax/broker-to-edavki.git
 cd broker-to-edavki
 pnpm install --frozen-lockfile
-pnpm run build
-pnpm --dir apps/web build && pnpm --dir apps/web preview   # the browser app, at http://localhost:4173
+pnpm run build                    # every package and both apps, the browser app included
+pnpm --dir apps/web preview       # the browser app, at http://localhost:4173
 ```
+
+### Run it on the synthetic fixtures
+
+The repository holds made-up Trading 212 exports (no real account's data). From the folder you
+just built, this writes both returns for tax year 2026 into a temporary folder and checks each
+against FURS's schema:
+
+```bash
+demo="$(mktemp -d)"
+cat > "$demo/payers.json" <<'EOF'
+{
+  "US1912161007": {
+    "name": "The Coca-Cola Company",
+    "address": "One Coca-Cola Plaza, Atlanta, GA 30313, United States",
+    "country": "US"
+  }
+}
+EOF
+node apps/cli/dist/bin.js \
+  packages/brokers/test/fixtures/trading212/t212-invest-v3-2025.csv \
+  packages/brokers/test/fixtures/trading212/t212-invest-v4-2026.csv \
+  --year 2026 --tax-number 12345678 --out "$demo/returns" --payers "$demo/payers.json"
+xmllint --nonet --noout --schema packages/furs/schemas/Doh_KDVP_9.xsd "$demo/returns/Doh_KDVP_2026.xml"
+xmllint --nonet --noout --schema packages/furs/schemas/Doh_Div_3.xsd "$demo/returns/Doh_Div_2026.xml"
+```
+
+The command-line tool prints a line for each return and the findings, and exits with 0.
+`xmllint` prints `validates` for each file. `12345678` is a made-up tax number. Leave out
+`--payers` and the tool exits with 1 and writes no Doh-Div, because a finding (`payerUnknown`)
+blocks it until each dividend has a payer.
+
+`xmllint` is part of libxml2: macOS has it, and Linux distributions package it, for example as
+`libxml2-utils`. The project's own tests run this schema check on every golden XML file with an
+`xmllint` compiled to WebAssembly, so they need no system copy: `pnpm vitest run packages/furs`.
+A passing schema check says the XML has the shape FURS requires. It does not say the figures are
+right, and the schema leaves out rules that TaxReporter checks itself.
 
 [Run it from source](website/src/content/docs/guides/run-from-source.md) covers the command-line
 tool, setting up the IBKR Flex Query, and the payer file Doh-Div needs. The full documentation is
@@ -165,8 +235,9 @@ a paid service.
   identifying amount replaced first, as [CONTRIBUTING.md](CONTRIBUTING.md) describes.
 - **Add a broker.** An adapter turns one export into ledger events; exchange rates, FIFO and the
   XML are shared, so it never touches them.
-  [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-broker-adapter) lists what a new adapter needs, and
-  the Trading 212, IBKR and Trade Republic adapters are worked examples.
+  [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-broker-adapter) lists what a new adapter needs,
+  [packages/brokers/README.md](packages/brokers/README.md) shows the interface to implement and
+  where to register it, and the Trading 212, IBKR and Trade Republic adapters are worked examples.
 - **Check the tax rules.** Each rule cites its primary source (the law, FURS instructions and
   schemas, Banka Slovenije) in [docs/research/](docs/research/); where one is still missing, an
   open issue tracks it (the trade-date rule, [#13](https://github.com/jaxtothemax/broker-to-edavki/issues/13)). If you know Slovenian tax
@@ -194,10 +265,17 @@ A TypeScript monorepo on Node 24 with pnpm workspaces
 | `docs/`                | Research with its sources, architecture decisions (ADRs) and specs                     |
 
 ```bash
-make setup     # install dependencies and git hooks
-make doctor    # check your toolchain
-make test      # run every package's tests
+make setup         # install dependencies and git hooks
+make doctor        # check your toolchain
+make format-check  # Prettier, without writing
+make lint          # ESLint
+make typecheck     # tsc over every project
+make test          # run every package's tests
 ```
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers forking, what a pull request needs and the hooks'
+prerequisites (python3 among them). You do not need Claude Code: `CLAUDE.md` and `.claude/`
+instruct AI coding agents, and a human contributor can ignore them.
 
 The development process (review gates, changelog fragments, release flow) comes from the
 [Blueprint](https://gitlab.com/macrodream/blueprint) delivery harness, adapted to GitHub;

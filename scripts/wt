@@ -507,14 +507,16 @@ issue_note() {
   (cd "$REPO_ROOT" && gh issue comment "$1" --body "$2" >/dev/null 2>&1)
 }
 
-# Apply the lock to issue $1: label + a check-out comment recording branch/worktree.
+# Apply the lock to issue $1: label + a check-out comment recording the branch.
+# The comment is public. It names the branch and never the worktree's path,
+# which is a directory on the maintainer's own computer.
 apply_lock() {
-  local issue="$1" branch="$2" path="$3" ts
+  local issue="$1" branch="$2" ts
   ensure_lock_label
   (cd "$REPO_ROOT" && gh issue edit "$issue" --add-label "$WT_LOCK_LABEL" >/dev/null 2>&1) \
     || warn "could not apply '$WT_LOCK_LABEL' to #$issue (check 'gh auth status')"
   ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  issue_note "$issue" "🔒 checked out ${ts} · branch \`${branch}\` · worktree \`${path}\`" \
+  issue_note "$issue" "🔒 checked out ${ts} · branch \`${branch}\`" \
     || warn "could not post check-out comment to #$issue"
 }
 
@@ -643,7 +645,7 @@ EOF
 
   # Check out the issue now that the worktree exists (best-effort forge lock).
   if [[ -n "$issue" ]] && lock_available; then
-    apply_lock "$issue" "$branch" "$target_path"
+    apply_lock "$issue" "$branch"
     if [[ -n "$force" ]]; then
       ok "took over check-out of #$issue (forced; '$WT_LOCK_LABEL' applied)"
     else
@@ -744,7 +746,7 @@ cmd_claim() {
   [[ "$issue" =~ ^[0-9]+$ ]] || die "usage: wt claim <issue-number> [--force]"
   lock_available || die "no forge CLI (gh with a GitHub origin) available — cannot claim #$issue"
   assert_claimable "$issue" "$force"
-  apply_lock "$issue" "(not started)" "(claim only — no worktree yet)"
+  apply_lock "$issue" "(not started)"
   if [[ -n "$force" ]]; then
     ok "took over check-out of #$issue (forced; no worktree yet)"
   else

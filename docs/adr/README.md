@@ -18,19 +18,19 @@ NNNN-short-title.md
 Examples:
 ```
 0001-record-architecture-decisions.md
-0002-use-postgresql-for-primary-storage.md
-0003-adopt-event-sourcing-for-audit-log.md
+0002-local-first-processing-on-the-users-device.md
+0003-typescript-monorepo-with-pnpm-workspaces.md
 ```
 
 ## Creating a new ADR
 
-Use the `/adr` command in Claude Code:
+Copy `docs/adr/0001-record-architecture-decisions.md` and increment the number.
+
+If you work in Claude Code, the `/adr` command does the same, and it is optional:
 
 ```
 /adr Title of the decision
 ```
-
-Or copy `docs/adr/0001-record-architecture-decisions.md` and increment the number.
 
 ## Status values
 
@@ -44,11 +44,11 @@ the **decision**, never about the code. When the two differ, add an
 `Implementation status` **blockquote** directly under the Status line:
 
 ```markdown
-**Status:** Accepted (2026-08-29)
+**Status:** Accepted (YYYY-MM-DD)
 
-> **Implementation status (2026-09-04 ADR audit, #123):** the *decision* stands,
-> but nothing ships with this ADR yet — verified against `src/`, there is no such
-> model, route, or component.
+> **Implementation status (YYYY-MM-DD):** the *decision* stands, but part of it
+> is not built yet: name what exists on `main` and what does not, verified
+> against the code.
 ```
 
 A blockquote is invisible to a status parser by construction, which is why it is a
