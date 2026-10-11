@@ -329,6 +329,30 @@ jobs:
       - run: bash scripts/check-nul-bytes.sh --self-test
       - run: bash scripts/check-nul-bytes.sh
 
+  # No tracked file may hold a literal Unicode format character (category Cf:
+  # the bidirectional controls U+202A to U+202E and U+2066 to U+2069, the
+  # zero-width characters U+200B to U+200F and U+2060, the soft hyphen, the tag
+  # characters) or a UTF-8 byte-order mark ("Trojan Source", CVE-2021-42574). They
+  # render as nothing, so a reviewer approves text that is not what a compiler or
+  # an importer reads. Tests that need one write an escape. Reads the committed
+  # blobs through `git ls-files -s` and `git cat-file`, never the working tree.
+  # The one exemption is the vendored FURS schemas (packages/furs/schemas/*.xsd),
+  # whose bytes are SHA-256 pinned; a stale exemption fails too. It does not cover
+  # binary files, non-Cf invisible characters or homoglyphs — the script's header
+  # says so, and so does its OK line. python3 is the runner's own.
+  invisible-chars:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: bash scripts/check-invisible-chars.sh --self-test
+      # Named so load-bearing.declarations can tell this step from the self-test
+      # above: the script's path is a substring of both lines.
+      - name: Scan every tracked file for invisible characters
+        run: bash scripts/check-invisible-chars.sh
+
   # Every call site this repo declared load-bearing is still there. The class: a
   # guard installed by ONE line — a validator at the top of a shared setup helper,
   # a hook entry in a config file, an ignore filter inside a tree walk — where

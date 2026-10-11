@@ -10,7 +10,7 @@
 # The application is a TypeScript pnpm workspace (packages/*, apps/*); its
 # targets are in the "Application" section below.
 
-.PHONY: setup install-deps lint format format-check typecheck test test-e2e build doctor customize clean pre-push-checks check-collision check-selftest-parity check-version-lockstep check-licenses print-coverage-layers release-pipeline-check gitleaks-check check-nul-bytes check-complexity
+.PHONY: setup install-deps lint format format-check typecheck test test-e2e build doctor customize clean pre-push-checks check-collision check-selftest-parity check-version-lockstep check-licenses print-coverage-layers release-pipeline-check gitleaks-check check-nul-bytes check-invisible-chars check-complexity
 
 # ─── Universal targets ────────────────────────────────────────────────────────
 
@@ -103,6 +103,7 @@ pre-push-checks: check-artifact-asserts
 pre-push-checks: check-shellcheck
 pre-push-checks: check-docs-links
 pre-push-checks: check-nul-bytes
+pre-push-checks: check-invisible-chars
 pre-push-checks: check-load-bearing
 pre-push-checks: check-added-files-covered
 pre-push-checks: check-app-fixture-gates
@@ -166,6 +167,15 @@ check-nul-bytes:  ## No tracked text=set file contains a literal 0x00 byte
 	@# defeats every other grep-based gate on it silently — catching it here
 	@# is cheaper than debugging a false-clean scan later.
 	@bash scripts/check-nul-bytes.sh
+
+check-invisible-chars:  ## No tracked file holds a Unicode format character, bidi control or byte-order mark
+	@# In pre-push-checks because it is repo-only and fast (one git cat-file
+	@# stream over the index, about a second). Reads the committed blobs, not the
+	@# working tree, so an ignored or untracked file is never a candidate. A
+	@# bidirectional control or zero-width character renders as nothing, which
+	@# is how a reviewed line stops being the line a compiler reads. The vendored
+	@# FURS schemas are the one exemption; see the script's header.
+	@bash scripts/check-invisible-chars.sh
 
 # The coverage "layers" check-added-files-covered.mjs checks: every TypeScript
 # file added under packages/ or apps/ must appear in the ONE Cobertura report
@@ -283,6 +293,7 @@ gate-self-tests:  ## Prove the check scripts can still fail
 	@bash scripts/gitleaks-precommit.sh --self-test
 	@python3 scripts/check-docs-internal-links.py --self-test
 	@bash scripts/check-nul-bytes.sh --self-test
+	@bash scripts/check-invisible-chars.sh --self-test
 	@python3 scripts/check-cognitive-complexity.py --self-test
 	@bash scripts/check-load-bearing.sh --self-test
 	@node scripts/check-added-files-covered.mjs --self-test
