@@ -898,6 +898,67 @@ describe("etoro, the day of a trade", () => {
       ],
     });
 
+  it("refuses a closed position bought so near midnight that the clock decides the purchase's day", () => {
+    // Winter, UTC+1: 23:30 is the 6th in Ljubljana at UTC+0, the 5th at
+    // UTC+3. The finding names the sale's day, where the return is.
+    const open = "05/01/2024 23:30:00";
+    const result = read({
+      ...ROUND_TRIP,
+      activity: ROUND_TRIP.activity.map((row) =>
+        row["Position ID"] === "1001" && row.Type === "Open Position"
+          ? { ...row, Date: open }
+          : row,
+      ),
+      closed: [{ ...ROUND_TRIP.closed[0], "Open Date": open }],
+    });
+    expect(blocking(result)).toEqual([
+      refusal(
+        "dateUncertain",
+        { broker: ETORO, isin: APPLE, date: "2024-01-16" },
+        "closedPositions",
+        2,
+      ),
+    ]);
+  });
+
+  it("refuses a position still open that had an overnight fee refunded", () => {
+    const result = read({
+      ...ROUND_TRIP,
+      activity: [
+        ...ROUND_TRIP.activity,
+        activityRow("Overnight refund", "16/02/2024 22:00:00", {
+          amount: n("0.05"),
+          id: "1002",
+          details: "AAPL/USD",
+          asset: "Stocks",
+        }),
+      ],
+    });
+    expect(codes(result)).toEqual(["unsupportedAction"]);
+  });
+
+  it("refuses a row whose position ID is not one, in either sheet", () => {
+    expect(
+      codes(
+        read({
+          ...ROUND_TRIP,
+          closed: [{ ...ROUND_TRIP.closed[0], "Position ID": "12a" }],
+        }),
+      ),
+    ).toContain("invalidNumber");
+    expect(
+      codes(
+        read({
+          ...ROUND_TRIP,
+          activity: [
+            ...ROUND_TRIP.activity,
+            opened("x1", "20/02/2024 15:00:00", "AAPL/USD", "100", "0.5"),
+          ],
+        }),
+      ),
+    ).toContain("invalidNumber");
+  });
+
   it("refuses crypto still open that paid an overnight fee, as it refuses shares", () => {
     const result = read({
       ...ROUND_TRIP,
@@ -1198,6 +1259,92 @@ describe("etoro, dividends", () => {
         dividends: swapPayment({ franked: "Franked" }),
       }),
     ).toEqual(["unsupportedAction"]);
+  });
+
+  it("refuses a dividend whose type is not its position's class, either way", () => {
+    const cfd = opened(
+      "1003",
+      "20/02/2024 15:00:00",
+      "NVDA/USD",
+      "100",
+      "2",
+      "CFD",
+    );
+    const cfdPaid = dividendPaid(
+      "1003",
+      "21/02/2024 12:00:00",
+      "NVDA/USD",
+      "0.3",
+    );
+    const onCfd = (type: string) =>
+      payment({
+        date: "21/02/2024",
+        id: "1003",
+        net: "0.3",
+        rate: "0%",
+        withheld: n("0"),
+        isin: APPLE,
+        type,
+      });
+    // A CFD's dividend called a share's: never on Doh-Div.
+    expect(
+      mismatch({
+        ...ROUND_TRIP,
+        activity: [...ROUND_TRIP.activity, cfd, cfdPaid],
+        dividends: [...swapPayment({}), onCfd("Stocks")],
+      }),
+    ).toEqual(["class"]);
+    // A share's dividend called a CFD's: never set aside as interest.
+    expect(
+      mismatch({ ...ROUND_TRIP, dividends: swapPayment({ type: "CFD" }) }),
+    ).toEqual(["class"]);
+    // A contract's dividend without its activity row is refused too.
+    expect(
+      mismatch({
+        ...ROUND_TRIP,
+        activity: [...ROUND_TRIP.activity, cfd],
+        dividends: [...swapPayment({}), onCfd("CFD")],
+      }),
+    ).toEqual(["pairing"]);
+  });
+
+  it("refuses a dividend with a sign it cannot have", () => {
+    expect(
+      mismatch({
+        ...ROUND_TRIP,
+        activity: [
+          ...ROUND_TRIP.activity.slice(0, 4),
+          dividendPaid("1002", "15/02/2024 12:00:00", "AAPL/USD", "-0.11"),
+        ],
+        dividends: swapPayment({ net: "-0.11" }),
+      }),
+    ).toEqual(["unexpectedSign"]);
+    expect(
+      mismatch({
+        ...ROUND_TRIP,
+        dividends: swapPayment({ withheld: n("-0.0122") }),
+      }),
+    ).toEqual(["unexpectedSign"]);
+  });
+
+  it("refuses a dividend booked so late on 31 December that its year is a guess", () => {
+    // 23:30 at UTC+0 is already 1 January in Ljubljana; at UTC+3 it is not.
+    const result = read({
+      ...ROUND_TRIP,
+      activity: [
+        ...ROUND_TRIP.activity.slice(0, 4),
+        dividendPaid("1002", "31/12/2024 23:30:00", "AAPL/USD", "0.11"),
+      ],
+      dividends: swapPayment({ date: "31/12/2024" }),
+    });
+    expect(blocking(result)).toEqual([
+      refusal(
+        "dateUncertain",
+        { broker: ETORO, isin: APPLE, date: "2024-12-31" },
+        "dividends",
+        2,
+      ),
+    ]);
   });
 
   it("refuses a dividend whose time could put it in another tax year", () => {

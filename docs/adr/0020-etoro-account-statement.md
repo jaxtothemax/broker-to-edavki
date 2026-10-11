@@ -210,6 +210,11 @@ conservative defaults taken for the risks; each default is one place in the code
     - **The 2025.11 layout.** Currency must be USD, Net dividends must equal the dollar
       amount (`netAmount`), and the franking columns must be empty or `-` (else
       `unsupportedAction`, `franked`).
+    - **Its class.** A row's Type must be the class its position was read as: a share's
+      dividend on a share's position, a contract's on a contract's (`class`). A CFD's
+      dividend on Doh-Div, or a share's set aside as interest, would be on the wrong
+      return, and no source says what the Type column holds against the Asset type.
+      A contract's dividend without its activity row is refused (`pairing`), as a share's.
     - **Required.** An ISIN is required.
     - **Payer.** The payer's details come from the payers table, as for every broker.
 11. **Reach (D11).** Every eToro refusal is unscoped (ADR 0017). The adapter never sets

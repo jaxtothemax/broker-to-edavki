@@ -21,10 +21,12 @@ file.
   spreadsheet program. TaxReporter reads US-dollar shares and ETFs held long, closed or still
   open, and their dividends. It leaves out CFDs with a note, sets crypto aside, and counts a
   CFD's dividend adjustments with interest, which belongs on another return. A statement that
-  starts later, a short or leveraged position, a position closed in part, a share in another
-  currency, or a trade too close to midnight to date stops both returns, and the finding
-  says why. The reader was written from other tools' code and one published sample, never
-  from a real statement, so check its figures against eToro's with extra care
+  starts later, a short or leveraged position, a position still open that paid an overnight
+  fee or whose ISIN the file does not give, a position closed in part, a share in another
+  currency, an activity type TaxReporter does not know, or a trade too close to midnight to
+  date stops both returns, and the finding says why. The reader was written from other
+  tools' code and one published sample, never from a real statement, so check its figures
+  against eToro's with extra care
   ([#8](https://github.com/jaxtothemax/broker-to-edavki/issues/8)).
 
 Export your **whole history**, from the day you opened the account: each sale is matched

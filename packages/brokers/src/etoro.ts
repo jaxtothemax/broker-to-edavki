@@ -1043,11 +1043,17 @@ function read(book: Workbook, context: ReadContext): ImportResult {
       blockAt(row.source)("invalidNumber", { column: "Position ID" });
     }
   }
+  // What each position was read as, which its dividends must agree with:
+  // a contract's go on Doh-Obr as interest, a share's on Doh-Div.
+  const classes = new Map<string, "share" | "contract" | "crypto">();
+  const classOf = (type: string) =>
+    DERIVATIVES.has(type) ? "contract" : type === CRYPTO ? "crypto" : "share";
   for (const [id, list] of opens) {
     const open = list[0] as Activity;
     const rows = closedById.get(id) ?? [];
     const closes = closesById.get(id) ?? [];
     if (rows.length === 0 && closes.length === 0) {
+      classes.set(id, classOf(open.assetType ?? ""));
       readOpen(open, id);
       continue;
     }
@@ -1061,6 +1067,10 @@ function read(book: Workbook, context: ReadContext): ImportResult {
       continue;
     }
     for (const row of rows) {
+      classes.set(
+        id,
+        classOf(textOf(cellOf(closedTable, row.row, "Type")) ?? ""),
+      );
       reason = readClosed(row, id, open, closes, rows.length);
     }
     ignore(open.source, reason);
@@ -1139,6 +1149,26 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     if (pair !== undefined) {
       paid.add(pair);
       ignore(pair.source, contract ? "interest" : "pairedRow");
+    }
+    // The Dividends sheet's type must be the class its position was read
+    // as: a CFD's dividend on Doh-Div, or a share's set aside as interest,
+    // would put it on the wrong return (ADR 0020 §8, §10).
+    const held = classes.get(id);
+    if (held !== undefined && held !== (contract ? "contract" : "share")) {
+      block("dividendInconsistent", {
+        broker: ETORO,
+        ...at,
+        mismatch: "class",
+      });
+      continue;
+    }
+    if (contract && pair === undefined) {
+      block("dividendInconsistent", {
+        broker: ETORO,
+        ...at,
+        mismatch: "pairing",
+      });
+      continue;
     }
     if (contract) {
       // A contract's dividend adjustment is interest on Doh-Obr, not part of

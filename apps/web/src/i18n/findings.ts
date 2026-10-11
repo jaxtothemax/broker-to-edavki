@@ -142,6 +142,8 @@ const DIVIDEND_MISMATCHES_EN: Clauses<"dividendInconsistent", "mismatch"> = {
   date: "its payment date is not the day of its row in Account Activity",
   unpaired: "a dividend in Account Activity is not on the Dividends sheet",
   netAmount: "its amount in its own currency is not its amount in dollars",
+  class:
+    "its type says a share or a contract where its position says the other",
 };
 
 const REPORT_EN =
@@ -616,6 +618,7 @@ const DIVIDEND_MISMATCHES_SL: Clauses<"dividendInconsistent", "mismatch"> = {
   date: "datum plačila ni dan njene vrstice na listu »Account Activity«",
   unpaired: "dividende z lista »Account Activity« ni na listu »Dividends«",
   netAmount: "znesek v njeni valuti ni enak znesku v dolarjih",
+  class: "njena vrsta navaja delnico ali pogodbo, njena pozicija pa drugo",
 };
 
 const REPORT_SL =

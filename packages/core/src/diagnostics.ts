@@ -515,7 +515,12 @@ export interface DiagnosticParams {
       /** An activity row's dividend is in no row of the dividends sheet. */
       | "unpaired"
       /** The amount in its own currency is not the amount in dollars. */
-      | "netAmount";
+      | "netAmount"
+      /**
+       * Its type (a share's or a contract's) is not the class its position
+       * was read as: which return it belongs on would be a guess.
+       */
+      | "class";
   };
   // The pipeline
   /**
