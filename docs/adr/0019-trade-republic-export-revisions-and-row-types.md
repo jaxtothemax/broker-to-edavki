@@ -117,15 +117,15 @@ they show five gaps (research 07 §4.2, issue #55):
    with the count of its rows, and none of them is read: a child's account is the child's,
    another taxpayer. A separate account scope would not keep it apart, since FIFO pools every
    account of the ledger. The taxpayer's own rows in the same file are still read.
-10. **The amount check takes two shapes, and a tax never widens a band.** Every share, fund
-    and crypto trade of the exports (174 of 179 in export 01) gives `amount` gross, quantity
-    times price within a cent, with the fee and tax beside it; only bond purchases differ, by
-    their accrued interest, and bonds are refused. The check keeps quantity times price within
-    the fee and a cent, and takes one shape more, exactly: the amount net of fee and tax to
-    the cent (more cash out on a purchase, less in on a sale). That is how a financial
-    transaction tax netted into a purchase would show, which only a parser's documentation
-    reports, with no shape; refusing it would withhold every return of every year. The amount
-    is never a value either way.
+10. **The amount check takes three shapes, and a tax never widens a band.** Every share,
+    fund and crypto trade of the exports (174 of 179 in export 01) gives `amount` gross,
+    quantity times price within a cent, with the fee and tax beside it; only bond purchases
+    differ, by their accrued interest, and bonds are refused. The check keeps quantity times
+    price within the fee and a cent, and takes two shapes more, each exactly to the cent: the
+    amount net of the tax with the fee beside it, and net of fee and tax (more cash out on a
+    purchase, less in on a sale). That is how a financial transaction tax netted into a
+    purchase would show, which only a parser's documentation reports, with no shape; refusing
+    it would withhold every return of every year. The amount is never a value either way.
 11. **The ignored reasons are a typed record** (`IGNORED_REASONS satisfies
     Record<IgnoredReason, true>`), so a reason added to the union and missing from the check
     does not compile (#15).
@@ -155,7 +155,7 @@ wrapped as untrusted; descriptions, counterparty names and IBANs never do.
 
 ## Consequences
 
-- **A Trade Republic user with the older semicolon export** gets their purchases and sales
+- **A Trade Republic user with the semicolon export** gets their purchases and sales
   read, where the whole file was refused before.
 - **Fewer rows block a whole history:** transfers, cash gifts, Saveback cash, German tax rows
   and derivative trades are set aside with a reason, and the rest name what they are.

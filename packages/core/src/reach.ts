@@ -51,11 +51,16 @@ interface Scoped {
   readonly shares: RefusedShares;
 }
 
-const SHARES: ReadonlySet<string> = new Set<RefusedShares>([
-  "out",
-  "in",
-  "rights",
-]);
+/**
+ * Every effect a refusal may state, as a record the compiler checks against
+ * `RefusedShares`: one added there and missing here does not compile (#15's
+ * class), where a copied list would quietly withhold everything.
+ */
+const SHARES = {
+  out: true,
+  in: true,
+  rights: true,
+} as const satisfies Record<RefusedShares, true>;
 
 /**
  * A refusal the rule can scope: one of the codes an adapter marks, with a
@@ -76,7 +81,7 @@ function scopedOf(finding: Diagnostic): Scoped | null {
     date === undefined ||
     !isIsoDate(date) ||
     shares === undefined ||
-    !SHARES.has(shares)
+    !Object.hasOwn(SHARES, shares)
   ) {
     return null;
   }

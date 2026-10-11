@@ -950,7 +950,9 @@ describe("tradeRepublic: the types and classes real exports show", () => {
   it("takes an amount gross, or net of fee and tax to the cent, never a band a tax widens", () => {
     // 2 at 180.50 is 361.00, with a fee of 1.00 and a tax of 1.44.
     expect(codes(rows(row({ tax: "-1.44" })))).toEqual([]);
-    // A purchase net of both, as a netted transaction tax would show.
+    // A purchase net of the tax, the fee beside it, or net of both, as a
+    // netted transaction tax would show.
+    expect(codes(rows(row({ amount: "-362.44", tax: "-1.44" })))).toEqual([]);
     expect(codes(rows(row({ amount: "-363.44", tax: "-1.44" })))).toEqual([]);
     expect(codes(rows(row({ amount: "-363.45", tax: "-1.44" })))).toEqual([]);
     // Between the shapes, or past them: no amount the trade explains.
@@ -962,9 +964,11 @@ describe("tradeRepublic: the types and classes real exports show", () => {
     // A sale net of both: less cash in, never more. Its tax is German
     // tax, counted in the warning.
     const sale = { type: "SELL", shares: "-2.0000000000", tax: "-1.44" };
-    expect(codes(rows(row({ ...sale, amount: "358.56" })))).toEqual([
-      "brokerTaxSettled",
-    ]);
+    for (const amount of ["358.56", "359.56"]) {
+      expect(codes(rows(row({ ...sale, amount }))), amount).toEqual([
+        "brokerTaxSettled",
+      ]);
+    }
     expect(codes(rows(row({ ...sale, amount: "363.44" })))).toEqual([
       "tradeInconsistent",
     ]);

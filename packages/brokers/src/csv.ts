@@ -7,8 +7,9 @@
  *
  * RFC 4180, plus what broker exports add: an optional byte-order mark, LF or
  * CRLF line ends, empty lines, which carry no data and are skipped, and a
- * semicolon in place of the comma, as Trade Republic's first export and
- * DEGIRO's continental-European exports write (research 07 §3). The header
+ * semicolon in place of the comma, as one revision of Trade Republic's
+ * export (research 07 §4.2) and DEGIRO's continental-European exports
+ * write (research 07 §4.4). The header
  * line chooses the delimiter before any row is read; see `delimiterOf`.
  * Errors name a rule and a row number, never a value from the file.
  */

@@ -93,7 +93,18 @@ function isIgnoredReason(reason: unknown): boolean {
   return typeof reason === "string" && Object.hasOwn(IGNORED_REASONS, reason);
 }
 
-const KINDS = ["trade", "split", "dividend", "withholding"] as const;
+/**
+ * Every kind of keyed event, as a record the compiler checks against the
+ * type (#15's class): a kind added to the ledger and missing here does not
+ * compile, where a copied list would leave it out of the overlap check.
+ */
+const KIND_SET = {
+  trade: true,
+  split: true,
+  dividend: true,
+  withholding: true,
+} as const satisfies Record<KeyedEvent["kind"], true>;
+const KINDS = Object.keys(KIND_SET) as readonly KeyedEvent["kind"][];
 
 /** A property of a value of unknown shape. */
 function field(value: unknown, key: string): unknown {
@@ -553,8 +564,8 @@ function reconcile(events: readonly KeyedEvent[]): Diagnostic[] {
 
 /**
  * Two accounts of one broker that hold the same event. A trade's key holds
- * its time to the second, its quantity, its price and the broker's order
- * ID, so two real accounts never share one: the files are one account
+ * the broker's own ID for it, or its time to the second, with its date,
+ * quantity and price, so two real accounts never share one: the files are one account
  * taken for two, and every trade they share would count twice. That
  * blocks. Two real accounts holding as many shares of one fund are paid
  * alike, so a shared dividend is a warning. Splits are shared by every
