@@ -1,0 +1,1 @@
+- **Trading 212 rows whose date or time cannot be read** now give the reason for their action when the importer refuses it, such as a transfer or an action it does not know, instead of saying the date cannot be read. The row stays blocking, a refusal that cannot be dated still withholds every return, and no computed figure changes.
