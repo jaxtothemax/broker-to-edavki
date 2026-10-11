@@ -12,7 +12,9 @@ the tax authority. Two kinds of problems count as security issues here:
 
 ## Supported versions
 
-TaxReporter is pre-1.0. Only the latest release and `main` receive fixes.
+TaxReporter is pre-1.0 and has not had a release yet (see the
+[roadmap](website/src/content/docs/roadmap.md)), so only `main` receives fixes today. Once
+releases exist, the latest release and `main` will receive them.
 
 ## Reporting a vulnerability
 

@@ -3,9 +3,14 @@
 **Date:** 2026-10-07
 **Status:** Accepted (2026-10-07)
 
-> **Implementation status (2026-10-07):** decided during project setup; nothing ships with
-> this ADR yet beyond the package skeleton. Remove this note when the first implementation
-> merges.
+> **Implementation status (2026-10-11):** on `main`, not yet in a release.
+> `packages/brokers/src/adapter.ts` registers three adapters: Trading 212 (CSV, four header
+> revisions), Interactive Brokers (Flex Query, XML) and Trade Republic (CSV, two revisions),
+> and recognizes Trading 212's CFD export so as to refuse it by name. The XLSX reader is
+> built and no XLSX adapter is registered yet. FIFO runs per ISIN across brokers in
+> `packages/core/src/fifo.ts`, on events that `validateLedger`
+> (`packages/core/src/validate.ts`) has checked, and a corporate action no adapter supports
+> is refused with a diagnostic.
 >
 > **Superseded in part by [ADR 0011](0011-import-contract-for-broker-files.md) (2026-10-08).**
 > The note below describes the contract before ADR 0011. Under ADR 0011, an event's identity is

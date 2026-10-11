@@ -3,9 +3,22 @@
 **Date:** 2026-10-07
 **Status:** Accepted (2026-10-07)
 
-> **Implementation status (2026-10-07):** decided during project setup; nothing ships with
-> this ADR yet beyond the package skeleton. Remove this note when the first implementation
-> merges.
+> **Implementation status (2026-10-11):** on `main`, not yet in a release. There is no
+> backend: the command line (`apps/cli`) and the static web app (`apps/web`) run on the
+> user's device, and no code that ships to a user calls `fetch`. The one exception is the
+> maintainer's snapshot builder, `packages/fx/scripts/build-snapshot.mjs`, which downloads
+> the Banka Slovenije rate files to rebuild the snapshot; it is not in the published package
+> (`files` in `packages/fx/package.json` lists `dist` and `data` only) and never runs on a
+> user's device. The exchange rates ship bundled in `packages/fx/data/` and are loaded as
+> modules, never fetched (`apps/web/src/engine/rates.ts`). In the browser, files are read in
+> a worker whose network and storage functions are removed
+> (`apps/web/src/engine/lockdown.ts`), under a Content Security Policy that allows
+> connections to the app's own origin only. The policy is defined in
+> `apps/web/content-security-policy.mjs`, and `apps/web/vite.config.ts` injects it into the
+> built `index.html`. A Playwright test (`apps/web/e2e/no-outbound-requests.spec.ts`, #2)
+> checks that importing files and reaching the results sends no request outside the app's
+> own origin. Not built yet: the opt-in LLM
+> check (ADR 0008).
 
 ## Context
 

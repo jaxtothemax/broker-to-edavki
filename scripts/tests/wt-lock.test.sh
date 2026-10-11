@@ -127,11 +127,16 @@ expect "wt new posts a check-out comment" grep -q 'checked out' "$STUB_DIR/11.no
 # gh refuses --add-label for a label the repository lacks, so wt creates it first —
 # once: a second check-out must not create (and so re-color) it again.
 expect "wt creates the missing lock label in the repository" grep -qxF 'status:wip' "$STUB_DIR/repo.labels"
+# The comment is public. It names the branch, and never a directory on the
+# maintainer's own computer: neither this run's worktree path nor the word.
+expect "the check-out comment names the branch" grep -qF 'branch `' "$STUB_DIR/11.notes"
+expect_not "the check-out comment does not post the worktree path" grep -qF "$WT_BASE" "$STUB_DIR/11.notes"
+expect_not "the check-out comment does not mention a worktree at all" grep -qi 'worktree' "$STUB_DIR/11.notes"
 
 # Negative twin: the same issue again is refused, and the refusal names the holder.
 run new 11
 expect_run "wt new refuses an issue that is already checked out" 1 "already checked out" "$rc" "$out"
-expect_run "the refusal quotes the existing check-out comment" 1 "worktree" "$rc" "$out"
+expect_run "the refusal quotes the existing check-out comment, with its branch" 1 "· branch" "$rc" "$out"
 
 # --force takes it over (remove the first worktree so the path is free).
 run remove 11 --force
@@ -150,6 +155,7 @@ expect_run "wt remove reports the release" 0 "released check-out of #11" "$rc" "
 # claim / release without a worktree.
 run claim 22
 expect "wt claim applies the label without a worktree" has_label 22
+expect_not "wt claim's check-out comment mentions no worktree either" grep -qi 'worktree' "$STUB_DIR/22.notes"
 run claim 22
 expect_run "wt claim refuses an already-claimed issue" 1 "already checked out" "$rc" "$out"
 run claim 22 --force
@@ -213,11 +219,19 @@ mkdir -p "$CGREPO"
 collide() { ( cd "$CGREPO" && bash "$CG" 2>&1 ); }
 printf '%s\n' 'status:wip' > "$STUB_DIR/55.labels"
 # shellcheck disable=SC2016  # literal backticks, as wt writes them
-printf '%s\n' '🔒 checked out T · branch `feat/55-claimant` · worktree `/x`' > "$STUB_DIR/55.notes"
+printf '%s\n' '🔒 checked out T · branch `feat/55-claimant`' > "$STUB_DIR/55.notes"
 expect_not "collision gate is quiet when the check-out names this branch" \
   contains "$(collide)" "labelled"
+# A comment written before wt stopped posting the worktree path ends with it.
+# The gate matches the branch alone, so those historic comments still count.
 # shellcheck disable=SC2016
-printf '%s\n' '🔒 checked out T2 · branch `feat/55-someone-else` · worktree `/y`' >> "$STUB_DIR/55.notes"
+printf '%s\n' '🔒 checked out T0 · branch `feat/55-claimant` · worktree `/x`' > "$STUB_DIR/55.notes"
+expect_not "collision gate still reads a historic comment that names a worktree" \
+  contains "$(collide)" "labelled"
+# shellcheck disable=SC2016
+printf '%s\n' '🔒 checked out T · branch `feat/55-claimant`' > "$STUB_DIR/55.notes"
+# shellcheck disable=SC2016
+printf '%s\n' '🔒 checked out T2 · branch `feat/55-someone-else`' >> "$STUB_DIR/55.notes"
 expect "collision gate warns after a takeover by another branch" \
   contains "$(collide)" "labelled"
 : > "$STUB_DIR/55.notes"

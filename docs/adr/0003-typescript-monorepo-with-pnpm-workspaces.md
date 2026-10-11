@@ -3,9 +3,12 @@
 **Date:** 2026-10-07
 **Status:** Accepted (2026-10-07)
 
-> **Implementation status (2026-10-07):** decided during project setup; nothing ships with
-> this ADR yet beyond the package skeleton. Remove this note when the first implementation
-> merges.
+> **Implementation status (2026-10-11):** on `main`, not yet in a release. All seven
+> workspace members of the table below exist: `packages/core`, `fx`, `furs`, `brokers` and
+> `pipeline`, and `apps/cli` and `apps/web`. `make format-check`, `lint`, `typecheck`, `test`
+> and `build` run Prettier, ESLint, `tsc -b --force`, Vitest and `pnpm -r build` through the
+> root `package.json` scripts, and `make test-e2e` runs the Playwright tests on the built web
+> app.
 
 ## Context
 

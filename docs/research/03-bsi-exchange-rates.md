@@ -1,6 +1,6 @@
 # Banka Slovenije (BSI) exchange rates for Slovenian tax filings
 
-> Researched: 2026-10-07 · Verification: adversarially verified (20 claims: 20 confirmed, 0 refuted, 0 uncertain)
+> Researched: 2026-10-07 · Verification: adversarially verified (20 claims: 20 confirmed, 0 refuted, 0 uncertain) · Updated: 2026-10-11 (§9 and §13: a pointer that the implementation caps the look-back at 10 days, not 7; the rule is unchanged and nothing was re-verified)
 >
 > Data snapshot: BSI rate lists through 2026-10-06. Research for building TaxReporter. It is not tax advice, and FURS publications and the law win over anything written here. Inline markers are explained in the [README](README.md#confidence-and-verification-legend).
 
@@ -261,6 +261,8 @@ Neither ZDoh-2 nor the FURS instructions say what to do when no list exists for 
 
 **Rule to implement:** `rate(D, C)` = the value of C in the list with the greatest `datum` ≤ D that contains C. Cap the lookback at 7 days and treat anything longer as an error. Confidence is medium; see the open questions. The longest real gaps between consecutive daily lists (§7: Easter, Thursday to Tuesday; Christmas, e.g. 2025-12-24 to 2025-12-29) are 5 calendar days, so a lookback across a calendar gap never exceeds 4 days. Hitting the 7-day cap means the data is missing, or the currency is not on the daily list for that period (for example ISK in 2008–2018), in which case the monthly list applies (§10).
 
+**Note (2026-10-11):** the implementation caps the look-back at 10 days, not the 7 proposed above (`MAX_LOOKBACK_DAYS` in `packages/fx/src/rates.ts`; [ADR 0005](../adr/0005-banka-slovenije-rates-from-a-bundled-snapshot.md); [README, key fact 12](README.md#key-facts-the-code-depends-on)). This is a pointer, not a change of the rule: it is still the list with the greatest `datum` ≤ D that contains C, and a cap of 7 or of 10 days both clear the 5-day maximum gap. The 7-day text above stays as researched.
+
 When D is a TARGET day, use D's own list even if the transaction happened before 16:00. If that list is not yet published, mark the result provisional instead of falling back.
 
 ## 10. Currencies not on the daily list
@@ -326,6 +328,7 @@ rate(D, C):
   C, factor = normalize(C)            # GBX->(GBP,100), ZAc->(ZAR,100), ILA->(ILS,100)
   if C in euro_changeover and D >= changeover[C]: return fixed[C] * factor
   L = daily list with max datum <= D containing C  (lookback <= 7 days)
+  # 2026-10-11: the code caps the look-back at 10 days, not 7 (note in §9; ADR 0005; README key fact 12)
   if D is a TARGET day and L.datum < D: mark PROVISIONAL (not yet published)
   if none: M = monthly list with max veljavnost <= D containing C   # by valid_from in the API, never by date (§6)
   if none: ERROR -> user-supplied rate (e.g. InforEuro for RUB), flagged
