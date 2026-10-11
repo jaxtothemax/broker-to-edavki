@@ -6,6 +6,13 @@
 *.ts    text eol=lf
 *.tsx   text eol=lf
 *.jsx   text eol=lf
+# ESM/CJS/TS-module variants. Left to `* text=auto`, a planted NUL byte makes git
+# call the file binary, and the NUL gate (scripts/check-nul-bytes.sh) only looks
+# at files declared text, so it would never open it.
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+*.mts   text eol=lf
+*.cts   text eol=lf
 *.json  text eol=lf
 *.yaml  text eol=lf
 *.yml   text eol=lf

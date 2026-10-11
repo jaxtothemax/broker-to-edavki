@@ -78,11 +78,11 @@ why:  The only filter between this gate's tree-wide grep and gitignored scratch 
 
 path: .github/workflows/governance.yml
 call: - name: Scan every tracked file for invisible characters
-why:  The only CI run of the invisible-character gate. Its --self-test is a separate step, and check-gate-selftest-parity only asks for a self-test beside a scan, never for the scan: delete this step, or the whole job, and every parity gate stays green while a bidirectional control or zero-width character can land in source and nobody sees it.
+why:  The only CI run of the invisible-character gate. check-gate-selftest-parity now fails when this step goes but the job keeps its --self-test step, yet delete the whole job and every parity gate stays green (neither can see a job that is gone) while a bidirectional control or zero-width character can land in source and nobody sees it.
 
 path: Makefile
 call: pre-push-checks: check-invisible-chars
-why:  The only thing that runs the invisible-character gate before a push. check-prepush-parity matches the script's name anywhere in the Makefile, and the target's recipe and the gate-self-tests line both contain it, so deleting this one line leaves the parity gate green while make pre-push stops checking.
+why:  The only thing that runs the invisible-character gate before a push. check-prepush-parity now fails when this line goes, because it wants a target on the pre-push-checks list to run the script and the gate-self-tests recipe no longer counts, so this is a second net and no longer the only one.
 
 path: .gitattributes
 call: packages/furs/schemas/*.xsd -text

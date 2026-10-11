@@ -200,7 +200,35 @@ self_test() {
     return 1
   fi
 
-  echo "SELF-TEST OK: clean text=set tree, a NUL in a text=set file, an encoding fixture (unset) with a genuine NUL, an auto file with a NUL, and line-number reporting all resolved correctly."
+  # Case 6: the repo's OWN .gitattributes must declare every JS and TS module
+  # extension text. Left at `* text=auto` (Case 4), a NUL planted in a .mjs makes
+  # git call the file binary and this gate never opens it, which also blinds
+  # check-invisible-chars.sh (it skips a file with a NUL in its first 8000 bytes as
+  # binary). The fixture copies the real file instead of writing a `*.mjs text`
+  # line of its own, so deleting or mistyping the real stanza fails here. Each
+  # extension gets its own tree, and a clean file of the same extension must pass.
+  local ext
+  for ext in mjs cjs mts cts; do
+    _fixture
+    cp "$REPO_ROOT/.gitattributes" "$tmp/repo/.gitattributes"
+    printf 'export const clean = 1;\n' > "$tmp/repo/clean.$ext"
+    git -C "$tmp/repo" add -A
+    status=0; run_check "$tmp/repo" >/dev/null 2>&1 || status=$?
+    if [ "$status" -ne 0 ]; then
+      echo "SELF-TEST FAIL: a clean .$ext file under the repo's .gitattributes was reported as violating (exit $status)" >&2
+      return 1
+    fi
+    printf 'export const key = "a%bb";\n' '\0' > "$tmp/repo/bad.$ext"
+    git -C "$tmp/repo" add -A
+    out="$(run_check "$tmp/repo" 2>&1)" && status=0 || status=$?
+    if [ "$status" -ne 1 ] || ! grep -qF "bad.$ext:1 has a NUL byte" <<<"$out"; then
+      echo "SELF-TEST FAIL: a .$ext file with a literal NUL byte was not caught under the repo's .gitattributes (exit $status); does it declare *.$ext text?" >&2
+      echo "$out" >&2
+      return 1
+    fi
+  done
+
+  echo "SELF-TEST OK: clean text=set tree, a NUL in a text=set file, an encoding fixture (unset) with a genuine NUL, an auto file with a NUL, line-number reporting, and a NUL in each of .mjs .cjs .mts .cts under the repo's real .gitattributes all resolved correctly."
   return 0
 }
 
