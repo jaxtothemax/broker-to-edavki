@@ -23,8 +23,15 @@ export const CONTENT_SECURITY_POLICY = [
   "connect-src 'self'",
   // blob: for the engine worker's bootstrap, which makes the worker inherit
   // this policy (ADR 0013 §3): a worker loaded from its own URL would get
-  // its policy from response headers, and GitHub Pages sends none.
+  // its policy from response headers, and GitHub Pages sends none. 'self'
+  // too: the bootstrap's static import of the engine is fetched as a worker
+  // script, so blob: alone stops the engine in Chromium, Firefox and WebKit
+  // (ADR 0009 says what that leaves open).
   "worker-src 'self' blob:",
+  // The app shows no frames. Without this, default-src 'self' would let it
+  // frame any page on its origin, which it shares with every Pages site of
+  // the same account (ADR 0009).
+  "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",

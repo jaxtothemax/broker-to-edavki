@@ -138,7 +138,19 @@ why:  The only place CI runs the browser tests: the guided tour's keyboard path,
 
 path: .github/workflows/docs.yml
 call: node apps/web/scripts/pages-build/check-pages-build.mjs apps/web/dist "$WEB_BASE"
-why:  The only run of the Pages build check on the real build output. check-gate-selftest-parity now fails when this line goes but the step keeps its --self-test line, yet delete the whole step and every parity gate stays green (neither can see a step that is gone) while a wrong base, a lost Content Security Policy tag or an inline script reaches the artifact.
+why:  The only run of the Pages build check on every pull request and push (job web-app); website-build runs it again only when the app is published. check-gate-selftest-parity now fails when this line goes but the step keeps its --self-test line, yet delete the whole step and every parity gate stays green (neither can see a step that is gone) while a wrong base, a lost Content Security Policy tag, an inline script or a stray page goes unreported until the day PUBLISH_WEB_APP is set.
+
+path: .github/workflows/docs.yml
+call: node apps/web/scripts/pages-build/check-pages-build.mjs "$WEB_APP_DIR" "$WEB_BASE"
+why:  The only check of the copy that actually joins the Pages artifact (job website-build, when the app is published), and with it the refusal of any file but index.html and the scripts, stylesheets and fonts under assets/. Delete it and the step runs only the self-test, which keeps check-gate-selftest-parity green, while whatever web-app's build handed over (a page with no policy, a weakened policy) is published unchecked; the shell refusal beside it catches links and other non-files only.
+
+path: .github/workflows/docs.yml
+call: if: always() && needs.detect.outputs.site == 'true'
+why:  Keeps website-build running when web-app or base-path fails, so its first step can fail it. Delete always() and a failed web-app skips website-build, a skipped required check counts as passed, and a lost Content Security Policy or a wrong base path no longer blocks the merge.
+
+path: .github/workflows/docs.yml
+call: if [ "$BASE_PATH_RESULT" != "success" ] || [ "$WEB_APP_RESULT" != "success" ]; then
+why:  The only thing that turns a failed web-app or base-path into a red website-build, the job branch protection requires. Delete it and website-build builds the docs and passes while web-app is red, so the merge goes through.
 
 path: .github/workflows/docs.yml
 call: if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then

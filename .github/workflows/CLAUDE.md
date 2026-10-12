@@ -9,7 +9,7 @@ there. See @../../scripts/CLAUDE.md.
 |---|---|---|
 | `governance.yml` | PR, push to `main`, weekly schedule, manual | every repository gate, each with its `--self-test` first in the same job; `changelog-check` and `pr-followups` on PRs only |
 | `security.yml` | PR, push to `main`, weekly schedule, manual | `osv-scan`, `gitleaks-scan` |
-| `docs.yml` | PR, push to `main`, manual | `docs-internal-links`, `website-build`, `pages` (deploy from `main` only); all skipped when there is no docs site |
+| `docs.yml` | PR, push to `main`, manual | `docs-internal-links`, `base-path`, `web-app`, `website-build`, `pages` (deploy from `main` only); all skipped when there is no docs site |
 | `release.yml` | push of a `v*` tag | `release-pipeline-gate`, then `publish-release` |
 
 The application's own lint/typecheck/test/build jobs live in `ci.yml`. See

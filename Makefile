@@ -252,7 +252,8 @@ check-load-bearing:  ## Every call site declared load-bearing is still present
 # Self-test only: the real scan reads a Vite build of apps/web made for the Pages
 # base, which the pre-push set does not produce. The parity check accepts a
 # self-test-only mirror without asking why, so this comment is the reason. CI's
-# website-build job (.github/workflows/docs.yml) runs both.
+# web-app job (.github/workflows/docs.yml) runs both on every run, and
+# website-build runs both again on the downloaded copy when the app is published.
 .PHONY: check-pages-build
 check-pages-build:  ## The web app's Pages build check proves it can still fail (self-test only)
 	@node apps/web/scripts/pages-build/check-pages-build.mjs --self-test

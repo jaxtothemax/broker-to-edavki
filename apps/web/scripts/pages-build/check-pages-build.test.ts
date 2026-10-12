@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -524,6 +530,168 @@ describe("check-pages-build: no foreign content", () => {
   });
 });
 
+// A refresh, a <base>, a <form> or a frame can take the page, or what is typed
+// into it, somewhere else, and the app's index.html has none. A refresh is a
+// navigation no policy directive governs.
+describe("check-pages-build: nothing that sends the page elsewhere", () => {
+  const navigating: readonly [string, string, string][] = [
+    [
+      "a refresh",
+      '<meta http-equiv="refresh" content="0; url=https://example.invalid/">',
+      '<meta http-equiv="refresh">',
+    ],
+    [
+      "an upper-case, unquoted refresh",
+      "<META HTTP-EQUIV=REFRESH CONTENT=0>",
+      '<meta http-equiv="REFRESH">',
+    ],
+    [
+      "a refresh spelled with a character reference",
+      '<meta http-equiv="&#114;efresh" content="0">',
+      '<meta http-equiv="&#114;efresh">',
+    ],
+    [
+      "an http-equiv with a character reference it cannot decode",
+      '<meta http-equiv="re&shy;fresh" content="0">',
+      '<meta http-equiv="re&shy;fresh">',
+    ],
+    ["an <iframe>", `<iframe src="${BASE}x.html"></iframe>`, "<iframe>"],
+    ["a <frame>", "<frame>", "<frame>"],
+    ["a <frameset>", "<frameset></frameset>", "<frameset>"],
+    [
+      "a <form>",
+      '<form action="https://example.invalid/"><input name="t"></form>',
+      "<form>",
+    ],
+    ["a <base>", '<base href="https://example.invalid/">', "<base>"],
+  ];
+
+  it.each(navigating)("rejects %s", (_name, element, named) => {
+    const outcome = check(
+      swap('<div id="root"></div>', `<div id="root"></div>${element}`),
+    );
+    expectRejected(
+      outcome,
+      `${named} at line 19: index.html may not contain a refresh`,
+    );
+  });
+});
+
+// The policy is in index.html and covers that page only, so any other page in
+// the output (an .html or .svg file) would be published on the app's origin
+// with no policy at all. The build writes index.html and, under assets/, its
+// scripts, stylesheet and fonts.
+describe("check-pages-build: only the files a build writes", () => {
+  const LAYOUT = "is not index.html at the root";
+
+  it("accepts the scripts, stylesheet and fonts the build writes under assets/", () => {
+    const outcome = check(BUILT_INDEX, BASE, [
+      ...BUILT_FILES,
+      "assets/engine.worker-Bq3x_9-Z.js",
+      "assets/geist-latin-wght-normal-DnRx1Ksa.woff2",
+      "assets/geist-mono-latin-wght-normal-Cz3P8_0e.woff",
+    ]);
+    expect(outcome.stdout).toContain("6 allowed file(s) in the output");
+    expect(outcome.stdout).toContain("check-pages-build: OK");
+    expect(outcome.status).toBe(0);
+  });
+
+  const extra: readonly [string, string, string][] = [
+    ["another page at the root", "about.html", '"about.html" (a file)'],
+    [
+      "a page under assets/",
+      "assets/index.html",
+      '"assets/index.html" (a file)',
+    ],
+    [
+      "an SVG image under assets/",
+      "assets/logo.svg",
+      '"assets/logo.svg" (a file)',
+    ],
+    [
+      "a source map",
+      "assets/index-Dh8ySHaT.js.map",
+      '"assets/index-Dh8ySHaT.js.map" (a file)',
+    ],
+    [
+      "an upper-case extension",
+      "assets/index-X.JS",
+      '"assets/index-X.JS" (a file)',
+    ],
+    ["a name that starts with a dot", "assets/.js", '"assets/.js" (a file)'],
+    ["a script at the root", "index.js", '"index.js" (a file)'],
+    [
+      "a script one directory deeper",
+      "assets/nested/x.js",
+      '"assets/nested" (a directory)',
+    ],
+    [
+      "a second copy of the app one directory deeper",
+      "app/index.html",
+      '"app" (a directory)',
+    ],
+    ["a .nojekyll marker", ".nojekyll", '".nojekyll" (a file)'],
+  ];
+
+  it.each(extra)("rejects %s", (_name, file, named) => {
+    expectRejected(
+      check(BUILT_INDEX, BASE, [...BUILT_FILES, file]),
+      `${named} ${LAYOUT}`,
+    );
+  });
+
+  it("rejects an empty directory", () => {
+    const dist = makeDist(BUILT_INDEX);
+    mkdirSync(join(dist, "empty"));
+    expectRejected(run([dist, BASE]), `"empty" (a directory) ${LAYOUT}`);
+  });
+
+  it("rejects a symbolic link, even to a file of the build, without following it", () => {
+    const dist = makeDist(BUILT_INDEX);
+    symlinkSync(join(dist, "index.html"), join(dist, "assets", "page.css"));
+    expectRejected(
+      run([dist, BASE]),
+      `"assets/page.css" (a symbolic link) ${LAYOUT}`,
+    );
+  });
+
+  it("rejects an index.html that is a symbolic link, and does not read through it", () => {
+    const dist = makeDist(BUILT_INDEX);
+    const elsewhere = join(root, `elsewhere-${String(counter)}.html`);
+    writeFileSync(elsewhere, BUILT_INDEX);
+    rmSync(join(dist, "index.html"));
+    symlinkSync(elsewhere, join(dist, "index.html"));
+    const outcome = run([dist, BASE]);
+    expectRejected(outcome, `"index.html" (a symbolic link) ${LAYOUT}`);
+    expect(outcome.stderr).toContain(
+      "index.html is not a regular file, so it is not read",
+    );
+    expect(outcome.stdout).toContain("Content Security Policy meta missing");
+  });
+
+  it("quotes a file name so a newline in it cannot start a log line of its own", () => {
+    const outcome = check(BUILT_INDEX, BASE, [
+      ...BUILT_FILES,
+      "assets/x\n::error::y.html",
+    ]);
+    expectRejected(outcome, String.raw`"assets/x\n::error::y.html" (a file)`);
+    expect(
+      outcome.stderr.split("\n").some((line) => line.startsWith("::")),
+    ).toBe(false);
+  });
+
+  it("stops listing a directory past 1000 entries", () => {
+    const many = Array.from(
+      { length: 1001 },
+      (_, at) => `assets/chunk-${String(at)}.js`,
+    );
+    expectRejected(
+      check(BUILT_INDEX, BASE, [...BUILT_FILES, ...many]),
+      "a directory of the output holds more than 1000 entries",
+    );
+  });
+});
+
 describe("check-pages-build: URLs outside the expected base", () => {
   const scriptUrls: readonly [string, string][] = [
     [
@@ -816,7 +984,7 @@ describe("check-pages-build: usage", () => {
   it("proves it can fail: --self-test passes", () => {
     const outcome = run(["--self-test"]);
     expect(outcome.stdout).toContain(
-      "check-pages-build: self-test ran 31 case(s), 0 failed",
+      "check-pages-build: self-test ran 40 case(s), 0 failed",
     );
     expect(outcome.stdout).toContain("check-pages-build: SELF-TEST OK");
     expect(outcome.stderr).toBe("");

@@ -9,20 +9,30 @@
  * loopback only. No route is registered: no-outbound-requests.spec.ts explains
  * why a test that might start the engine worker must not, and a framed app
  * never gets that far.
+ *
+ * A sandboxed frame (sandbox="allow-scripts") runs the app's code with an
+ * opaque origin, so its script and stylesheet are cross-origin requests from
+ * "null"; vite.config.ts lets `vite preview` answer them, as GitHub Pages
+ * does.
  */
 import { createServer } from "node:http";
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type Worker } from "@playwright/test";
 
-/** A page on another origin whose only content is a frame of `src`. */
+/**
+ * A page on another origin whose only content is a frame of `src`, with a
+ * sandbox attribute when `sandbox` is given.
+ */
 async function withFramingPage(
   src: string,
   run: (url: string) => Promise<void>,
+  sandbox?: string,
 ): Promise<void> {
+  const sandboxAttribute = sandbox === undefined ? "" : ` sandbox="${sandbox}"`;
   const page = [
     "<!doctype html>",
     '<html lang="en"><head><meta charset="utf-8"><title>Another website</title></head>',
-    `<body><iframe src="${src}" title="Framed page" width="1000" height="700"></iframe></body></html>`,
+    `<body><iframe src="${src}"${sandboxAttribute} title="Framed page" width="1000" height="700"></iframe></body></html>`,
   ].join("\n");
   const server = createServer((_request, response) => {
     response
@@ -51,6 +61,38 @@ async function withFramingPage(
   }
 }
 
+/**
+ * Workers the page starts from now on, in any of its frames (Playwright
+ * reports a frame's workers on its page). The engine worker starts on the
+ * first file read, not on load, so an empty list proves only that nothing in
+ * the frame starts a worker as the page loads.
+ */
+function workersFromNowOn(page: Page): Worker[] {
+  const started: Worker[] = [];
+  page.on("worker", (worker) => {
+    started.push(worker);
+  });
+  return started;
+}
+
+/** The frame shows the guard and a link to the app's own tab, never the app. */
+async function expectGuarded(page: Page, app: string): Promise<void> {
+  const frame = page.frameLocator("iframe");
+  await expect(frame.locator(".frame-guard")).toBeVisible();
+  await expect(
+    frame.getByText(
+      "TaxReporter does not start inside another website. Open it in its own tab to use it.",
+    ),
+  ).toBeVisible();
+  await expect(frame.locator(".app")).toHaveCount(0);
+  await expect(frame.locator("#main")).toHaveCount(0);
+  const link = frame.getByRole("link", {
+    name: "Open TaxReporter in its own tab",
+  });
+  await expect(link).toHaveAttribute("href", app);
+  await expect(link).toHaveAttribute("target", "_top");
+}
+
 test("in another site's frame the app does not start, and links its own tab", async ({
   page,
   baseURL,
@@ -62,21 +104,30 @@ test("in another site's frame the app does not start, and links its own tab", as
   await expect(page.locator(".app")).toHaveCount(1);
   await expect(page.locator(".frame-guard")).toHaveCount(0);
 
+  const workers = workersFromNowOn(page);
   await withFramingPage(app, async (framing) => {
     await page.goto(framing);
-    const frame = page.frameLocator("iframe");
-    await expect(frame.locator(".frame-guard")).toBeVisible();
-    await expect(
-      frame.getByText(
-        "TaxReporter does not start inside another website. Open it in its own tab to use it.",
-      ),
-    ).toBeVisible();
-    await expect(frame.locator(".app")).toHaveCount(0);
-    await expect(frame.locator("#main")).toHaveCount(0);
-    const link = frame.getByRole("link", {
-      name: "Open TaxReporter in its own tab",
-    });
-    await expect(link).toHaveAttribute("href", app);
-    await expect(link).toHaveAttribute("target", "_top");
+    await expectGuarded(page, app);
+    expect(workers).toHaveLength(0);
   });
+});
+
+// A sandbox without allow-same-origin gives the framed app an opaque origin.
+// The guard compares windows, which needs no origin, and builds its link from
+// the page's address, which the sandbox leaves alone.
+test("in a sandboxed frame that allows scripts the app does not start either", async ({
+  page,
+  baseURL,
+}) => {
+  const app = new URL("/", baseURL).href;
+  const workers = workersFromNowOn(page);
+  await withFramingPage(
+    app,
+    async (framing) => {
+      await page.goto(framing);
+      await expectGuarded(page, app);
+      expect(workers).toHaveLength(0);
+    },
+    "allow-scripts",
+  );
 });
