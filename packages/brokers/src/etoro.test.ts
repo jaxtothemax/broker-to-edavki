@@ -1247,8 +1247,11 @@ describe("etoro, dividends", () => {
 
   it("pairs dividends in linear time, however many rows name one position", () => {
     // A crafted file: thousands of payments and activity rows of one
-    // position. Pairing by lookup keeps it fast; a scan per payment would
-    // take seconds.
+    // position. Pairing by lookup costs little more than reading the three
+    // sheets (1.3 to 1.7 times, measured); a scan per payment costs about 4
+    // times. The bound is that ratio, never an absolute time: a slow or loaded
+    // runner stretches reading and importing alike (CI took 5.3 s where this
+    // machine takes 0.5 s).
     const count = 12_000;
     const days = Array.from({ length: count }, (_, i) => {
       const day = new Date(Date.UTC(2024, 1, 15) + i * 86_400_000);
@@ -1276,10 +1279,20 @@ describe("etoro, dividends", () => {
       ),
     };
     const bytes = statement(spec);
-    const started = Date.now();
-    importXlsx(bytes, context, [etoro]);
-    expect(Date.now() - started).toBeLessThan(4000);
-  });
+    const timed = (run: () => void) => {
+      const started = performance.now();
+      run();
+      return performance.now() - started;
+    };
+    // Warm the code both runs share, so that the first does not pay for it.
+    importXlsx(statement(ROUND_TRIP), context, [etoro]);
+    const reading = timed(() => {
+      const book = openWorkbook(bytes) as Workbook;
+      for (const sheet of [2, 3, 4]) book.rows(sheet);
+    });
+    const importing = timed(() => importXlsx(bytes, context, [etoro]));
+    expect(importing / reading).toBeLessThan(3);
+  }, 60_000);
 
   it("sets a CFD's dividend adjustment aside as interest, in any currency", () => {
     // Interest under ZDoh-2 art. 81, on Doh-Obr (research 04 §2.4, FURS IFI
