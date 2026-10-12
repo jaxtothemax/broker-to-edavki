@@ -162,7 +162,7 @@ why:  The id the copy step's guard reads (steps.recheck.outcome). Delete or rena
 
 path: .github/workflows/docs.yml
 call: if: ${{ !cancelled() && needs.detect.outputs.site == 'true' }}
-why:  Keeps website-build running when web-app or base-path fails (but not in a cancelled run), so its first step can fail it. Delete !cancelled() and a failed web-app skips website-build, a skipped required check counts as passed, and a lost Content Security Policy or a wrong base path no longer blocks the merge.
+why:  Keeps website-build running when web-app or base-path fails (but not in a canceled run), so its first step can fail it. Delete !cancelled() and a failed web-app skips website-build, a skipped required check counts as passed, and a lost Content Security Policy or a wrong base path no longer blocks the merge.
 
 path: .github/workflows/docs.yml
 call: if [ "$BASE_PATH_RESULT" != "success" ] || [ "$WEB_APP_RESULT" != "success" ]; then
