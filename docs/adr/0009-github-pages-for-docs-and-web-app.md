@@ -3,7 +3,7 @@
 **Date:** 2026-10-07
 **Status:** Accepted (2026-10-07)
 
-> **Implementation status (2026-10-11):** `.github/workflows/docs.yml` builds and checks the
+> **Implementation status (2026-10-12):** `.github/workflows/docs.yml` builds and checks the
 > web app on every run, in its own `web-app` job, and adds it to the Pages artifact only when
 > the repository variable `PUBLISH_WEB_APP` is `true`. Issue #70 tracks what must be true
 > before the variable is set.
@@ -43,8 +43,8 @@ repository, at `https://<owner>.github.io/<repo>/` for project sites.
   runtime token and, while the run lasts, delete the `github-pages` artifact after it is
   uploaded and upload another under the same name, which `deploy-pages` picks by name.
   Comparing the run's `github-pages` artifact ID with the one the build job uploaded,
-  before deploying, would close that path; it is an idea tracked on issue #70, not
-  implemented. This path does not depend on the variable: the app's job runs on every
+  before deploying, would close that path; it is an idea, not implemented. This path
+  does not depend on the variable: the app's job runs on every
   run, so it exists while publishing is off, and "publishing is off" does not mean that
   merging adds no exposure. It is smaller than before this layout, when the same build code
   ran inside the job that uploads the Pages artifact.

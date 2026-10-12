@@ -21,7 +21,7 @@
 #                        publish is inspectable). It never installs or runs the
 #                        web app's toolchain, and restores no cache. It still
 #                        runs when base-path or web-app fails (not when the run
-#                        is cancelled), and then fails at once: skipped, it
+#                        is canceled), and then fails at once: skipped, it
 #                        would count as passed.
 #   pages                publishes that already-verified artifact from main,
 #                        without rebuilding
@@ -121,8 +121,8 @@
 #     it to delete the github-pages artifact after website-build uploads it and
 #     upload another under the same name; deploy-pages picks the artifact by
 #     name. Comparing the run's github-pages artifact ID with the one
-#     website-build uploaded, before deploying, would close that path: an idea
-#     tracked on issue #70, not implemented. This path does not depend on
+#     website-build uploaded, before deploying, would close that path: an idea,
+#     not implemented. This path does not depend on
 #     PUBLISH_WEB_APP: web-app builds the app on every run, so it exists with
 #     the variable unset, and "publishing is off" does not mean merging adds no
 #     exposure. It is smaller than before this layout, when the same build code
@@ -311,7 +311,7 @@ jobs:
     # its first step fails it. A skipped job counts as passed for a required
     # check, so without this a lost Content Security Policy or a wrong base path
     # would turn web-app red and leave the merge unblocked. Unlike always(), a
-    # cancelled run does not start it. Wrapped in ${{ }} because YAML reads a
+    # canceled run does not start it. Wrapped in ${{ }} because YAML reads a
     # leading "!" as a tag.
     if: ${{ !cancelled() && needs.detect.outputs.site == 'true' }}
     runs-on: ubuntu-latest
