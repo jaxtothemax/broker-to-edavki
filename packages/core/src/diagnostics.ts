@@ -336,6 +336,15 @@ export interface DiagnosticParams {
     readonly year: string;
     readonly shares: RefusedShares;
   };
+  /**
+   * A purchase whose security the file does not name (`isinUnresolved`)
+   * that holds back neither return of `year`, shown in place of its
+   * refusal (ADR 0017 §3). It names no security, and no text from a file.
+   */
+  unresolvedElsewhere: Pick<Where, "date"> & {
+    readonly broker: string;
+    readonly year: string;
+  };
   lossDisallowed: Where;
   lossPartlyDisallowed: Where & { readonly replaced: string };
   washSaleWindowOpen: Where & { readonly until: IsoDate };
@@ -498,10 +507,18 @@ export interface DiagnosticParams {
   dividendDatesUncertain: { readonly broker: string; readonly count: number };
   /** Positions still open, taken as purchases with no leverage, long. */
   openPositionsAssumed: { readonly broker: string; readonly count: number };
-  /** A position still open whose ISIN the file does not settle. */
-  isinUnresolved: MaybeWhere & {
+  /**
+   * A position still open whose ISIN the file does not settle, so no ISIN
+   * can be stated. With `side` and a date, it holds back only the Doh-KDVP
+   * of the years it can change (ADR 0017 §3); without either, both returns
+   * of every year. `side: "buy"` is an adapter's claim that the row is a
+   * long purchase made at a certain `date`, which is the trade's, never a
+   * booking's.
+   */
+  isinUnresolved: Pick<MaybeWhere, "date"> & {
     readonly broker: string;
     readonly cause: "missing" | "ambiguous";
+    readonly side?: "buy";
   };
   dividendInconsistent: MaybeWhere & {
     readonly broker: string;

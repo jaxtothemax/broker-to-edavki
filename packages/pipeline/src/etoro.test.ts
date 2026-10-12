@@ -8,7 +8,16 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { APPLE, ROUND_TRIP, statement } from "@taxreporter/brokers/testing";
+import {
+  APPLE,
+  closing,
+  EXXON,
+  n,
+  opened,
+  position,
+  ROUND_TRIP,
+  statement,
+} from "@taxreporter/brokers/testing";
 import { Decimal, fileRef, type FileId } from "@taxreporter/core";
 import { writeDohDiv, writeDohKdvp, type PayerInfo } from "@taxreporter/furs";
 import { validateAgainstSchema } from "@taxreporter/furs/testing";
@@ -200,5 +209,86 @@ describe("a second statement of one eToro account", () => {
         .filter((d) => d.severity === "blocking")
         .map((d) => d.code),
     ).toContain("accountsShareEvents");
+  });
+});
+
+describe("a position still open that no row of the statement names (ADR 0017 §3)", () => {
+  // MSFT, bought on 20 February 2024: the statement gives an open position
+  // no ISIN, and no other row names one for MSFT. Its lot is not in the
+  // ledger, so the refusal holds back the Doh-KDVP of every year in which
+  // any security is sold from 21 January 2024 on, and never the Doh-Div.
+  // With `exxon`, Exxon is bought and sold on 21 and 22 February.
+  const unnamed = (exxon: boolean): ExportFile => ({
+    name: "etoro.xlsx",
+    bytes: statement({
+      ...ROUND_TRIP,
+      activity: [
+        ...ROUND_TRIP.activity,
+        opened("1004", "20/02/2024 15:00:00", "MSFT/USD", "400", "1"),
+        ...(exxon
+          ? [
+              opened("1005", "21/02/2024 10:00:00", "XOM/USD", "200", "2"),
+              closing("1005", "22/02/2024 10:00:00", "XOM/USD", "202", n("2")),
+            ]
+          : []),
+      ],
+      closed: [
+        ...ROUND_TRIP.closed,
+        ...(exxon
+          ? [
+              position({
+                id: "1005",
+                amount: "200",
+                units: "2",
+                open: "21/02/2024 10:00:00",
+                close: "22/02/2024 10:00:00",
+                profit: "2",
+                openRate: "100",
+                closeRate: "101",
+                isin: EXXON,
+              }),
+            ]
+          : []),
+      ],
+    }),
+  });
+  const valid = async (
+    xml: string,
+    schema: "Doh_KDVP_9.xsd" | "Doh_Div_3.xsd",
+  ) => {
+    const result = await validateAgainstSchema(xml, schema);
+    expect(result.errors, schema).toEqual([]);
+    expect(result.valid, schema).toBe(true);
+  };
+
+  it("writes both returns of a year with no sale from 30 days before it on, and says why", async () => {
+    // The only sale of 2024 is on 16 January, before 21 January.
+    const prepared = prepareReturns(input([unnamed(false)]));
+    expect([prepared.scope.kdvp, prepared.scope.div]).toEqual([[], []]);
+    if (prepared.kdvp.form === null || prepared.div.form === null) {
+      throw new Error("a return was withheld");
+    }
+    await valid(writeDohKdvp(prepared.kdvp.form), "Doh_KDVP_9.xsd");
+    await valid(writeDohDiv(prepared.div.form), "Doh_Div_3.xsd");
+    expect(
+      prepared.scope.findings
+        .filter((d) => d.severity === "info")
+        .map((d) => d.code),
+    ).toContain("unresolvedElsewhere");
+    // The ledger keeps the refusal as it was: another year reads it.
+    expect(
+      prepared.ledger.diagnostics
+        .filter((d) => d.severity === "blocking")
+        .map((d) => d.code),
+    ).toEqual(["isinUnresolved"]);
+  });
+
+  it("holds back only the Doh-KDVP of a year with such a sale, and still writes the Doh-Div", async () => {
+    const prepared = prepareReturns(input([unnamed(true)]));
+    expect(prepared.scope.kdvp.map((d) => d.code)).toEqual(["isinUnresolved"]);
+    expect(prepared.scope.div).toEqual([]);
+    expect(prepared.kdvp.form).toBeNull();
+    if (prepared.div.form === null) throw new Error("no Doh-Div");
+    await valid(writeDohDiv(prepared.div.form), "Doh_Div_3.xsd");
   });
 });

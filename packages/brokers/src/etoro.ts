@@ -995,17 +995,6 @@ function read(book: Workbook, context: ReadContext): ImportResult {
       block("invalidTime", {});
       return;
     }
-    // R2, option (a): a position no row of the file names an ISIN for is
-    // refused, and withholds every return (ADR 0020, open questions).
-    if (isins.size !== 1) {
-      block("isinUnresolved", {
-        broker: ETORO,
-        date: dated.date,
-        cause: isins.size === 0 ? "missing" : "ambiguous",
-      });
-      return;
-    }
-    const [isin] = [...isins] as [string];
     if (open.units === null) {
       block("invalidNumber", { column: "Units / Contracts" });
       return;
@@ -1022,6 +1011,22 @@ function read(book: Workbook, context: ReadContext): ImportResult {
       block("unexpectedSign", { column: "Amount" });
       return;
     }
+    // R2, option (b) (ADR 0020 §11): a position no row of the file names an
+    // ISIN for is refused, but only after the checks above, so that `side`
+    // can claim a real long purchase, and it states `side` only when the
+    // time zone cannot move its day. Core then holds back just the Doh-KDVP
+    // of the years the lot can change (ADR 0017 §3). Without `side`, as for
+    // a time near midnight, it withholds every return.
+    if (isins.size !== 1) {
+      block("isinUnresolved", {
+        broker: ETORO,
+        date: dated.date,
+        cause: isins.size === 0 ? "missing" : "ambiguous",
+        ...(certain(open.at) ? { side: "buy" as const } : {}),
+      });
+      return;
+    }
+    const [isin] = [...isins] as [string];
     if (!certain(open.at)) {
       block("dateUncertain", { broker: ETORO, ...where(isin, dated.date) });
       return;

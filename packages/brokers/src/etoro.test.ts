@@ -857,33 +857,123 @@ describe("etoro, lots", () => {
     expect(blocking(result)).toContainEqual(
       refusal(
         "isinUnresolved",
-        { broker: ETORO, date: "2024-01-08", cause: "ambiguous" },
+        {
+          broker: ETORO,
+          date: "2024-01-08",
+          cause: "ambiguous",
+          side: "buy",
+        },
         "accountActivity",
         4,
       ),
     );
   });
 
-  it("refuses a position still open with no ISIN in the file, in every year (R2, option a)", () => {
-    const result = read({
-      ...ROUND_TRIP,
-      activity: [
-        ...ROUND_TRIP.activity,
-        opened("1004", "20/02/2024 15:00:00", "MSFT/USD", "400", "1"),
-      ],
-    });
+  describe("a position still open with no ISIN in the file (R2, option b)", () => {
+    /** MSFT, bought on 20 February 2024, which no row of the file names. */
+    const unnamed = opened(
+      "1004",
+      "20/02/2024 15:00:00",
+      "MSFT/USD",
+      "400",
+      "1",
+    );
     const finding = refusal(
       "isinUnresolved",
-      { broker: ETORO, date: "2024-02-20", cause: "missing" },
+      { broker: ETORO, date: "2024-02-20", cause: "missing", side: "buy" },
       "accountActivity",
       7,
     );
-    expect(blocking(result)).toEqual([finding]);
-    // Unscoped (ADR 0017): it withholds the returns of a year it is not in.
-    const ledger = validateLedger(result.events, result.diagnostics);
-    const scope = scopeLedger(ledger, 2026);
-    expect(scope.kdvp).toEqual([finding]);
-    expect(scope.div).toEqual([finding]);
+    const ledgerOf = (spec: Statement) => {
+      const result = read(spec);
+      return validateLedger(result.events, result.diagnostics);
+    };
+
+    it("is refused as a purchase of its day, and reaches no Doh-Div and no year without a sale from 30 days before it on", () => {
+      const result = read({
+        ...ROUND_TRIP,
+        activity: [...ROUND_TRIP.activity, unnamed],
+      });
+      expect(blocking(result)).toEqual([finding]);
+      // Scoped (ADR 0017 §3): the statement's own sale is on 16 January,
+      // before 21 January, 30 days before the purchase, and 2026 has none.
+      const ledger = validateLedger(result.events, result.diagnostics);
+      for (const year of [2024, 2026]) {
+        const scope = scopeLedger(ledger, year);
+        expect([scope.kdvp, scope.div], String(year)).toEqual([[], []]);
+        expect(
+          scope.findings.map((d) => d.code),
+          String(year),
+        ).toContain("unresolvedElsewhere");
+      }
+    });
+
+    it("holds back only Doh-KDVP, and only of a year with a sale of any security from 30 days before it on", () => {
+      // Exxon, bought on 21 February and sold on the 22nd.
+      const ledger = ledgerOf({
+        ...ROUND_TRIP,
+        activity: [
+          ...ROUND_TRIP.activity,
+          unnamed,
+          opened("1005", "21/02/2024 10:00:00", "XOM/USD", "200", "2"),
+          closing("1005", "22/02/2024 10:00:00", "XOM/USD", "202", n("2")),
+        ],
+        closed: [
+          ...ROUND_TRIP.closed,
+          position({
+            id: "1005",
+            amount: "200",
+            units: "2",
+            open: "21/02/2024 10:00:00",
+            close: "22/02/2024 10:00:00",
+            profit: "2",
+            openRate: "100",
+            closeRate: "101",
+            isin: EXXON,
+          }),
+        ],
+      });
+      const scope = scopeLedger(ledger, 2024);
+      expect(scope.kdvp).toEqual([finding]);
+      expect(scope.div).toEqual([]);
+      expect(scopeLedger(ledger, 2025).kdvp).toEqual([]);
+    });
+
+    it("withholds every return when the time is so near midnight that the day is a guess", () => {
+      const result = read({
+        ...ROUND_TRIP,
+        activity: [
+          ...ROUND_TRIP.activity,
+          opened("1004", "20/02/2024 23:30:00", "MSFT/USD", "400", "1"),
+        ],
+      });
+      const [near, ...rest] = blocking(result);
+      expect(rest).toEqual([]);
+      expect(near?.code).toBe("isinUnresolved");
+      // No `side`, so core cannot scope it (ADR 0017 §3).
+      expect(near?.params).not.toHaveProperty("side");
+      const scope = scopeLedger(
+        validateLedger(result.events, result.diagnostics),
+        2026,
+      );
+      expect([scope.kdvp, scope.div]).toEqual([[near], [near]]);
+    });
+
+    it("is refused for its units or amount first, which `side` needs to be true", () => {
+      for (const [amount, units, code] of [
+        ["400", "0", "invalidQuantity"],
+        ["-400", "1", "unexpectedSign"],
+      ] as const) {
+        const result = read({
+          ...ROUND_TRIP,
+          activity: [
+            ...ROUND_TRIP.activity,
+            opened("1004", "20/02/2024 15:00:00", "MSFT/USD", amount, units),
+          ],
+        });
+        expect(codes(result), `${amount} ${units}`).toEqual([code]);
+      }
+    });
   });
 });
 

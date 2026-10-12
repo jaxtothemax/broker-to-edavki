@@ -39,8 +39,8 @@ Three things set eToro apart from the brokers before it:
 - **An undocumented clock.** No source states the statement's time zone [L].
 
 The architect's review of 2026-10-11 made decisions D1 to D12 and named three risks for
-the owner. The owner has not answered them yet. This ADR records the decisions and the
-conservative defaults taken for the risks; each default is one place in the code.
+the owner. The owner answered two of them on 2026-10-12 (R2 and R3, below); R1 is still
+open. This ADR records the decisions and what was chosen for each risk.
 
 ## Decision
 
@@ -122,7 +122,7 @@ conservative defaults taken for the risks; each default is one place in the code
      - Its ISIN comes from its ticker, through the Closed Positions and Dividends rows
        that give both.
      - A ticker with no ISIN in the file is refused (`isinUnresolved`, `missing`), and
-       so is one with two ISINs (`ambiguous`).
+       so is one with two ISINs (`ambiguous`). Decision 11 says what that withholds.
      - The price is kept exact: `Decimal` holds 200 ÷ 1.1 as a fraction until a form
        field rounds it. Tests run such a lot through `validateLedger`, the returns, the
        holdings, the CLI's `--json` report and the web preview, and nothing calls
@@ -217,9 +217,28 @@ conservative defaults taken for the risks; each default is one place in the code
       A contract's dividend without its activity row is refused (`pairing`), as a share's.
     - **Required.** An ISIN is required.
     - **Payer.** The payer's details come from the payers table, as for every broker.
-11. **Reach (D11).** Every eToro refusal is unscoped (ADR 0017). The adapter never sets
-    `shares`, so a refusal withholds both returns of every year. A test checks this on
-    `isinUnresolved` for a year the row is not in.
+11. **Reach (D11).** Every eToro refusal is unscoped (ADR 0017) and the adapter never sets
+    `shares`, with one exception: a position still open whose ISIN no row settles
+    (`isinUnresolved`, R2 below).
+    - **What the adapter states.** `side: "buy"` and the trade's day. It states them only
+      after the row's units and amount are checked, and only when no clock from UTC+0 to
+      UTC+3 can move the day (`certain`). A row with bad units or amount, or so near
+      midnight that its day is a guess, is refused without `side` and withholds both
+      returns of every year, as every other eToro refusal does.
+    - **What core does** (ADR 0017 §3, last bullet). Doh-KDVP(Y) is withheld when any
+      security, in any account, has a sale in Y on or after D − 30, D being the purchase.
+      Doh-Div is never withheld: the lot is missing from the ledger, but a dividend reads no
+      lots, and a position that paid one would have its ISIN from the Dividends sheet. In a
+      year the row cannot change it shows as the note `unresolvedElsewhere`.
+    - **Why no security key.** The row has no ISIN. Trade Republic events carry no ticker,
+      Trading 212 sets one only when its cell is filled, and IBKR writes its own form, so a
+      match by ticker could miss and release a return the lot can change. A ticker taken to
+      an ISIN through another broker's rows would book the lot under a guess. A closed eToro
+      position under an older ticker can also take the lot under FIFO, so the sales counted
+      are every account's, eToro's included.
+    - **What it costs.** An accumulating ETF that is never sold still holds back every
+      later year's Doh-KDVP that has any sale. Asking the user for the ISIN (option (c)) would
+      release those.
 12. **Findings (D12).** New codes, each in English and Slovenian:
     - for the sheets: `unknownSheet`, `hiddenSheet`, `hiddenCells`;
     - for the statement: `columnMissing`, `statementFormat`, `historyIncomplete`,
@@ -233,19 +252,24 @@ conservative defaults taken for the risks; each default is one place in the code
     letters only (`closedPositions`, `accountActivity`, `dividends`, `accountSummary`,
     `financialSummary`).
 
-### The owner's open risks, and the defaults taken
+### The owner's risks, and what was chosen
 
-- **R1, no real export.** The adapter was built in full on synthetic statements made by
-  `makeWorkbook` at test time, with no binary fixture. It is marked unverified here and in
+- **R1, no real export: open.** The adapter was built in full on synthetic statements made
+  by `makeWorkbook` at test time, with no binary fixture. It is marked unverified here and in
   `packages/brokers/test/fixtures/etoro/README.md`. ADR 0014's precondition is not set
-  aside: it waits for one real, untouched export before it ships.
-- **R2, a position still open with no ISIN in the file: option (a).** It is refused,
-  blocking and unscoped (`isinUnresolved`), and withholds every return. `core/reach.ts` is
-  unchanged. Option (b), withholding only Doh-KDVP of years in which another account sells
-  the same security, would be a new rule in `scopeLedger`. Option (c), asking the user,
-  would be a new question in the app.
-- **R3, short or leveraged shares.** They are refused (`unsupportedAction`, `short` and
-  `leveraged`).
+  aside: it waits for one real, untouched export before it ships. A search on 2026-10-12
+  found none online: every public parser builds its test data in code, and the one published
+  statement was saved again by a third party and is refused by the history gate. Only an
+  export from a real account, anonymized as the fixtures README describes, can settle it.
+- **R2, a position still open with no ISIN in the file: option (b), settled 2026-10-12,
+  with the any-security scope.** The owner chose (b), withholding only the Doh-KDVP the lot
+  can change. The review that followed found that no key on a security is safe without an
+  ISIN, so the rule counts a sale of any security, in any account, from 30 days before the
+  purchase on, and never withholds Doh-Div (decision 11, ADR 0017 §3). Option (c), asking
+  the user for the ISIN, would be a new question in the app and would release more.
+- **R3, short or leveraged shares: refusal confirmed 2026-10-12.** They are refused
+  (`unsupportedAction`, `short` and `leveraged`), not dropped as CFDs and not put on
+  PLVPSHORT.
 
 ### Where the spec left a gap, and what was chosen
 
@@ -280,6 +304,9 @@ conservative defaults taken for the risks; each default is one place in the code
 - Everyone else is refused with a finding that says why. That covers a statement that
   starts later, a partial close, a UK or EU share, a short, and a trade near midnight.
   That is a lot of refusals; the first real exports will show which to lift.
+- A position still open that no row of the statement names an ISIN for holds back only the
+  Doh-KDVP of a year with a sale of any security from 30 days before its purchase on, and
+  never the Doh-Div. It is shown as a note in every year it changes nothing.
 - A second statement of the same account is refused rather than merged. A user with two
   eToro accounts answers the account question.
 - Account Summary is never read, so no name or username can reach the ledger, a finding
@@ -317,7 +344,7 @@ conservative defaults taken for the risks; each default is one place in the code
   statement is mostly caught (a day past 12 is no month, and the date-order gate), but one
   whose every day is 12 or less would be read with day and month swapped, consistently
   across its sheets, so no cross-check would notice. An untouched export settles the order.
-- **The owner's answers.** R1 to R3 above.
+- **The owner's answer to R1.** One real, untouched export. R2 and R3 are settled above.
 
 ## On Acceptance
 

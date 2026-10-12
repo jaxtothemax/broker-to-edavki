@@ -232,6 +232,11 @@ export const findingsEn: FindingMessages = {
       p,
       `${p.shares === "out" ? "a sale priced at zero" : p.shares === "in" ? "a receipt of new shares" : "a receipt of free rights"} is not read, but it changes nothing on the ${p.year} returns: nothing it could affect is sold or received in ${p.year}. It holds back only the returns it can change.`,
     ),
+  unresolvedElsewhere: (p) =>
+    at(
+      p,
+      `a position still open in the ${p.broker} statement has no ISIN, but it changes nothing on the ${p.year} returns: no security is sold in ${p.year} from 30 days before its purchase on, and a purchase is no dividend. It holds back only the returns it can change.`,
+    ),
   lossDisallowed: (p) =>
     at(
       p,
@@ -427,9 +432,15 @@ export const findingsEn: FindingMessages = {
   isinUnresolved: (p) =>
     at(
       p,
+      // With `side`, core holds back only the Doh-KDVP of the years the lot
+      // can change (ADR 0017 §3); without it, both returns of every year.
       p.cause === "ambiguous"
-        ? `the ticker of a position still open in the ${p.broker} statement names two securities elsewhere in it, so its ISIN is not known. It is not chosen on a guess; please report it.`
-        : `a position still open in the ${p.broker} statement has no ISIN: the statement gives one only for closed positions and dividends. Without it, its shares cannot be matched with sales of the same security, so the returns wait; please report it.`,
+        ? p.side === undefined
+          ? `the ticker of a position still open in the ${p.broker} statement names two securities elsewhere in it, so its ISIN is not known. It is not chosen on a guess; please report it.`
+          : `the ticker of a position still open in the ${p.broker} statement names two securities elsewhere in it, so its ISIN is not known, and it is not chosen on a guess. Doh-KDVP waits for each year with a sale of any security from 30 days before the purchase on; dividends are not affected. Please report it.`
+        : p.side === undefined
+          ? `a position still open in the ${p.broker} statement has no ISIN: the statement gives one only for closed positions and dividends. Without it, its shares cannot be matched with sales of the same security, so the returns wait; please report it.`
+          : `a position still open in the ${p.broker} statement has no ISIN: the statement gives one only for closed positions and dividends. Without it, its shares cannot be matched with sales of the same security. Doh-KDVP waits for each year with a sale of any security from 30 days before the purchase on; dividends are not affected. Please report it.`,
     ),
   dividendInconsistent: (p) =>
     at(
@@ -709,6 +720,11 @@ export const findingsSl: FindingMessages = {
       p,
       `${p.shares === "out" ? "prodaja po ceni nič ni prebrana" : p.shares === "in" ? "prejem novih delnic ni prebran" : "prejem brezplačnih pravic ni prebran"}, vendar ta vrstica ne spremeni ničesar v napovedih za leto ${p.year}: v tem letu ni prodano ali prejeto nič, na kar bi lahko vplivala. Zadrži le napovedi, ki jih lahko spremeni.`,
     ),
+  unresolvedElsewhere: (p) =>
+    at(
+      p,
+      `še odprta pozicija v izpisku ${p.broker} nima kode ISIN, vendar ne spremeni ničesar v napovedih za leto ${p.year}: v tem letu od 30 dni pred njenim nakupom naprej ni prodan noben vrednostni papir, nakup pa ni dividenda. Zadrži le napovedi, ki jih lahko spremeni.`,
+    ),
   lossDisallowed: (p) =>
     at(
       p,
@@ -914,9 +930,15 @@ export const findingsSl: FindingMessages = {
   isinUnresolved: (p) =>
     at(
       p,
+      // With `side`, core holds back only the Doh-KDVP of the years the lot
+      // can change (ADR 0017 §3); without it, both returns of every year.
       p.cause === "ambiguous"
-        ? `oznaka še odprte pozicije v izpisku ${p.broker} drugje v izpisku označuje dva vrednostna papirja, zato njena koda ISIN ni znana. Ne izbere se na slepo; sporočite to.`
-        : `še odprta pozicija v izpisku ${p.broker} nima kode ISIN: izpisek jo navaja le pri zaprtih pozicijah in dividendah. Brez nje njenih delnic ni mogoče povezati s prodajami istega vrednostnega papirja, zato napovedi počakajo; sporočite to.`,
+        ? p.side === undefined
+          ? `oznaka še odprte pozicije v izpisku ${p.broker} drugje v izpisku označuje dva vrednostna papirja, zato njena koda ISIN ni znana. Ne izbere se na slepo; sporočite to.`
+          : `oznaka še odprte pozicije v izpisku ${p.broker} drugje v izpisku označuje dva vrednostna papirja, zato njena koda ISIN ni znana in se ne izbere na slepo. Napoved Doh-KDVP počaka za vsako leto s prodajo katerega koli vrednostnega papirja od 30 dni pred nakupom naprej; dividende to ne prizadene. Sporočite to.`
+        : p.side === undefined
+          ? `še odprta pozicija v izpisku ${p.broker} nima kode ISIN: izpisek jo navaja le pri zaprtih pozicijah in dividendah. Brez nje njenih delnic ni mogoče povezati s prodajami istega vrednostnega papirja, zato napovedi počakajo; sporočite to.`
+          : `še odprta pozicija v izpisku ${p.broker} nima kode ISIN: izpisek jo navaja le pri zaprtih pozicijah in dividendah. Brez nje njenih delnic ni mogoče povezati s prodajami istega vrednostnega papirja. Napoved Doh-KDVP počaka za vsako leto s prodajo katerega koli vrednostnega papirja od 30 dni pred nakupom naprej; dividende to ne prizadene. Sporočite to.`,
     ),
   dividendInconsistent: (p) =>
     at(

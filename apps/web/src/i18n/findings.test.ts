@@ -159,6 +159,33 @@ describe("the findings catalog", () => {
     );
   });
 
+  it("words an unnamed purchase by whether core can scope it, and its note", () => {
+    const broker = "eToro";
+    const date = "2024-02-20";
+    for (const catalog of [findingsEn, findingsSl]) {
+      for (const cause of ["missing", "ambiguous"]) {
+        const bare = catalog.isinUnresolved({ broker, cause, date });
+        const scoped = catalog.isinUnresolved({
+          broker,
+          cause,
+          date,
+          side: "buy",
+        });
+        // Scoped, it says which return waits and which does not.
+        expect(scoped, cause).not.toBe(bare);
+        expect(scoped, cause).toContain("Doh-KDVP");
+        expect(bare, cause).not.toContain("Doh-KDVP");
+      }
+    }
+    const note = { broker, date, year: "2026" };
+    expect(findingsEn.unresolvedElsewhere(note)).toMatch(
+      /^2024-02-20: a position still open in the eToro statement has no ISIN, but it changes nothing on the 2026 returns/,
+    );
+    expect(findingsSl.unresolvedElsewhere(note)).toMatch(
+      /^2024-02-20: še odprta pozicija v izpisku eToro nima kode ISIN, vendar ne spremeni ničesar v napovedih za leto 2026/,
+    );
+  });
+
   it("has the same closed lists in both languages", () => {
     for (const list of [
       "kinds",

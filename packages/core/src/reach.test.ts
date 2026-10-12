@@ -64,7 +64,10 @@ function withheld(
     kdvp: scope.kdvp.map(label),
     div: scope.div.map(label),
     notes: scope.findings
-      .filter((d) => d.code === "refusedElsewhere")
+      .filter(
+        (d) =>
+          d.code === "refusedElsewhere" || d.code === "unresolvedElsewhere",
+      )
       .map(label),
   };
 }
@@ -243,6 +246,114 @@ describe("rights handed out free", () => {
       "unsupportedAction@12",
     ]);
     expect(withheld(rights, saleOn("2025-07-25"), 2025).kdvp).toEqual([]);
+  });
+});
+
+describe("a purchase whose security the file does not name", () => {
+  const params = (date: string | undefined, rest: Record<string, string>) =>
+    ({
+      broker: "eToro",
+      cause: "missing",
+      ...(date === undefined ? {} : { date }),
+      ...rest,
+    }) as DiagnosticParams["isinUnresolved"];
+  const unnamed = (date: string, rest: Record<string, string> = {}, row = 13) =>
+    diagnostic(
+      "blocking",
+      "isinUnresolved",
+      params(date, { side: "buy", ...rest }),
+      source(row),
+    );
+  const saleOn = (date: string) => [trade("sell", date, "5", "20", of(OTHER))];
+
+  it("withholds Doh-KDVP of a year with a sale of any security from 30 days before it on", () => {
+    // 15 March: 30 days before is 13 February.
+    const finding = [unnamed("2025-03-15")];
+    expect(withheld(finding, saleOn("2025-02-13"), 2025).kdvp).toEqual([
+      "isinUnresolved@13",
+    ]);
+    expect(withheld(finding, saleOn("2025-02-12"), 2025).kdvp).toEqual([]);
+  });
+
+  it("reaches a sale however long after the purchase, as FIFO does", () => {
+    expect(
+      withheld([unnamed("2021-06-01")], saleOn("2025-09-01"), 2025).kdvp,
+    ).toEqual(["isinUnresolved@13"]);
+  });
+
+  it("reads the look-back across the turn of a year, and a sale in an earlier year not at all", () => {
+    // Bought 15 January: a sale from 16 December of the year before is
+    // within the 30-day rule's reach, one on 1 December is not.
+    const finding = [unnamed("2026-01-15")];
+    expect(withheld(finding, saleOn("2025-12-20"), 2025).kdvp).toEqual([
+      "isinUnresolved@13",
+    ]);
+    expect(withheld(finding, saleOn("2025-12-01"), 2025).kdvp).toEqual([]);
+    expect(withheld(finding, saleOn("2025-12-20"), 2026).kdvp).toEqual([]);
+  });
+
+  it("never withholds Doh-Div, and shows a note in a year it cannot change", () => {
+    const finding = [unnamed("2025-03-15")];
+    expect(withheld(finding, saleOn("2025-06-01"), 2025)).toEqual({
+      kdvp: ["isinUnresolved@13"],
+      div: [],
+      notes: [],
+    });
+    expect(withheld(finding, [], 2025)).toEqual({
+      kdvp: [],
+      div: [],
+      notes: ["unresolvedElsewhere@13"],
+    });
+    expect(withheld(finding, [], 2030)).toEqual({
+      kdvp: [],
+      div: [],
+      notes: ["unresolvedElsewhere@13"],
+    });
+  });
+
+  it("says in its place which row it is, and keeps the ledger's refusal as it was", () => {
+    const finding = unnamed("2025-03-15");
+    const scope = scopeLedger(validateLedger([], [finding]), 2026);
+    const note = diagnostic(
+      "info",
+      "unresolvedElsewhere",
+      { broker: "eToro", date: "2025-03-15", year: "2026" },
+      source(13),
+    );
+    expect(scope.findings).toEqual([note]);
+    const other = diagnostic("blocking", "invalidIsin", {}, source(14));
+    expect(scope.view([finding, other])).toEqual([note, other]);
+    // The year of a sale still sees the refusal.
+    const sold = scopeLedger(
+      validateLedger(saleOn("2026-01-05"), [finding]),
+      2026,
+    );
+    expect(sold.findings).toEqual([finding]);
+  });
+
+  it("withholds everything when the row does not state a purchase of a real day", () => {
+    const unscoped = [
+      unnamed("2025-03-15", { side: "sell" }, 13),
+      diagnostic(
+        "blocking",
+        "isinUnresolved",
+        params("2025-03-15", {}),
+        source(14),
+      ),
+      diagnostic(
+        "blocking",
+        "isinUnresolved",
+        params(undefined, { side: "buy" }),
+        source(15),
+      ),
+      unnamed("2025-02-30", {}, 16),
+    ];
+    const all = [13, 14, 15, 16].map((row) => `isinUnresolved@${String(row)}`);
+    expect(withheld(unscoped, [], 2030)).toEqual({
+      kdvp: all,
+      div: all,
+      notes: [],
+    });
   });
 });
 
