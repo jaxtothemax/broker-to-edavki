@@ -48,6 +48,17 @@ const ANCHORS = {
   "download.title": "text",
   "download.fileName": "box",
   "download.button": "box",
+  "held.item": "box",
+  "held.summary": "box",
+  "held.asOf": "text",
+  "held.lots": "box",
+  "held.lot": "box",
+  "held.account": "box",
+  "held.next": "text",
+  "acct.card": "box",
+  "acct.asOf": "box",
+  "acct.flag": "box",
+  "acct.position": "box",
 } as const satisfies Record<string, "box" | "text">;
 
 export type ExplainName = keyof typeof ANCHORS;

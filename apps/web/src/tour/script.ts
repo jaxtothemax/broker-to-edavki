@@ -35,8 +35,10 @@ import {
   type DividendRow,
   type KdvpRow,
   type ReturnPreview,
+  type HeldSecurity,
   type SecurityResult,
 } from "../model/preview";
+import { accountName, lotKey } from "../screens/dashboard/names";
 import type { DashboardView, DashPage } from "../screens/dashboard/view";
 import type { FlowStep } from "../state/wizard";
 import { bucketLabel } from "../ui/bits";
@@ -96,6 +98,8 @@ export type StopId =
   | "holiday"
   | "treaty"
   | "notes"
+  | "stillHeld"
+  | "accountCheck"
   | "download";
 
 export interface TourStop {
@@ -112,13 +116,22 @@ export interface TourStop {
   readonly notes: readonly [TourNote, ...TourNote[]];
 }
 
-/** A dashboard page, with the sold securities it opens. */
+/**
+ * A dashboard page, with the sold securities it opens, and the held ones and
+ * the account where the page is the holdings or an account's.
+ */
 const dash = (
   page: DashPage,
   sold: readonly string[] = [],
+  shown: { readonly held?: readonly string[]; readonly account?: string } = {},
 ): { readonly screen: FlowStep; readonly dash: DashboardView } => ({
   screen: "dashboard",
-  dash: { page, sold: new Set(sold) },
+  dash: {
+    page,
+    account: shown.account ?? null,
+    sold: new Set(sold),
+    held: new Set(shown.held ?? []),
+  },
 });
 
 const security = (
@@ -126,6 +139,14 @@ const security = (
   isin: string,
 ): SecurityResult | null =>
   preview.securities.find((s) => s.isin === isin) ?? null;
+
+/** A security still held, from the preview's holdings. */
+const heldOf = (preview: ReturnPreview, isin: string): HeldSecurity | null =>
+  preview.holdings?.securities.find((s) => s.isin === isin) ?? null;
+
+/** An account of the preview's holdings, by its id. */
+const accountOf = (preview: ReturnPreview, id: string) =>
+  preview.holdings?.accounts.find((a) => a.id === id);
 
 const rowKey = (row: KdvpRow) => `${row.kind}@${row.date}`;
 
@@ -210,6 +231,12 @@ const lotDate = (isin: string, index: number) =>
   security(demoPreview, isin)?.lots[index]?.purchaseDate;
 const nvdaOldest = purchases(security(demoPreview, DEMO_NVDA))[0] ?? null;
 const nvdaSale = firstSale(security(demoPreview, DEMO_NVDA));
+/** NVIDIA's lot still held: the one its sale did not use. */
+const nvdaLeft = heldOf(demoPreview, DEMO_NVDA)?.lots[0];
+const nvdaLeftKey = nvdaLeft === undefined ? "" : lotKey(nvdaLeft);
+/** The demo's account whose files move shares in or out (IBKR). */
+const transferredId =
+  demoPreview.holdings?.accounts.find((a) => a.transferred)?.id ?? "";
 /** The lot a sale used only in part: the purchase it came from was larger. */
 const partLot = (s: SecurityResult | null) =>
   s?.lots.find((lot) => {
@@ -761,6 +788,130 @@ export const TOUR: readonly TourStop[] = [
           // The note's first sentence names what it is about.
           const [first = said] = said.split(/(?<=\.)\s/);
           return { lead: first, body: t.explain.notOnTheseReturns };
+        },
+      },
+    ],
+  },
+  {
+    id: "stillHeld",
+    view: dash("holdings", [], { held: [DEMO_NVDA] }),
+    focus: [path(["held.item", DEMO_NVDA])],
+    pad: 8,
+    prefer: "row",
+    title: ({ t }) => t.tour.stops.stillHeld.title,
+    intro: ({ t }) => t.tour.stops.stillHeld.intro,
+    notes: [
+      {
+        target: path(["held.item", DEMO_NVDA], "held.asOf"),
+        text: ({ t, locale, preview }) => {
+          const held = heldOf(preview, DEMO_NVDA);
+          if (held === null) return null;
+          const day = formatDate(held.asOf, locale);
+          return { lead: day, body: t.explain.heldAsOf(day) };
+        },
+      },
+      {
+        target: path(
+          ["held.item", DEMO_NVDA],
+          ["held.lot", nvdaLeftKey],
+          "held.next",
+        ),
+        text: ({ t, locale, preview }) => {
+          const lot = heldOf(preview, DEMO_NVDA)?.lots[0];
+          if (lot?.next == null) return null;
+          const rate = bucketLabel(lot.next.bucket, locale);
+          const day = formatDate(lot.next.from, locale);
+          return {
+            lead: t.held.nextFrom(rate, day),
+            body: t.explain.nextBucketDay(rate, day),
+          };
+        },
+      },
+      {
+        target: path(
+          ["held.item", DEMO_NVDA],
+          ["held.lot", nvdaLeftKey],
+          "held.account",
+        ),
+        text: ({ t, preview }) => {
+          const lot = heldOf(preview, DEMO_NVDA)?.lots[0];
+          const s = security(preview, DEMO_NVDA);
+          const sale = firstSale(s);
+          const oldest = purchases(s)[0];
+          if (lot === undefined || sale === null || oldest === undefined)
+            return null;
+          const left = accountName(t, lot.account);
+          return {
+            lead: left,
+            body: t.explain.lotLeft(
+              t.brokers[sale.broker],
+              t.brokers[oldest.broker],
+              left,
+            ),
+          };
+        },
+      },
+    ],
+  },
+  {
+    id: "accountCheck",
+    view: dash("account", [], { account: transferredId }),
+    focus: [path(["acct.card", transferredId])],
+    pad: 8,
+    prefer: "row",
+    title: ({ t }) => t.tour.stops.accountCheck.title,
+    intro: ({ t }) => t.tour.stops.accountCheck.intro,
+    notes: [
+      {
+        target: path(
+          ["acct.card", transferredId],
+          ["acct.asOf", transferredId],
+        ),
+        text: ({ t, locale, preview }) => {
+          const account = accountOf(preview, transferredId);
+          if (account?.asOf == null) return null;
+          const day = formatDate(account.asOf, locale);
+          return { lead: t.acct.asOf(day), body: t.explain.accountAsOf(day) };
+        },
+      },
+      {
+        target: path(
+          ["acct.card", transferredId],
+          ["acct.flag", `${transferredId}:transferred`],
+        ),
+        text: ({ t, preview }) =>
+          accountOf(preview, transferredId)?.transferred === true
+            ? {
+                // The flag's own first words, as the screen shows them.
+                lead: t.acct.transferred.split(":")[0] ?? "",
+                body: t.explain.transferNotRead,
+              }
+            : null,
+      },
+      {
+        target: path(
+          ["acct.card", transferredId],
+          ["acct.position", `${transferredId}:${DEMO_NVDA}`],
+        ),
+        text: ({ t, preview }) => {
+          const account = accountOf(preview, transferredId);
+          const position = account?.positions.find((p) => p.isin === DEMO_NVDA);
+          const other = preview.holdings?.accounts.find(
+            (a) => a.id !== transferredId,
+          );
+          if (
+            account === undefined ||
+            position === undefined ||
+            other === undefined
+          )
+            return null;
+          return {
+            lead: position.symbol,
+            body: t.explain.accountPosition(
+              accountName(t, account),
+              accountName(t, other),
+            ),
+          };
         },
       },
     ],

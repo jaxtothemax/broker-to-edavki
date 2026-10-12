@@ -215,6 +215,129 @@ export interface MonthlyAmount {
   readonly grossEur: DecimalString;
 }
 
+/**
+ * An account as the dashboard names it: its broker and a number at that
+ * broker, never an account number or the scope the engine keys it by (an
+ * IBKR scope is a hash of a short account ID: ADR 0018 §5).
+ */
+export interface AccountRef {
+  /** "ibkr-1": unique in the session, and nothing of the account in it. */
+  readonly id: string;
+  readonly broker: BrokerId;
+  /** From 1 at that broker, the account with the earliest event first. */
+  readonly ordinal: number;
+  /** "account N" is said only where the broker has two accounts or more. */
+  readonly showOrdinal: boolean;
+}
+
+/** The shares one account holds of one security, by its own count. */
+export interface PositionRow {
+  readonly isin: string;
+  readonly symbol: string;
+  readonly name: string;
+  /** Whether it is a fund, for the mark beside it (a fund house's wordmark). */
+  readonly isFund: boolean;
+  /** Signed: negative where the files sell more than they buy. */
+  readonly quantity: DecimalString;
+}
+
+export interface AccountSummary extends AccountRef {
+  /** The last day its files cover; null for an account with no dated row. */
+  readonly asOf: IsoDate | null;
+  /** The names of the files that hold its rows. */
+  readonly files: readonly string[];
+  /** Its files move shares in or out, which are not read yet (#48). */
+  readonly transferred: boolean;
+  /** A row of its files was refused, so its positions may be missing it. */
+  readonly refusedRows: boolean;
+  /** Quantities only: a broker's own cost is not the FIFO cost. */
+  readonly positions: readonly PositionRow[];
+}
+
+/** Why the Banka Slovenije snapshot has no rate for a purchase. */
+export const MISSING_RATES = [
+  "invalidDate",
+  "metal",
+  "unknownCurrency",
+  "beforeSnapshot",
+  "afterSnapshot",
+  "noRate",
+] as const;
+export type MissingRate = (typeof MISSING_RATES)[number];
+
+/** One open FIFO lot, whichever account bought it. */
+export interface HeldLotRow {
+  readonly account: AccountRef;
+  readonly purchaseDate: IsoDate;
+  /** In shares as of the security's `asOf`. */
+  readonly quantity: DecimalString;
+  /** Price per share as of `asOf`, in the instrument's currency. */
+  readonly price: Money;
+  /** A split since the purchase restated the quantity and the price. */
+  readonly splitAdjusted: boolean;
+  /** null where the price is in EUR, or where `missingRate` says why. */
+  readonly rate: RateProvenance | null;
+  readonly missingRate?: MissingRate;
+  /** EUR per share at the form's 8 decimals; null without a rate. */
+  readonly unitCostEur: DecimalString | null;
+  /** The lot's cost in cents, at the rate of its purchase date. */
+  readonly costEur: DecimalString | null;
+  /** The holding bucket on the security's `asOf`. */
+  readonly bucket: HoldingBucket;
+  /**
+   * The next, lower bucket and the first day it is certain, the day after
+   * the anniversary (research 04 §4.5); null once exempt.
+   */
+  readonly next: {
+    readonly bucket: HoldingBucket;
+    readonly from: IsoDate;
+  } | null;
+  readonly source: SourceRef;
+}
+
+/** A security still held, across every account of the taxpayer. */
+export interface HeldSecurity {
+  readonly isin: string;
+  readonly symbol: string;
+  readonly name: string;
+  /** Whether it is a fund, for the mark beside it (a fund house's wordmark). */
+  readonly isFund: boolean;
+  /** The day its lots are as of: the earliest among the accounts holding it. */
+  readonly asOf: IsoDate;
+  readonly quantity: DecimalString;
+  /** The lots' costs together; null when any lot has none. */
+  readonly costEur: DecimalString | null;
+  /** The files sell more than they buy: an earlier export is missing. */
+  readonly incomplete: boolean;
+  /** The accounts the lots were bought in, in lot order. */
+  readonly accounts: readonly AccountRef[];
+  /** Oldest first: the order a sale consumes them. */
+  readonly lots: readonly HeldLotRow[];
+}
+
+/** What the "still held" card says, summed in the worker (ADR 0006). */
+export interface HoldingsTotals {
+  readonly securities: number;
+  readonly lots: number;
+  /** The cost of the lots that have one; `withoutRate` lots are not in it. */
+  readonly costEur: DecimalString;
+  readonly withoutRate: number;
+  /** The earliest and latest of the securities' as-of days; null if none. */
+  readonly asOfFirst: IsoDate | null;
+  readonly asOfLast: IsoDate | null;
+}
+
+/**
+ * The shares still held (ADR 0018): each account's own positions, and the
+ * open FIFO lots across accounts. Holdings never block a return, and are
+ * null when they could not be worked out.
+ */
+export interface HoldingsPreview {
+  readonly accounts: readonly AccountSummary[];
+  readonly securities: readonly HeldSecurity[];
+  readonly totals: HoldingsTotals;
+}
+
 export interface ReturnPreview {
   readonly taxYear: number;
   readonly files: readonly ImportedFile[];
@@ -235,6 +358,8 @@ export interface ReturnPreview {
    * real tax.
    */
   readonly taxToPayEur: DecimalString;
+  /** The shares still held; null when they could not be worked out. */
+  readonly holdings: HoldingsPreview | null;
   /** All twelve months, zero where nothing was paid. */
   readonly dividendsByMonth: readonly MonthlyAmount[];
 }

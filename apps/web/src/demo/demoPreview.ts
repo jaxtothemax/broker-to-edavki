@@ -17,6 +17,20 @@ import type { ReturnPreview } from "../model/preview";
 export const DEMO_TRADING212_FILE = "trading212-2023-2026.csv";
 export const DEMO_IBKR_FILE = "ibkr-flex-2019-2026.xml";
 
+/** Each demo account as the dashboard names it: one at each broker. */
+const DEMO_IBKR_ACCOUNT = {
+  id: "ibkr-1",
+  broker: "ibkr",
+  ordinal: 1,
+  showOrdinal: false,
+} as const;
+const DEMO_TRADING212_ACCOUNT = {
+  id: "trading212-1",
+  broker: "trading212",
+  ordinal: 1,
+  showOrdinal: false,
+} as const;
+
 export const demoPreview: ReturnPreview = {
   taxYear: 2026,
   files: [
@@ -32,7 +46,7 @@ export const demoPreview: ReturnPreview = {
       broker: "ibkr",
       firstDate: "2019-08-14",
       lastDate: "2026-08-13",
-      rowsRead: 18,
+      rowsRead: 19,
     },
   ],
   securities: [
@@ -679,6 +693,212 @@ export const demoPreview: ReturnPreview = {
     taxDueEur: "21.33",
   },
   taxToPayEur: "1791.37",
+  holdings: {
+    // Each account by its own count, and the lots across both. Nothing here
+    // is typed in from the engine: demoHoldings.test.ts runs the engine over
+    // the demo's ledger and compares, and recomputes the costs by hand.
+    accounts: [
+      {
+        ...DEMO_IBKR_ACCOUNT,
+        asOf: "2026-08-13",
+        files: [DEMO_IBKR_FILE],
+        // The Trading 212 shares of NVIDIA were moved here: not read yet.
+        transferred: true,
+        refusedRows: false,
+        positions: [
+          {
+            isin: "US0378331005",
+            symbol: "AAPL",
+            name: "Apple Inc.",
+            isFund: false,
+            quantity: "10",
+          },
+          {
+            isin: "US67066G1040",
+            symbol: "NVDA",
+            name: "NVIDIA Corp.",
+            isFund: false,
+            quantity: "-10",
+          },
+        ],
+      },
+      {
+        ...DEMO_TRADING212_ACCOUNT,
+        asOf: "2026-06-18",
+        files: [DEMO_TRADING212_FILE],
+        transferred: false,
+        refusedRows: false,
+        positions: [
+          {
+            isin: "IE00BK5BQT80",
+            symbol: "VWCE",
+            name: "Vanguard FTSE All-World UCITS ETF (Acc)",
+            isFund: true,
+            quantity: "4.5638",
+          },
+          {
+            isin: "US67066G1040",
+            symbol: "NVDA",
+            name: "NVIDIA Corp.",
+            isFund: false,
+            quantity: "20",
+          },
+        ],
+      },
+    ],
+    securities: [
+      {
+        isin: "IE00BK5BQT80",
+        symbol: "VWCE",
+        name: "Vanguard FTSE All-World UCITS ETF (Acc)",
+        isFund: true,
+        asOf: "2026-06-18",
+        quantity: "4.5638",
+        costEur: "600.16",
+        incomplete: false,
+        accounts: [DEMO_TRADING212_ACCOUNT],
+        lots: [
+          {
+            account: DEMO_TRADING212_ACCOUNT,
+            purchaseDate: "2024-10-15",
+            quantity: "0.0013",
+            price: { amount: "122.08", currency: "EUR" },
+            splitAdjusted: false,
+            rate: null,
+            unitCostEur: "122.08",
+            costEur: "0.16",
+            bucket: "25",
+            next: { bucket: "20", from: "2029-10-16" },
+            source: { file: DEMO_TRADING212_FILE, row: 14 },
+          },
+          {
+            account: DEMO_TRADING212_ACCOUNT,
+            purchaseDate: "2025-01-15",
+            quantity: "1.1102",
+            price: { amount: "135.11", currency: "EUR" },
+            splitAdjusted: false,
+            rate: null,
+            unitCostEur: "135.11",
+            costEur: "150.00",
+            bucket: "25",
+            next: { bucket: "20", from: "2030-01-16" },
+            source: { file: DEMO_TRADING212_FILE, row: 17 },
+          },
+          {
+            account: DEMO_TRADING212_ACCOUNT,
+            purchaseDate: "2025-04-15",
+            quantity: "1.2468",
+            price: { amount: "120.31", currency: "EUR" },
+            splitAdjusted: false,
+            rate: null,
+            unitCostEur: "120.31",
+            costEur: "150.00",
+            bucket: "25",
+            next: { bucket: "20", from: "2030-04-16" },
+            source: { file: DEMO_TRADING212_FILE, row: 19 },
+          },
+          {
+            account: DEMO_TRADING212_ACCOUNT,
+            purchaseDate: "2025-07-15",
+            quantity: "1.131",
+            price: { amount: "132.63", currency: "EUR" },
+            splitAdjusted: false,
+            rate: null,
+            unitCostEur: "132.63",
+            costEur: "150.00",
+            bucket: "25",
+            next: { bucket: "20", from: "2030-07-16" },
+            source: { file: DEMO_TRADING212_FILE, row: 21 },
+          },
+          {
+            account: DEMO_TRADING212_ACCOUNT,
+            purchaseDate: "2025-10-15",
+            quantity: "1.0745",
+            price: { amount: "139.6", currency: "EUR" },
+            splitAdjusted: false,
+            rate: null,
+            unitCostEur: "139.6",
+            costEur: "150.00",
+            bucket: "25",
+            next: { bucket: "20", from: "2030-10-16" },
+            source: { file: DEMO_TRADING212_FILE, row: 24 },
+          },
+        ],
+      },
+      {
+        isin: "US0378331005",
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        isFund: false,
+        asOf: "2026-08-13",
+        quantity: "10",
+        costEur: "1500.81",
+        incomplete: false,
+        accounts: [DEMO_IBKR_ACCOUNT],
+        lots: [
+          {
+            account: DEMO_IBKR_ACCOUNT,
+            purchaseDate: "2022-03-03",
+            quantity: "10",
+            price: { amount: "166.23", currency: "USD" },
+            splitAdjusted: false,
+            rate: {
+              currency: "USD",
+              rate: "1.1076",
+              listDate: "2022-03-03",
+              source: "bsi-daily",
+            },
+            unitCostEur: "150.08125677",
+            costEur: "1500.81",
+            bucket: "25",
+            next: { bucket: "20", from: "2027-03-04" },
+            source: { file: DEMO_IBKR_FILE, row: 61 },
+          },
+        ],
+      },
+      {
+        // Held at two brokers and sold at one: the sale at IBKR used the
+        // oldest lot, bought at Trading 212, so the lot left is IBKR's.
+        isin: "US67066G1040",
+        symbol: "NVDA",
+        name: "NVIDIA Corp.",
+        isFund: false,
+        asOf: "2026-06-18",
+        quantity: "10",
+        costEur: "901.97",
+        incomplete: false,
+        accounts: [DEMO_IBKR_ACCOUNT],
+        lots: [
+          {
+            account: DEMO_IBKR_ACCOUNT,
+            purchaseDate: "2024-08-05",
+            quantity: "10",
+            price: { amount: "98.91", currency: "USD" },
+            splitAdjusted: false,
+            rate: {
+              currency: "USD",
+              rate: "1.0966",
+              listDate: "2024-08-05",
+              source: "bsi-daily",
+            },
+            unitCostEur: "90.19697246",
+            costEur: "901.97",
+            bucket: "25",
+            next: { bucket: "20", from: "2029-08-06" },
+            source: { file: DEMO_IBKR_FILE, row: 147 },
+          },
+        ],
+      },
+    ],
+    totals: {
+      securities: 3,
+      lots: 7,
+      costEur: "3002.94",
+      withoutRate: 0,
+      asOfFirst: "2026-06-18",
+      asOfLast: "2026-08-13",
+    },
+  },
   dividendsByMonth: [
     { month: "2026-01", grossEur: "2.78" },
     { month: "2026-02", grossEur: "14.76" },

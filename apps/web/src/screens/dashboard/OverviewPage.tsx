@@ -231,6 +231,29 @@ export function OverviewPage({
             }}
           />
           <DrillCard
+            title={t.dash.holdings}
+            figure={
+              preview.holdings === null ? (
+                <span className="muted">{t.held.failedShort}</span>
+              ) : (
+                <Amount value={preview.holdings.totals.costEur} size="md" />
+              )
+            }
+            detail={
+              preview.holdings === null
+                ? t.held.failed
+                : `${t.dash.heldCardLabel} · ${plural(
+                    preview.holdings.totals.securities,
+                    locale,
+                    t.dash.countHoldings,
+                  )}`
+            }
+            action={t.dash.viewHoldings}
+            onOpen={() => {
+              onNavigate("holdings");
+            }}
+          />
+          <DrillCard
             title={t.dash.notes}
             figure={
               <span className="drill-count num">

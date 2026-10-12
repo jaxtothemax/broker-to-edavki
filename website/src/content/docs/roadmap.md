@@ -34,8 +34,9 @@ Planned scope:
   and rate kept next to every converted amount.
 - **Browser app:** it will run on your device, with nothing uploaded, in Slovenian and English.
   After you add your files and details, it will open a dashboard of your results: the tax to
-  pay as an estimate, the two returns to download, and a page each for your gains, dividends
-  and notes, with the shares you still hold and a section per broker account to follow.
+  pay as an estimate, the two returns to download, and a page each for your gains, dividends,
+  the shares you still hold and notes, with a page per broker account where you have more than
+  one.
 - **Command-line tool (CLI):** the same results, for scripts and repeatable runs.
 - **FURS XML format:** files built to FURS's published schemas, with tests that check the output
   against them.

@@ -16,7 +16,15 @@ import { isFindingCode } from "../i18n/present";
 import {
   BROKERS,
   HOLDING_BUCKETS,
+  MISSING_RATES,
+  type AccountRef,
+  type AccountSummary,
   type BrokerId,
+  type HeldLotRow,
+  type HeldSecurity,
+  type HoldingsPreview,
+  type HoldingsTotals,
+  type PositionRow,
   type DividendRow,
   type Finding,
   type FindingParam,
@@ -352,6 +360,86 @@ const isMonth = (v: unknown): v is MonthlyAmount =>
   MONTH.test(v["month"]) &&
   isDecimal(v["grossEur"]);
 
+/** "ibkr-1": a broker's name and a number, never a scope, which has a colon. */
+const ACCOUNT_ID = /^[a-z0-9]{1,32}-[1-9]\d{0,3}$/;
+
+const isAccountRef = (v: unknown): v is AccountRef =>
+  isRecord(v) &&
+  isString(v["id"]) &&
+  ACCOUNT_ID.test(v["id"]) &&
+  isBroker(v["broker"]) &&
+  isCount(v["ordinal"]) &&
+  v["ordinal"] >= 1 &&
+  v["id"] === `${v["broker"]}-${String(v["ordinal"])}` &&
+  typeof v["showOrdinal"] === "boolean";
+
+const isPosition = (v: unknown): v is PositionRow =>
+  isRecord(v) &&
+  isAnIsin(v["isin"]) &&
+  isString(v["symbol"]) &&
+  isString(v["name"]) &&
+  typeof v["isFund"] === "boolean" &&
+  isDecimal(v["quantity"]);
+
+const isAccountSummary = (v: unknown): v is AccountSummary =>
+  isAccountRef(v) &&
+  isRecord(v) &&
+  isDateOrNull(v["asOf"]) &&
+  isArrayOf(v["files"], isString) &&
+  typeof v["transferred"] === "boolean" &&
+  typeof v["refusedRows"] === "boolean" &&
+  isArrayOf(v["positions"], isPosition);
+
+const isHeldLot = (v: unknown): v is HeldLotRow => {
+  if (!isRecord(v)) return false;
+  const next = v["next"];
+  return (
+    isAccountRef(v["account"]) &&
+    isDate(v["purchaseDate"]) &&
+    isDecimal(v["quantity"]) &&
+    isMoney(v["price"]) &&
+    typeof v["splitAdjusted"] === "boolean" &&
+    isRate(v["rate"]) &&
+    (v["missingRate"] === undefined ||
+      (MISSING_RATES as readonly unknown[]).includes(v["missingRate"])) &&
+    (v["unitCostEur"] === null || isDecimal(v["unitCostEur"])) &&
+    (v["costEur"] === null || isDecimal(v["costEur"])) &&
+    isBucket(v["bucket"]) &&
+    (next === null ||
+      (isRecord(next) && isBucket(next["bucket"]) && isDate(next["from"]))) &&
+    isSource(v["source"])
+  );
+};
+
+const isHeldSecurity = (v: unknown): v is HeldSecurity =>
+  isRecord(v) &&
+  isAnIsin(v["isin"]) &&
+  isString(v["symbol"]) &&
+  isString(v["name"]) &&
+  typeof v["isFund"] === "boolean" &&
+  isDate(v["asOf"]) &&
+  isDecimal(v["quantity"]) &&
+  (v["costEur"] === null || isDecimal(v["costEur"])) &&
+  typeof v["incomplete"] === "boolean" &&
+  isArrayOf(v["accounts"], isAccountRef) &&
+  isArrayOf(v["lots"], isHeldLot);
+
+const isTotals = (v: unknown): v is HoldingsTotals =>
+  isRecord(v) &&
+  isCount(v["securities"]) &&
+  isCount(v["lots"]) &&
+  isDecimal(v["costEur"]) &&
+  isCount(v["withoutRate"]) &&
+  isDateOrNull(v["asOfFirst"]) &&
+  isDateOrNull(v["asOfLast"]);
+
+/** The shares still held, in full: the mapper checks its own output too. */
+export const isHoldings = (v: unknown): v is HoldingsPreview =>
+  isRecord(v) &&
+  isArrayOf(v["accounts"], isAccountSummary) &&
+  isArrayOf(v["securities"], isHeldSecurity) &&
+  isTotals(v["totals"]);
+
 /** The results, every field the dashboard reads. */
 function isPreview(v: unknown): v is ReturnPreview {
   if (!isRecord(v)) return false;
@@ -382,7 +470,8 @@ function isPreview(v: unknown): v is ReturnPreview {
       "taxDueEur",
     ) &&
     isArrayOf(v["dividendsByMonth"], isMonth) &&
-    isDecimal(v["taxToPayEur"])
+    isDecimal(v["taxToPayEur"]) &&
+    (v["holdings"] === null || isHoldings(v["holdings"]))
   );
 }
 
