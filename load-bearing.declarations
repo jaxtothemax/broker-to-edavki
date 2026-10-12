@@ -175,3 +175,7 @@ why:  The only check that the docs sidebar links the web app exactly when the ap
 path: .github/workflows/docs.yml
 call: if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then
 why:  The only thing keeping the web app out of the Pages artifact until PUBLISH_WEB_APP is true. Delete the guard and the next push to main publishes the app with every gate green.
+
+path: apps/web/src/tour/TourLayer.tsx
+call: place(true);
+why:  The only place a stop is judged: with `judge`, a presentation whose lines cannot be drawn clear of the text and controls, or whose boxes would leave the band between the sticky header and the dock, gives way to the next, the sheet at last (ADR 0016, section 5). The silent break is not deleting this line (then no stop is ever laid out and every e2e spec waiting for `data-ready` fails) but changing it to `place()`: every stop still lays out, but a line that cannot be drawn is left out and a box may sit under the header, with nothing saying which target it explains. No stop of the demo at 1440x900 needs the fallback, so the unit tests stay green; tour-lines.spec.ts at 1280x800 catches it.
