@@ -20,8 +20,9 @@
 #                        Pages artifact (on PRs too, so the artifact a PR would
 #                        publish is inspectable). It never installs or runs the
 #                        web app's toolchain, and restores no cache. It still
-#                        runs when base-path or web-app fails, and then fails
-#                        at once: skipped, it would count as passed.
+#                        runs when base-path or web-app fails (not when the run
+#                        is cancelled), and then fails at once: skipped, it
+#                        would count as passed.
 #   pages                publishes that already-verified artifact from main,
 #                        without rebuilding
 #
@@ -88,10 +89,11 @@
 # step of that job. So it runs in web-app, whose token can only read the
 # repository and which has no step that builds, uploads or deploys the Pages
 # artifact. website-build never installs it: it takes the built app only as a
-# downloaded artifact, refuses it unless it is small and holds nothing but
-# regular files and directories, and re-runs the checker from its own checkout
-# (the verifier is the repository's script, never anything from the artifact)
-# before copying the files under app/.
+# downloaded artifact and, just before copying the files under app/ (after npm
+# ci and the docs build, so no later step can change what it checked), refuses
+# it unless it is small and holds nothing but regular files and directories,
+# and re-runs the checker from its own checkout (the verifier is the
+# repository's script, never anything from the artifact).
 #
 # website-build restores no cache, on purpose. Code in any job can write the
 # Actions cache (web-app's build on a push to main, or any `cache: pnpm` job in
@@ -99,18 +101,28 @@
 # tar -P, which keeps absolute and ".." paths: a poisoned cache restored there
 # could overwrite the checker, node or a later action before the re-check runs.
 # So its setup-node has no `cache:` and automatic caching off, which costs about
-# 30 seconds a run. Keep website-build free of every cache restore.
+# 30 seconds a run. Nothing but this comment keeps a cache out of website-build:
+# a reviewer must reject any `cache:` input or actions/cache step there.
 #
 # What is left, stated plainly. No step of web-app runs in website-build or
 # pages: they run on other machines, restore no cache, and take web-app's work
-# only as the web-app artifact, which website-build checks and never runs. But
-# compromised build code still writes the app's own files: a script it hides
-# inside a bundle the policy allows passes every check here and is published
-# with the app, on the same origin as these docs and every other Pages site of
-# the account (ADR 0009), where it runs for anyone who opens the app. A file it
-# adds beside them is refused. And website-build runs third-party code of its
-# own: npm ci and the docs build (Astro, Starlight) run after the re-check and
-# before the copy and the upload.
+# only as the web-app artifact, which website-build checks and never runs. But:
+#   - Compromised build code still writes the app's own files: a script it
+#     hides inside a bundle the policy allows passes every check here and is
+#     published with the app, on the same origin as these docs and every other
+#     Pages site of the account (ADR 0009), where it runs for anyone who opens
+#     the app. A file it adds beside them is refused.
+#   - website-build runs third-party code of its own: npm ci and the docs build
+#     (Astro, Starlight) run in the same job before the re-check, so they could
+#     change the checker, or the files it reads, as they could change every
+#     docs page they build. They are trusted that far.
+#   - Unverified: code in web-app may be able to take that job's runtime token
+#     (what its actions use to upload artifacts) and, while the run lasts, use
+#     it to delete the github-pages artifact after website-build uploads it and
+#     upload another under the same name; deploy-pages picks the artifact by
+#     name. Comparing the run's github-pages artifact ID with the one
+#     website-build uploaded, before deploying, would close that path: an idea
+#     tracked on issue #70, not implemented.
 
 name: docs
 
@@ -291,11 +303,13 @@ jobs:
 
   website-build:
     needs: [detect, base-path, web-app]
-    # always(): when base-path or web-app fails, this job still runs, and its
-    # first step fails it. A skipped job counts as passed for a required check,
-    # so without this a lost Content Security Policy or a wrong base path would
-    # turn web-app red and leave the merge unblocked.
-    if: always() && needs.detect.outputs.site == 'true'
+    # !cancelled(): when base-path or web-app fails, this job still runs, and
+    # its first step fails it. A skipped job counts as passed for a required
+    # check, so without this a lost Content Security Policy or a wrong base path
+    # would turn web-app red and leave the merge unblocked. Unlike always(), a
+    # cancelled run does not start it. Wrapped in ${{ }} because YAML reads a
+    # leading "!" as a tag.
+    if: ${{ !cancelled() && needs.detect.outputs.site == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # The workflow default, `contents: read`: the Pages lookup is base-path's.
@@ -344,43 +358,14 @@ jobs:
           package-manager-cache: false
       # ── The web app, only when PUBLISH_WEB_APP is "true" ───────────────────
       # Downloaded outside the checkout (runner.temp), so nothing from it lands
-      # in website/ or next to the scripts that check it.
+      # in website/ or next to the scripts that check it. It is checked later,
+      # just before the copy.
       - name: Download the web app that web-app built
         if: steps.publish.outputs.app == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: web-app
           path: ${{ runner.temp }}/web-app
-      # The artifact is not trusted; this job's checkout is. So the checker that
-      # runs here is the repository's own script, self-tested first in this job
-      # (scripts/CLAUDE.md), and it reads the downloaded files without running
-      # them. The shell prints no entry names (they come from the artifact); the
-      # checker prints them JSON-escaped, so none can start a line of its own.
-      # The caps sit far above a real build (about 20 files: index.html, six
-      # scripts, a stylesheet and the fonts, under 2 MB) and refuse a flood of
-      # files or bytes before the checks below read it.
-      - name: Check the downloaded web app again
-        if: steps.publish.outputs.app == 'true'
-        working-directory: .
-        env:
-          WEB_APP_DIR: ${{ runner.temp }}/web-app
-          WEB_BASE: ${{ needs.base-path.outputs.app }}
-          MAX_ENTRIES: "200"
-          MAX_KIB: "51200"
-        run: |
-          entries="$(find "$WEB_APP_DIR" | wc -l)"
-          kib="$(du -sk --apparent-size "$WEB_APP_DIR" | cut -f1)"
-          if [ "$entries" -gt "$MAX_ENTRIES" ] || [ "$kib" -gt "$MAX_KIB" ]; then
-            echo "::error::the downloaded web app has ${entries} entries and ${kib} KiB, over the caps of ${MAX_ENTRIES} entries and ${MAX_KIB} KiB; refusing to publish it."
-            exit 1
-          fi
-          odd="$(find "$WEB_APP_DIR" ! -type f ! -type d)"
-          if [ -n "$odd" ]; then
-            echo "::error::the downloaded web app holds entries that are neither regular files nor directories (job web-app lists them); refusing to publish it."
-            exit 1
-          fi
-          node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
-          node apps/web/scripts/pages-build/check-pages-build.mjs "$WEB_APP_DIR" "$WEB_BASE"
       # ── The documentation site ─────────────────────────────────────────────
       - run: npm ci
       # astro build empties its output directory, but not completely: Astro's
@@ -451,11 +436,47 @@ jobs:
             exit 1
           fi
           echo "The built docs link the web app: ${linked}, as PUBLISH_WEB_APP says."
+      # ── The web app again, only when PUBLISH_WEB_APP is "true" ─────────────
+      # The artifact is not trusted; this job's checkout is. So the checker that
+      # runs here is the repository's own script, self-tested first in this job
+      # (scripts/CLAUDE.md), and it reads the downloaded files without running
+      # them. It runs last before the copy, after npm ci and the docs build, so
+      # no later step can change the files it checked; the copy runs only if
+      # this step itself succeeded (its outcome, not just the job's state, so
+      # continue-on-error here would not let an unchecked app through). The
+      # shell prints no entry names (they come from the artifact); the
+      # checker prints them JSON-escaped, so none can start a line of its own.
+      # The caps sit far above a real build (about 20 files: index.html, six
+      # scripts, a stylesheet and the fonts, under 2 MB) and refuse a flood of
+      # files or bytes before the checks below read it.
+      - name: Check the downloaded web app again
+        id: recheck
+        if: steps.publish.outputs.app == 'true'
+        working-directory: .
+        env:
+          WEB_APP_DIR: ${{ runner.temp }}/web-app
+          WEB_BASE: ${{ needs.base-path.outputs.app }}
+          MAX_ENTRIES: "200"
+          MAX_KIB: "51200"
+        run: |
+          entries="$(find "$WEB_APP_DIR" | wc -l)"
+          kib="$(du -sk --apparent-size "$WEB_APP_DIR" | cut -f1)"
+          if [ "$entries" -gt "$MAX_ENTRIES" ] || [ "$kib" -gt "$MAX_KIB" ]; then
+            echo "::error::the downloaded web app has ${entries} entries and ${kib} KiB, over the caps of ${MAX_ENTRIES} entries and ${MAX_KIB} KiB; refusing to publish it."
+            exit 1
+          fi
+          odd="$(find "$WEB_APP_DIR" ! -type f ! -type d)"
+          if [ -n "$odd" ]; then
+            echo "::error::the downloaded web app holds entries that are neither regular files nor directories (job web-app lists them); refusing to publish it."
+            exit 1
+          fi
+          node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
+          node apps/web/scripts/pages-build/check-pages-build.mjs "$WEB_APP_DIR" "$WEB_BASE"
       # The app goes under the docs base followed by app/ (/<repo>/app/ on a
       # project site, /app/ on a custom domain). The copy never follows links
       # (cp -P), and the check above refused any.
       - name: Add the web app to the Pages artifact
-        if: steps.publish.outputs.app == 'true'
+        if: steps.publish.outputs.app == 'true' && steps.recheck.outcome == 'success'
         working-directory: .
         env:
           WEB_APP_DIR: ${{ runner.temp }}/web-app

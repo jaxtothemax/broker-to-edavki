@@ -30,14 +30,21 @@ repository, at `https://<owner>.github.io/<repo>/` for project sites.
   workflow artifact. The job that builds and uploads the Pages artifact never runs the app's
   toolchain and restores no cache: code in any job can write the Actions cache, and a
   restored archive can overwrite files outside its own directory, the checker among them,
-  before the checker runs. It downloads the build only when publishing, checks it again
-  with the repository's own checker, which refuses any file but `index.html` and the
-  scripts, stylesheets and fonts under `assets/`, and copies it under `app/`. No code from
-  the app's job runs in that job or in the deploy. What remains: compromised build-time
-  code can still hide a script in the app's own bundles, which pass those checks and are
-  published with the app, and the job that uploads the Pages artifact still runs the docs
-  site's own third-party dependencies (`npm ci` and the Astro build) between the check and
-  the upload.
+  before the checker runs. It downloads the build only when publishing and, just before
+  copying it under `app/` (after `npm ci` and the docs build, so no later step can change
+  what was checked), checks it again with the repository's own checker, which refuses any
+  file but `index.html` and the scripts, stylesheets and fonts under `assets/`. No code
+  from the app's job runs in that job or in the deploy. What remains: compromised
+  build-time code can still hide a script in the app's own bundles, which pass those checks
+  and are published with the app. The job that uploads the Pages artifact runs the docs
+  site's own third-party dependencies (`npm ci` and the Astro build) before the check, so
+  they could change the checker or the files it reads, as they could change every docs
+  page they build. And, unverified: code in the app's job may be able to take that job's
+  runtime token and, while the run lasts, delete the `github-pages` artifact after it is
+  uploaded and upload another under the same name, which `deploy-pages` picks by name.
+  Comparing the run's `github-pages` artifact ID with the one the build job uploaded,
+  before deploying, would close that path; it is an idea tracked on issue #70, not
+  implemented.
 - **Base paths come from the build.** They come from `actions/configure-pages` at build time,
   read once in one job for both the docs and the app, never from a hardcoded repository name.
 - **The CLI comes later.** It will be published to npm once v0.1 is usable. Until then it runs
@@ -56,20 +63,23 @@ repository, at `https://<owner>.github.io/<repo>/` for project sites.
   other Pages site of the same account, including sites this project does not control. A
   page on that origin can open the app in a window and read what it shows, a tax number and
   parsed broker rows included: the frame guard cannot help against a same-origin page, and
-  `'self'` in the app's Content Security Policy covers the whole origin. Issue #4 settles
-  framing with a frame guard (the app does not start inside a frame) and a note on the
-  privacy page, and accepts this residual risk for the preview. The stronger fix is an
-  origin that holds nothing else: a custom domain for the Pages site, or a dedicated GitHub
-  account or organization for the app.
+  `'self'` in the app's Content Security Policy covers the whole origin. On 2026-10-12 the
+  maintainer decided, for the preview, to accept publishing on the shared `github.io`
+  origin, with the frame guard (the app does not start inside a frame) and a note on the
+  privacy page. An origin that holds nothing else, a custom domain for the Pages site or a
+  dedicated GitHub account or organization for the app, is wanted later. The account's
+  other Pages site that loaded a third-party script has been unpublished. The decision is
+  recorded in issue #4.
 - **A service worker stays possible.** The policy keeps `worker-src 'self' blob:`, so the
   app's own code could register a service worker, which can outlive taking the app down.
   Allowing only `blob:` was tried and stops the engine in Chromium, Firefox and WebKit: the
   bootstrap's static `import` of the engine is checked against `worker-src`. A service
   worker can only control pages under the folder its script is served from, and the build
   check allows scripts only in `app/assets/`, where no page of the app lives. A bootstrap
-  that loads the engine with a dynamic `import()` works under `blob:` alone, but a failed
-  load then reaches the page only at the client's timeout, so it would change ADR 0013's
-  bootstrap and is not done here.
+  that loads the engine with a dynamic `import()` works under `blob:` alone only while the
+  engine bundle has no static imports, because Firefox checks static imports of a `blob:`
+  worker against `worker-src`; and a failed load then reaches the page only at the
+  client's timeout. So it would change ADR 0013's bootstrap and is not done here.
 
 ## On Acceptance
 

@@ -69,10 +69,10 @@ site that frames a page from another site cannot read what that page shows or wh
 into it.
 
 That last protection does not hold for pages on the same origin (the same scheme, host and
-port). GitHub Pages serves this site, the app and every other Pages site of the same GitHub
-account from one origin, `https://<owner>.github.io`. A page on that origin can open the app in
-a new window and read everything it shows, a tax number and your broker rows included,
-while you use it. Neither the frame guard nor the app's Content Security Policy can stop it:
+port). GitHub Pages serves this site, the app when it is published, and every other Pages
+site of the same GitHub account from one origin, `https://<owner>.github.io`. A page on that
+origin can open the app in a new window and read everything it shows, a tax number and your
+broker rows included, while you use it. Neither the frame guard nor the app's Content Security Policy can stop it:
 the guard only keeps the app from starting inside a frame, and the policy trusts its whole
 origin. This site loads nothing from other sites, but the account's other Pages sites are not
 part of this project. The way to close this is to serve the app from an origin of its own, a

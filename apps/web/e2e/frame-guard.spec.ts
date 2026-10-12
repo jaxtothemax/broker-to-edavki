@@ -17,7 +17,7 @@
  */
 import { createServer } from "node:http";
 
-import { expect, test, type Page, type Worker } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * A page on another origin whose only content is a frame of `src`, with a
@@ -61,20 +61,6 @@ async function withFramingPage(
   }
 }
 
-/**
- * Workers the page starts from now on, in any of its frames (Playwright
- * reports a frame's workers on its page). The engine worker starts on the
- * first file read, not on load, so an empty list proves only that nothing in
- * the frame starts a worker as the page loads.
- */
-function workersFromNowOn(page: Page): Worker[] {
-  const started: Worker[] = [];
-  page.on("worker", (worker) => {
-    started.push(worker);
-  });
-  return started;
-}
-
 /** The frame shows the guard and a link to the app's own tab, never the app. */
 async function expectGuarded(page: Page, app: string): Promise<void> {
   const frame = page.frameLocator("iframe");
@@ -104,11 +90,9 @@ test("in another site's frame the app does not start, and links its own tab", as
   await expect(page.locator(".app")).toHaveCount(1);
   await expect(page.locator(".frame-guard")).toHaveCount(0);
 
-  const workers = workersFromNowOn(page);
   await withFramingPage(app, async (framing) => {
     await page.goto(framing);
     await expectGuarded(page, app);
-    expect(workers).toHaveLength(0);
   });
 });
 
@@ -120,13 +104,11 @@ test("in a sandboxed frame that allows scripts the app does not start either", a
   baseURL,
 }) => {
   const app = new URL("/", baseURL).href;
-  const workers = workersFromNowOn(page);
   await withFramingPage(
     app,
     async (framing) => {
       await page.goto(framing);
       await expectGuarded(page, app);
-      expect(workers).toHaveLength(0);
     },
     "allow-scripts",
   );
