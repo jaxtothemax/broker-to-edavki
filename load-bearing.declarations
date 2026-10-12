@@ -166,7 +166,7 @@ why:  Keeps website-build running when web-app or base-path fails (but not in a 
 
 path: .github/workflows/docs.yml
 call: if [ "$BASE_PATH_RESULT" != "success" ] || [ "$WEB_APP_RESULT" != "success" ]; then
-why:  The only thing that turns a failed web-app or base-path into a red website-build, the job branch protection requires. Delete it and website-build builds the docs and passes while web-app is red, so the merge goes through.
+why:  The only thing that turns a failed web-app or base-path into a red website-build, the job branch protection requires. Delete this if block (or the whole step) and website-build builds the docs and passes while web-app is red, so the merge goes through. Deleting only this line is a shell syntax error, red at once; the stanza names the if line, as the guards above do, so either deletion fails this gate.
 
 path: .github/workflows/docs.yml
 call: if [ "$linked" != "$PUBLISHED" ]; then

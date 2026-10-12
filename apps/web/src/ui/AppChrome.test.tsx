@@ -1,6 +1,6 @@
 /**
  * The preview notice (#70) on each kind of screen, in both languages: the
- * start screen, a wizard step and the dashboard shell. Server-rendered, as in
+ * start screen, each wizard step and the dashboard shell. Server-rendered, as in
  * App.test.tsx: the tests run in Node without a DOM.
  */
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,6 +22,10 @@ function stateAfter(...actions: WizardAction[]): WizardState {
 const SCREENS: [string, WizardState][] = [
   ["start", initialWizardState],
   ["files", stateAfter({ type: "startDemo" })],
+  [
+    "details",
+    stateAfter({ type: "startDemo" }, { type: "goTo", screen: "details" }),
+  ],
   [
     "dashboard",
     stateAfter({ type: "startDemo" }, { type: "goTo", screen: "dashboard" }),

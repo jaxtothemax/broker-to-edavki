@@ -122,7 +122,11 @@
 #     upload another under the same name; deploy-pages picks the artifact by
 #     name. Comparing the run's github-pages artifact ID with the one
 #     website-build uploaded, before deploying, would close that path: an idea
-#     tracked on issue #70, not implemented.
+#     tracked on issue #70, not implemented. This path does not depend on
+#     PUBLISH_WEB_APP: web-app builds the app on every run, so it exists with
+#     the variable unset, and "publishing is off" does not mean merging adds no
+#     exposure. It is smaller than before this layout, when the same build code
+#     ran inside the job that uploads the Pages artifact.
 
 name: docs
 
@@ -447,7 +451,7 @@ jobs:
       # shell prints no entry names (they come from the artifact); the
       # checker prints them JSON-escaped, so none can start a line of its own.
       # The caps sit far above a real build (about 20 files: index.html, six
-      # scripts, a stylesheet and the fonts, under 2 MB) and refuse a flood of
+      # scripts, a stylesheet and the fonts, about 2.5 MB) and refuse a flood of
       # files or bytes before the checks below read it.
       - name: Check the downloaded web app again
         id: recheck

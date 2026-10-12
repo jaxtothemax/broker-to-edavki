@@ -44,7 +44,10 @@ repository, at `https://<owner>.github.io/<repo>/` for project sites.
   uploaded and upload another under the same name, which `deploy-pages` picks by name.
   Comparing the run's `github-pages` artifact ID with the one the build job uploaded,
   before deploying, would close that path; it is an idea tracked on issue #70, not
-  implemented.
+  implemented. This path does not depend on the variable: the app's job runs on every
+  run, so it exists while publishing is off, and "publishing is off" does not mean that
+  merging adds no exposure. It is smaller than before this layout, when the same build code
+  ran inside the job that uploads the Pages artifact.
 - **Base paths come from the build.** They come from `actions/configure-pages` at build time,
   read once in one job for both the docs and the app, never from a hardcoded repository name.
 - **The CLI comes later.** It will be published to npm once v0.1 is usable. Until then it runs
