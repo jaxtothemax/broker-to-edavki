@@ -12,8 +12,10 @@ your broker already gives you, on your own device, and shows you where every num
 
 > **Status: pre-alpha, no release yet.** Version 0.1 is being built for tax year 2026 (returns
 > due by 1 March 2027), for Trading 212, Interactive Brokers and Trade Republic. The source can
-> already read these brokers' exports and write both returns: see [Try it](#try-it). Treat what
-> it writes as a draft to check, never as a finished return.
+> already read these brokers' exports and write both returns, and a
+> [preview of the browser app](https://jaxtothemax.github.io/broker-to-edavki/app/) runs online
+> with demo data to explore: see [Try it](#try-it). Treat what it writes as a draft to check,
+> never as a finished return.
 
 > [!IMPORTANT]
 > **Check every figure before you file.** TaxReporter can be wrong. The return you file is your
@@ -168,6 +170,12 @@ An optional AI "second opinion" is planned: it will run only with your own API k
 have seen exactly what it sends, and it will never change a figure.
 
 ## Try it
+
+The quickest way is the online preview:
+**[jaxtothemax.github.io/broker-to-edavki/app](https://jaxtothemax.github.io/broker-to-edavki/app/)**.
+It runs entirely in your browser, and nothing you add to it is uploaded. Start with **Explore the
+demo** and its guided tour. How it reads broker exports has not been checked against real exports
+yet, so treat every figure it shows as a draft.
 
 There is no release to install yet. To run it from source you need Node.js 24 and pnpm 10:
 
