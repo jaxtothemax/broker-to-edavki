@@ -57,6 +57,12 @@ export interface Route {
 
 /** What a bend costs, in pixels of line. */
 const BEND = 24;
+/**
+ * The most grid nodes a search may build. The page the tour runs over is the
+ * demo's, a few hundred obstacles and about 100,000 nodes; past this there is
+ * no route rather than a tab that stops answering.
+ */
+export const MAX_NODES = 500_000;
 /** Of a segment's length, the part not used for a start or a ring. */
 const OFF_CENTER = 0.35;
 
@@ -276,7 +282,7 @@ export function route(input: RouteInput): Route | null {
   const ys = axis(yValues.filter((y) => y >= room.top && y <= roomBottom));
   const nx = xs.length;
   const ny = ys.length;
-  if (nx < 2 || ny < 2) return null;
+  if (nx < 2 || ny < 2 || nx * ny > MAX_NODES) return null;
 
   // Blocked nodes and edges: those strictly inside a grown obstacle.
   const nodeBlocked = new Uint8Array(nx * ny);

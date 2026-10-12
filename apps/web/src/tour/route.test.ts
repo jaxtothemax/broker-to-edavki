@@ -247,3 +247,31 @@ describe("a line kept clear", () => {
     ).toBe(false);
   });
 });
+
+describe("a route's bounds", () => {
+  it("builds no grid past its limit: there is no route, not a stalled tab", () => {
+    // A thousand separate obstacles, each its own columns and rows.
+    const many = Array.from({ length: 1000 }, (_, k) =>
+      box(10 + (k % 40) * 9.7, 10 + Math.floor(k / 40) * 11.3, 3, 3),
+    );
+    const big: Box = { left: 0, top: 0, width: 800, height: 600 };
+    const started = performance.now();
+    const found = route({ ...input(many), bounds: big });
+    // Either it is within the limit and answers, or it refuses at once; it
+    // never takes long to say which.
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(found === null || found.line.length >= 2).toBe(true);
+  });
+
+  it("refuses at once when the grid would pass the limit", () => {
+    const many = Array.from({ length: 2000 }, (_, k) =>
+      box(5 + k * 0.37, 5 + k * 0.29, 0.2, 0.2),
+    );
+    const found = route({
+      ...input(many),
+      bounds: { left: 0, top: 0, width: 800, height: 600 },
+      clearance: 0.05,
+    });
+    expect(found).toBeNull();
+  });
+});

@@ -25,6 +25,14 @@ const GONE = "[hidden], .visually-hidden, dialog.tour";
 /** Smaller than this is a hairline or a clip, not something to steer round. */
 const LEAST = 2;
 
+/**
+ * The most obstacles taken in. The tour runs over the demo, a few hundred at a
+ * time; a page with more than this is not one to steer lines across, so the
+ * whole window counts as in the way, no line has a route, and the stop is
+ * shown as the sheet.
+ */
+export const MAX_OBSTACLES = 6000;
+
 const boxOf = (r: DOMRect): Box => ({
   left: r.left,
   top: r.top,
@@ -107,6 +115,9 @@ export function measureObstacles(): readonly Box[] {
         style.backgroundColor,
       );
     if (painted) keep(element, rect);
+  }
+  if (out.length > MAX_OBSTACLES) {
+    return [{ left: 0, top: 0, width, height }];
   }
   return out;
 }
