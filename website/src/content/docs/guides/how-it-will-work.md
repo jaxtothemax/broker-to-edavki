@@ -88,6 +88,18 @@ lead to:
   first out across all your brokers, and their dates, quantities and euro values.
 - **Dividends:** each payment, with the tax already withheld abroad and the part of it
   Slovenia credits.
+- **Holdings:** the shares you still hold, across all your brokers: for each security, the
+  purchases a next sale would use, oldest first, with what each cost in euros at the Banka
+  Slovenije rate of its purchase date and the day it moves to a lower holding-period rate.
+  That day is the day after the purchase's anniversary: FURS has not said whether the
+  anniversary itself counts, so the day after is safe either way. Holdings are as of the last
+  day your files cover, not today, and show cost only: TaxReporter fetches no market prices, so
+  there is no market value.
+- **Accounts:** with two broker accounts or more, a page for each, listed under the sidebar's
+  pages on a computer and at the top of Holdings on a tablet or phone. Each will show that
+  account's own count of every security, to compare with your broker's app, and no tax
+  figure, since losses offset across brokers. An account whose files move shares in or out
+  will be flagged "may not match your broker": TaxReporter does not read transfers yet.
 - **Notes:** anything TaxReporter could not handle, with an explanation. Every row of your
   export will either be used, listed as ignored with a reason, or reported; nothing is dropped
   silently. A blocking problem, such as a corporate action TaxReporter does not support yet,
