@@ -18,6 +18,7 @@ import {
 import type { Locale } from "../i18n/format";
 import { en, sl, type Messages } from "../i18n/messages";
 import { HOLDING_BUCKETS } from "../model/preview";
+import { pageTitle } from "../screens/dashboard/names";
 import { FLOW_STEPS, initialWizardState, wizardReducer } from "../state/wizard";
 import {
   DEMO_AAPL,
@@ -155,7 +156,7 @@ describe("each stop on the screen it shows", () => {
               details: en.details.title,
               dashboard: en.dash.overview,
             }[stop.view.screen]
-          : en.dash[stop.view.dash.page];
+          : pageTitle(en, demoPreview, stop.view.dash);
       // The page's own heading, not the navigation that names every page.
       const shown = /<h1[^>]*>([^<]*)<\/h1>/.exec(page(html))?.[1] ?? "";
       expect(text(shown).trim(), stop.id).toBe(heading);

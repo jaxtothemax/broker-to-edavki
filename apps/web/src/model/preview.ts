@@ -235,6 +235,8 @@ export interface PositionRow {
   readonly isin: string;
   readonly symbol: string;
   readonly name: string;
+  /** Whether it is a fund, for the mark beside it (a fund house's wordmark). */
+  readonly isFund: boolean;
   /** Signed: negative where the files sell more than they buy. */
   readonly quantity: DecimalString;
 }
@@ -298,6 +300,8 @@ export interface HeldSecurity {
   readonly isin: string;
   readonly symbol: string;
   readonly name: string;
+  /** Whether it is a fund, for the mark beside it (a fund house's wordmark). */
+  readonly isFund: boolean;
   /** The day its lots are as of: the earliest among the accounts holding it. */
   readonly asOf: IsoDate;
   readonly quantity: DecimalString;

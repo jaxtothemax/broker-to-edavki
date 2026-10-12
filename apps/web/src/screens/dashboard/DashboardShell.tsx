@@ -2,7 +2,8 @@
  * The results dashboard (#47): where the flow ends once the files and the
  * details are in. A sidebar leads to the overview (the tax to pay, the
  * returns to download) and to a page for each part behind it: the gains,
- * the dividends and the notes. A note that stops a return withholds that
+ * the dividends, the shares still held and the notes, and on a desktop to
+ * a page for each broker account where there are two or more. A note that stops a return withholds that
  * return only, and never hides the dashboard (ADR 0018 §6). With the
  * user's own files the engine prepares the returns when the dashboard
  * opens, so until then it says it is working.
@@ -15,23 +16,35 @@ import {
   ArrowCounterClockwiseIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
+  BankIcon,
   CoinsIcon,
   DownloadSimpleIcon,
   MagnifyingGlassIcon,
   NotePencilIcon,
   SignpostIcon,
   SquaresFourIcon,
+  StackIcon,
   TrendUpIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
 import type { FormOutput } from "../../engine/protocol";
-import { formatPercent, formatNumber, plural } from "../../i18n/format";
+import {
+  formatDate,
+  formatPercent,
+  formatNumber,
+  plural,
+} from "../../i18n/format";
 import { useI18n } from "../../i18n/i18n";
 import type { Messages } from "../../i18n/messages";
 import type { ReturnPreview } from "../../model/preview";
 import { TAX_YEAR } from "../../state/wizard";
-import { AppShell, SideNav, type NavEntry } from "../../ui/AppShell";
+import {
+  AppShell,
+  SideNav,
+  type NavEntry,
+  type NavGroup,
+} from "../../ui/AppShell";
 import { Main } from "../../ui/AppChrome";
 import { DemoBanner, Eur, TOUR_BUTTON_ID } from "../../ui/bits";
 import { MonthBars, StackBar } from "../../ui/charts";
@@ -40,6 +53,9 @@ import { Amount, Button, Chip, Note } from "../../ui/kit";
 import { DividendsPanel } from "../review/DividendsPanel";
 import { GainsPanel } from "../review/GainsPanel";
 import { NotesPanel } from "../review/NotesPanel";
+import { AccountCard } from "./AccountParts";
+import { HoldingsPage } from "./HoldingsPage";
+import { accountName, pageTitle, shownAccount } from "./names";
 import { OverviewPage } from "./OverviewPage";
 import { neededForms, RETURNS_TITLE } from "./ReturnsCard";
 import { DASH_PAGES, type DashboardView, type DashPage } from "./view";
@@ -244,10 +260,28 @@ export function DashboardShell({
             ? [t.download.divTitle]
             : []),
         ];
-  const page: DashPage = ready ? view.page : "overview";
+  // An account page whose account is gone (the files changed) shows the
+  // holdings, which list the accounts there are.
+  const account = shownAccount(preview, view);
+  const page: DashPage = !ready
+    ? "overview"
+    : view.page === "account" && account === undefined
+      ? "holdings"
+      : view.page;
+  const shownView: DashboardView = { ...view, page };
   const year = String(preview?.taxYear ?? TAX_YEAR);
   const navigate = (next: DashPage) => {
     onViewChange({ ...view, page: next });
+  };
+  const openAccount = (id: string) => {
+    onViewChange({ ...view, page: "account", account: id });
+  };
+  const setHeld = (isin: string, open: boolean) => {
+    if (view.held.has(isin) === open) return;
+    const next = new Set(view.held);
+    if (open) next.add(isin);
+    else next.delete(isin);
+    onViewChange({ ...view, held: next });
   };
   const setOpen = (isin: string, open: boolean) => {
     if (view.sold.has(isin) === open) return;
@@ -262,7 +296,10 @@ export function DashboardShell({
   const blocking = notes.filter((d) => d.severity === "blocking").length;
   const needAttention = notes.filter((d) => d.severity !== "info").length;
   const count = (n: number) => formatNumber(String(n), locale);
-  const items: NavEntry<DashPage>[] = [
+  const holdings = preview?.holdings ?? null;
+  // A page of the navigation, or an account's page by its id.
+  type NavId = DashPage | `account:${string}`;
+  const items: NavEntry<NavId>[] = [
     {
       id: "overview",
       icon: <SquaresFourIcon size={20} weight="bold" />,
@@ -291,6 +328,21 @@ export function DashboardShell({
       ),
     },
     {
+      id: "holdings",
+      icon: <StackIcon size={20} weight="bold" />,
+      label: t.dash.holdings,
+      ...(holdings === null
+        ? {}
+        : {
+            count: count(holdings.securities.length),
+            countLabel: plural(
+              holdings.securities.length,
+              locale,
+              t.dash.countHoldings,
+            ),
+          }),
+    },
+    {
       id: "notes",
       icon: <NotePencilIcon size={20} weight="bold" />,
       label: t.dash.notes,
@@ -305,6 +357,37 @@ export function DashboardShell({
         : { tone: blocking > 0 ? ("danger" as const) : ("warn" as const) }),
     },
   ];
+
+  // Each account a page of its own, where there are two or more (with one,
+  // the holdings page says all). On a tablet or a phone the group is not
+  // shown and the holdings page lists the accounts; while an account's page
+  // is shown there, no item of the rail or the bar is marked current.
+  const groups: NavGroup<NavId>[] =
+    holdings === null || holdings.accounts.length < 2
+      ? []
+      : [
+          {
+            id: "accounts",
+            title: t.dash.accounts,
+            items: holdings.accounts.map((a) => ({
+              id: `account:${a.id}` as const,
+              icon: <BankIcon size={20} weight="bold" />,
+              label: accountName(t, a),
+              detail:
+                a.asOf === null
+                  ? t.acct.noDate
+                  : t.acct.asOf(formatDate(a.asOf, locale)),
+            })),
+          },
+        ];
+  const current: NavId =
+    page === "account" && account !== undefined
+      ? `account:${account.id}`
+      : page;
+  const select = (id: NavId) => {
+    if (id.startsWith("account:")) openAccount(id.slice("account:".length));
+    else navigate(id as DashPage);
+  };
 
   const tourButton =
     demo && onTour !== undefined ? (
@@ -387,16 +470,22 @@ export function DashboardShell({
       eyebrow={
         page === "overview"
           ? t.dash.eyebrowEstimate(year)
-          : t.dash.eyebrowYear(year)
+          : page === "holdings" || page === "account"
+            ? t.dash.eyebrowAsOf
+            : t.dash.eyebrowYear(year)
       }
-      title={t.dash[page]}
+      title={pageTitle(t, preview, shownView)}
       {...(page === "gains"
         ? { lead: t.dash.gainsLead }
         : page === "dividends"
           ? { lead: t.dash.dividendsLead }
           : page === "notes"
             ? { lead: t.dash.notesLead }
-            : {})}
+            : page === "holdings"
+              ? { lead: t.held.intro }
+              : page === "account"
+                ? { lead: t.acct.intro }
+                : {})}
       actions={actions}
     />
   );
@@ -432,6 +521,27 @@ export function DashboardShell({
             omitted={at.preview.omittedFindings}
             symbols={at.preview.symbols}
             fileNames={fileNames}
+          />
+        );
+      case "holdings":
+        return (
+          <HoldingsPage
+            holdings={at.preview.holdings}
+            open={view.held}
+            onToggle={setHeld}
+            onOpenAccount={openAccount}
+            onShowNotes={() => {
+              navigate("notes");
+            }}
+          />
+        );
+      case "account":
+        return account === undefined ? null : (
+          <AccountCard
+            account={account}
+            onShowNotes={() => {
+              navigate("notes");
+            }}
           />
         );
       case "overview":
@@ -473,7 +583,7 @@ export function DashboardShell({
   } else if (live === null) {
     body = <EmptyResults onStartDemo={onStartDemo} />;
   } else {
-    body = DASH_PAGES.map((shown) => (
+    body = [...DASH_PAGES, "account" as const].map((shown) => (
       <div key={shown} className="dash-page" hidden={shown !== page}>
         {/* One boundary a page: a page that fails to render, shown or
             hidden, leaves the others, the downloads and the user's files
@@ -491,10 +601,11 @@ export function DashboardShell({
         <SideNav
           label={t.dash.navLabel}
           items={items}
-          current={page}
+          groups={groups}
+          current={current}
           disabled={!ready}
           {...(ready ? {} : { describedBy: STATUS })}
-          onSelect={navigate}
+          onSelect={select}
           actions={side}
         />
       }

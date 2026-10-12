@@ -25,6 +25,7 @@ import type { Locale } from "./i18n/format";
 import { I18nProvider, useI18n } from "./i18n/i18n";
 import { formFileName } from "./model/preview";
 import { DashboardShell } from "./screens/dashboard/DashboardShell";
+import { pageTitle } from "./screens/dashboard/names";
 import {
   initialDashboardView,
   type DashboardView,
@@ -215,8 +216,8 @@ function Frame({
     document.title =
       state.screen === "start"
         ? t.app.name
-        : `${state.screen === "dashboard" ? t.dash[dashView.page] : t.stepper[state.screen]} · ${t.app.name}`;
-  }, [state.screen, dashView.page, t]);
+        : `${state.screen === "dashboard" ? pageTitle(t, preview, dashView) : t.stepper[state.screen]} · ${t.app.name}`;
+  }, [state.screen, dashView, preview, t]);
 
   // A new screen replaces the whole content: move focus to its heading so
   // keyboard and screen-reader users land at its start, hearing which screen it

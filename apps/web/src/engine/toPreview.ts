@@ -418,6 +418,7 @@ function toHoldings(holdings: Holdings, index: FileIndex): HoldingsPreview {
       isin: p.isin,
       symbol: tickerOf(p.security.symbol),
       name: nameText(p.security.name),
+      isFund: p.security.isFund === true,
       quantity: eight(p.quantity),
     })),
   }));
@@ -451,6 +452,7 @@ function toHoldings(holdings: Holdings, index: FileIndex): HoldingsPreview {
       isin: s.isin,
       symbol: tickerOf(s.security.symbol),
       name: nameText(s.security.name),
+      isFund: s.security.isFund === true,
       asOf: s.asOf,
       quantity: eight(s.quantity),
       costEur: s.costEur === null ? null : cents(s.costEur),

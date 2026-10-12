@@ -285,11 +285,71 @@ export interface Messages {
     readonly viewDividends: string;
     readonly viewNotes: string;
     readonly noNotes: string;
+    readonly holdings: string;
+    readonly accounts: string;
+    readonly countHoldings: PluralForms;
+    readonly viewHoldings: string;
+    readonly heldCardLabel: string;
+    readonly eyebrowAsOf: string;
     /** Read after the notes count when some ask for attention. */
     readonly countAttention: PluralForms;
     readonly resultsReady: string;
     /** Under the headline, for each return a note withholds. */
     readonly partWithheld: (form: string) => string;
+  };
+  /** The shares still held, across accounts (ADR 0018). */
+  readonly held: {
+    readonly intro: string;
+    readonly noPrices: string;
+    readonly history: string;
+    readonly whyDiffer: string;
+    readonly loneAccount: (account: string, date: string) => string;
+    readonly statShares: string;
+    readonly statCost: string;
+    readonly statLots: string;
+    readonly statAsOf: string;
+    readonly colBought: string;
+    readonly colAccount: string;
+    readonly colShares: string;
+    readonly colPrice: string;
+    readonly colRate: string;
+    readonly colCost: string;
+    readonly colRateOn: (date: string) => string;
+    readonly colNext: string;
+    readonly colSource: string;
+    readonly nextFrom: (rate: string, date: string) => string;
+    readonly nextZero: (rate: string) => string;
+    readonly nextNone: string;
+    readonly nextNote: string;
+    readonly lotsTitle: (security: string) => string;
+    readonly showLots: (security: string) => string;
+    readonly splitAdjusted: string;
+    readonly noRate: string;
+    readonly missingRate: (reason: string, currency: string) => string;
+    readonly incomplete: string;
+    readonly incompleteBody: (security: string, date: string) => string;
+    readonly cardWithoutRate: PluralForms;
+    readonly cardRange: (first: string, last: string) => string;
+    readonly emptyTitle: string;
+    readonly emptyBody: string;
+    readonly failed: string;
+    readonly failedShort: string;
+    readonly accountsLabel: string;
+  };
+  /** One broker account's own positions. */
+  readonly acct: {
+    readonly label: (broker: string, number: string) => string;
+    readonly intro: string;
+    readonly asOf: (date: string) => string;
+    readonly noDate: string;
+    readonly files: string;
+    readonly positions: (account: string) => string;
+    readonly colSecurity: string;
+    readonly colShares: string;
+    readonly none: string;
+    readonly transferred: string;
+    readonly refused: string;
+    readonly short: string;
   };
   readonly tour: {
     readonly action: string;
@@ -341,6 +401,11 @@ export interface Messages {
       readonly holiday: { readonly title: string; readonly intro: string };
       readonly treaty: { readonly title: string; readonly intro: string };
       readonly notes: { readonly title: string; readonly intro: string };
+      readonly stillHeld: { readonly title: string; readonly intro: string };
+      readonly accountCheck: {
+        readonly title: string;
+        readonly intro: string;
+      };
       readonly download: { readonly title: string; readonly intro: string };
     };
   };
@@ -427,6 +492,16 @@ export interface Messages {
     readonly returnForms: string;
     readonly edavkiImport: string;
     readonly youReviewAndSubmit: string;
+    readonly heldAsOf: (date: string) => string;
+    readonly nextBucketDay: (rate: string, date: string) => string;
+    readonly lotLeft: (
+      soldAt: string,
+      oldestAt: string,
+      leftAt: string,
+    ) => string;
+    readonly accountPosition: (broker: string, other: string) => string;
+    readonly transferNotRead: string;
+    readonly accountAsOf: (date: string) => string;
   };
   /**
    * Publishing the app as a preview (#70): the notice on every screen, and
@@ -810,6 +885,15 @@ export const en: Messages = {
     viewDividends: "View all dividends",
     viewNotes: "View notes",
     noNotes: "Nothing to note",
+    holdings: "Holdings",
+    accounts: "Accounts",
+    countHoldings: {
+      one: "{n} security held",
+      other: "{n} securities held",
+    },
+    viewHoldings: "View holdings",
+    heldCardLabel: "Still held, at cost",
+    eyebrowAsOf: "As of your files, not today",
     countAttention: {
       one: "{n} needs your attention",
       other: "{n} need your attention",
@@ -817,6 +901,85 @@ export const en: Messages = {
     resultsReady: "Your results are ready.",
     partWithheld: (form) =>
       `${form} is not written yet, so its part may change once its notes are fixed.`,
+  },
+  held: {
+    intro:
+      "The lots your next sale will use, oldest first, across all your accounts. Each security is as of the last day its accounts' files cover, not today.",
+    noPrices:
+      "Cost only, at Banka Slovenije rates. No price data leaves or enters your device, so there is no market value.",
+    history:
+      "Built from your files alone: if an older export is missing, so are the shares it bought.",
+    whyDiffer:
+      "Lots and an account's positions can differ when accounts end on different days, or one security is held at two brokers: a sale uses the oldest lot, wherever it is held.",
+    loneAccount: (account, date) =>
+      `With one account, these quantities should match ${account} on ${date}.`,
+    statShares: "Shares",
+    statCost: "Cost in EUR",
+    statLots: "Lots",
+    statAsOf: "As of",
+    colBought: "Bought",
+    colAccount: "Account",
+    colShares: "Shares",
+    colPrice: "Price",
+    colRate: "Exchange rate",
+    colCost: "Cost in EUR",
+    colRateOn: (date) => `Tax rate on ${date}`,
+    colNext: "Lower rate",
+    colSource: "Source",
+    nextFrom: (rate, date) => `${rate} from ${date}`,
+    nextZero: (rate) => `Already ${rate}`,
+    nextNone: "No date to show",
+    nextNote:
+      "Lower rate from: the day after the purchase's anniversary. FURS has not said whether the anniversary itself counts, so this day is safe either way.",
+    lotsTitle: (security) => `${security}: open lots, oldest first`,
+    showLots: (security) => `Show the open lots of ${security}`,
+    splitAdjusted: "Adjusted for splits",
+    noRate: "No rate yet",
+    missingRate: (reason, currency) => {
+      switch (reason) {
+        case "afterSnapshot":
+          return "Bought after the newest Banka Slovenije list this version has.";
+        case "beforeSnapshot":
+          return "Bought before the oldest list this version has.";
+        case "invalidDate":
+          return "The purchase date could not be read.";
+        default:
+          return `Banka Slovenije lists no rate for ${currency} on this day.`;
+      }
+    },
+    incomplete: "Sold more than these files bought",
+    incompleteBody: (security, date) =>
+      `By ${date} your files sell more ${security} than they buy. An older export is missing, so these lots may not be the ones you hold.`,
+    cardWithoutRate: {
+      one: "Without {n} lot that has no rate yet",
+      other: "Without {n} lots that have no rate yet",
+    },
+    cardRange: (first, last) =>
+      first === last
+        ? `As of ${first}`
+        : `Each security as of its accounts' last day, ${first} to ${last}`,
+    emptyTitle: "No shares left in your files",
+    emptyBody: "Every share your files bought was sold.",
+    failed:
+      "The shares still held could not be worked out from these files. The returns are not affected.",
+    failedShort: "Could not be worked out",
+    accountsLabel: "Accounts",
+  },
+  acct: {
+    label: (broker, number) => `${broker} · account ${number}`,
+    intro:
+      "Each account's own positions, to check against its broker's app. Quantities only: a broker's own cost is not the first-in, first-out cost the return uses.",
+    asOf: (date) => `As of ${date}`,
+    noDate: "No dated rows",
+    files: "Files",
+    positions: (account) => `${account}: positions`,
+    colSecurity: "Security",
+    colShares: "Shares",
+    none: "No shares left in this account's files.",
+    transferred:
+      "May not match your broker: shares were transferred in or out, and transfers are not read yet.",
+    refused: "May not match your broker: a row of these files was refused.",
+    short: "Sold more than these files bought",
   },
   tour: {
     action: "Guided tour",
@@ -888,6 +1051,16 @@ export const en: Messages = {
         title: "What the notes mean",
         intro:
           "Notes say what TaxReporter found in the files and how the rules applied. None in this demo stops a return.",
+      },
+      stillHeld: {
+        title: "What you still hold",
+        intro:
+          "The lots left after every sale, matched across brokers, as of the files' last day rather than the tax year.",
+      },
+      accountCheck: {
+        title: "Check an account against its broker",
+        intro:
+          "Each account's own count of the shares, to compare with its broker's app.",
       },
       download: {
         title: "Download, then you submit",
@@ -978,6 +1151,18 @@ export const en: Messages = {
       "Written on this device and saved there; nothing is uploaded. In eDavki, a file like this is imported under Dokumenti, then Uvoz.",
     youReviewAndSubmit:
       "After the import, eDavki shows the form for you to compare with these results and submit yourself. TaxReporter never files, and eDavki calculates the final tax.",
+    heldAsOf: (date) =>
+      `Lots are as of ${date}, the last day every account holding this security covers. A trade after it is not in your files.`,
+    nextBucketDay: (rate, date) =>
+      `From ${date} a sale of this lot is taxed at ${rate}: the day after its anniversary, safe however FURS counts that day.`,
+    lotLeft: (soldAt, oldestAt, leftAt) =>
+      `The sale at ${soldAt} used the oldest lot, bought at ${oldestAt}: first in, first out runs across all your brokers. The lot left is at ${leftAt}.`,
+    accountPosition: (broker, other) =>
+      `This is ${broker}'s own count, to compare with its app. It is below zero because the shares sold here were moved in from ${other}, and moves between accounts are not read yet.`,
+    transferNotRead:
+      "Moving shares between your own accounts creates no lot and ends none, so the first-in, first-out lots are not affected. Only this account's count is off, until transfers are read.",
+    accountAsOf: (date) =>
+      `The last day this account's files cover. Nothing after ${date} is in these figures.`,
   },
   preview: {
     noticeTitle: "Preview.",
@@ -1407,6 +1592,17 @@ export const sl: Messages = {
     viewDividends: "Pokaži vse dividende",
     viewNotes: "Pokaži opombe",
     noNotes: "Ni opomb",
+    holdings: "Imetje",
+    accounts: "Računi",
+    countHoldings: {
+      one: "{n} papir v lasti",
+      two: "{n} papirja v lasti",
+      few: "{n} papirji v lasti",
+      other: "{n} papirjev v lasti",
+    },
+    viewHoldings: "Pokaži imetje",
+    heldCardLabel: "Še v lasti, po nabavni vrednosti",
+    eyebrowAsOf: "Na dan vaših datotek, ne današnji",
     countAttention: {
       one: "{n} zahteva vašo pozornost",
       two: "{n} zahtevata vašo pozornost",
@@ -1416,6 +1612,88 @@ export const sl: Messages = {
     resultsReady: "Rezultati so pripravljeni.",
     partWithheld: (form) =>
       `${form} še ni zapisan, zato se njegov del lahko spremeni, ko bodo opombe odpravljene.`,
+  },
+  held: {
+    intro:
+      "Loti, ki jih bo porabila naslednja prodaja, najprej najstarejši, prek vseh vaših računov. Vsak papir je prikazan na zadnji dan, ki ga pokrivajo datoteke njegovih računov, ne na današnji dan.",
+    noPrices:
+      "Le nabavna vrednost po tečajih Banke Slovenije. Podatki o cenah vaše naprave ne zapustijo in vanjo ne pridejo, zato tržne vrednosti ni.",
+    history:
+      "Le iz vaših datotek: če manjka starejši izvoz, manjkajo tudi delnice, kupljene v njem.",
+    whyDiffer:
+      "Loti in stanje računa se lahko razlikujejo, če se računi končajo na različne dni ali imate isti papir pri dveh posrednikih: prodaja porabi najstarejši lot, kjer koli je.",
+    loneAccount: (account, date) =>
+      `Pri enem računu se morajo te količine ujemati s stanjem pri ${account} na dan ${date}.`,
+    statShares: "Delnice",
+    statCost: "Nabavna vrednost v EUR",
+    statLots: "Loti",
+    statAsOf: "Na dan",
+    colBought: "Nakup",
+    colAccount: "Račun",
+    colShares: "Delnice",
+    colPrice: "Cena",
+    colRate: "Tečaj",
+    colCost: "Nabavna vrednost v EUR",
+    colRateOn: (date) => `Stopnja na dan ${date}`,
+    colNext: "Nižja stopnja",
+    colSource: "Vir",
+    nextFrom: (rate, date) => `${rate} od ${date}`,
+    nextZero: (rate) => `Že ${rate}`,
+    nextNone: "Datuma ni mogoče prikazati",
+    nextNote:
+      "Nižja stopnja od: dan po obletnici nakupa. FURS ni pojasnil, ali šteje že dan obletnice, zato je ta dan varen v obeh primerih.",
+    lotsTitle: (security) => `${security}: odprti loti, najprej najstarejši`,
+    showLots: (security) => `Pokaži odprte lote: ${security}`,
+    splitAdjusted: "Prilagojeno za delitve",
+    noRate: "Tečaja še ni",
+    missingRate: (reason, currency) => {
+      switch (reason) {
+        case "afterSnapshot":
+          return "Kupljeno po zadnji tečajnici Banke Slovenije v tej različici.";
+        case "beforeSnapshot":
+          return "Kupljeno pred najstarejšo tečajnico v tej različici.";
+        case "invalidDate":
+          return "Datuma nakupa ni bilo mogoče prebrati.";
+        default:
+          return `Banka Slovenije za ${currency} na ta dan nima tečaja.`;
+      }
+    },
+    incomplete: "Prodanih več, kot je kupljenih v datotekah",
+    incompleteBody: (security, date) =>
+      `Do ${date} vaše datoteke prodajo več papirja ${security}, kot ga kupijo. Manjka starejši izvoz, zato ti loti morda niso tisti, ki jih imate.`,
+    cardWithoutRate: {
+      one: "Brez {n} lota, ki še nima tečaja",
+      two: "Brez {n} lotov, ki še nimata tečaja",
+      few: "Brez {n} lotov, ki še nimajo tečaja",
+      other: "Brez {n} lotov, ki še nimajo tečaja",
+    },
+    cardRange: (first, last) =>
+      first === last
+        ? `Na dan ${first}`
+        : `Vsak papir na zadnji dan svojih računov, od ${first} do ${last}`,
+    emptyTitle: "V vaših datotekah ni več delnic",
+    emptyBody: "Vse delnice iz vaših datotek so bile prodane.",
+    failed:
+      "Delnic, ki jih še imate, iz teh datotek ni bilo mogoče izračunati. Na napovedi to ne vpliva.",
+    failedShort: "Ni bilo mogoče izračunati",
+    accountsLabel: "Računi",
+  },
+  acct: {
+    label: (broker, number) => `${broker} · račun ${number}`,
+    intro:
+      "Stanje vsakega računa, da ga primerjate z aplikacijo posrednika. Le količine: nabavna vrednost pri posredniku ni vrednost po metodi FIFO, ki jo uporablja napoved.",
+    asOf: (date) => `Stanje na dan ${date}`,
+    noDate: "Brez datiranih vrstic",
+    files: "Datoteke",
+    positions: (account) => `${account}: stanje`,
+    colSecurity: "Vrednostni papir",
+    colShares: "Delnice",
+    none: "V datotekah tega računa ni več delnic.",
+    transferred:
+      "Morda se ne ujema s posrednikom: delnice so bile prenesene na račun ali z njega, prenosov pa aplikacija še ne bere.",
+    refused:
+      "Morda se ne ujema s posrednikom: vrstica iz teh datotek je bila zavrnjena.",
+    short: "Prodanih več, kot je kupljenih v datotekah",
   },
   tour: {
     action: "Vodeni ogled",
@@ -1489,6 +1767,16 @@ export const sl: Messages = {
         intro:
           "Opombe povedo, kaj je TaxReporter našel v datotekah in kako so se uporabila pravila. Nobena v teh demo podatkih ne ustavi napovedi.",
       },
+      stillHeld: {
+        title: "Kaj še imate",
+        intro:
+          "Loti, ki ostanejo po vseh prodajah, povezani prek posrednikov, na zadnji dan datotek in ne za davčno leto.",
+      },
+      accountCheck: {
+        title: "Preverite račun pri posredniku",
+        intro:
+          "Stanje delnic na vsakem računu, da ga primerjate z aplikacijo posrednika.",
+      },
       download: {
         title: "Prenos, oddate pa sami",
         intro:
@@ -1559,6 +1847,18 @@ export const sl: Messages = {
       "Zapisana je na tej napravi in tam shranjena, ničesar se ne naloži. V eDavkih se taka datoteka uvozi pod Dokumenti, nato Uvoz.",
     youReviewAndSubmit:
       "Po uvozu eDavki prikažejo obrazec, ki ga primerjate s temi rezultati in sami oddate. TaxReporter napovedi nikoli ne odda, končni davek pa izračunajo eDavki.",
+    heldAsOf: (date) =>
+      `Loti veljajo na dan ${date}, zadnji dan, ki ga pokrivajo vsi računi s tem papirjem. Posla po tem dnevu ni v vaših datotekah.`,
+    nextBucketDay: (rate, date) =>
+      `Od ${date} je prodaja tega lota obdavčena po ${rate}: dan po obletnici, varno ne glede na to, kako FURS šteje ta dan.`,
+    lotLeft: (soldAt, oldestAt, leftAt) =>
+      `Prodaja pri ${soldAt} je porabila najstarejši lot, kupljen pri ${oldestAt}: FIFO velja prek vseh vaših posrednikov. Preostali lot je pri ${leftAt}.`,
+    accountPosition: (broker, other) =>
+      `To je stanje pri ${broker}, ki ga primerjate z njegovo aplikacijo. Pod ničlo je, ker so bile delnice, prodane tu, prenesene od ${other}, prenosov med računi pa aplikacija še ne bere.`,
+    transferNotRead:
+      "Prenos delnic med vašimi računi ne ustvari lota in nobenega ne konča, zato loti po metodi FIFO niso prizadeti. Napačno je le stanje tega računa, dokler prenosov ne beremo.",
+    accountAsOf: (date) =>
+      `Zadnji dan, ki ga pokrivajo datoteke tega računa. Nič po dnevu ${date} ni v teh številkah.`,
   },
   preview: {
     noticeTitle: "Predogled.",

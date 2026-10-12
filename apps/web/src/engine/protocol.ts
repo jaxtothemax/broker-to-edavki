@@ -378,6 +378,7 @@ const isPosition = (v: unknown): v is PositionRow =>
   isAnIsin(v["isin"]) &&
   isString(v["symbol"]) &&
   isString(v["name"]) &&
+  typeof v["isFund"] === "boolean" &&
   isDecimal(v["quantity"]);
 
 const isAccountSummary = (v: unknown): v is AccountSummary =>
@@ -415,6 +416,7 @@ const isHeldSecurity = (v: unknown): v is HeldSecurity =>
   isAnIsin(v["isin"]) &&
   isString(v["symbol"]) &&
   isString(v["name"]) &&
+  typeof v["isFund"] === "boolean" &&
   isDate(v["asOf"]) &&
   isDecimal(v["quantity"]) &&
   (v["costEur"] === null || isDecimal(v["costEur"])) &&

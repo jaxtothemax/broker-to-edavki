@@ -84,6 +84,98 @@ const shell = (
     />,
   );
 
+describe("holdings and accounts", () => {
+  const accountView = (account: string | null) => ({
+    view: { ...initialDashboardView, page: "account" as const, account },
+  });
+
+  it("lists each account in the navigation, by broker and as-of day, never an ID", () => {
+    const html = shell();
+    const nav = /<nav[^>]*>([^]*?)<\/nav>/.exec(html)?.[1] ?? "";
+    expect(html.match(/<nav /g)).toHaveLength(1);
+    expect(text(nav)).toContain(en.dash.accounts);
+    const group = text(nav.slice(nav.indexOf('class="nav-group"')));
+    expect(group).toMatch(
+      new RegExp(`Interactive Brokers\\s*${en.acct.asOf("13 Aug 2026")}`),
+    );
+    expect(group).toMatch(
+      new RegExp(`Trading 212\\s*${en.acct.asOf("18 Jun 2026")}`),
+    );
+    expect(nav).not.toContain("ibkr-1");
+  });
+
+  it("marks the account on show as the current page", () => {
+    const html = shell(accountView("ibkr-1"), "account");
+    const current =
+      /<button[^>]*aria-current="page"[^>]*>([^]*?)<\/button>/.exec(html)?.[1];
+    expect(text(current ?? "")).toContain("Interactive Brokers");
+    expect(/<h1[^>]*>([^<]*)<\/h1>/.exec(html)?.[1]).toBe(
+      "Interactive Brokers",
+    );
+  });
+
+  it("flags an account whose files move shares, and shows its count only", () => {
+    const html = shell(accountView("ibkr-1"), "account");
+    // The page on show, not the hidden ones beside it.
+    const page = text(
+      html
+        .split('<div class="dash-page"')
+        .slice(1)
+        .find((part) => part.startsWith(">")) ?? "",
+    );
+    expect(page).toContain(en.acct.transferred);
+    expect(page).toContain(en.acct.short);
+    // Quantities only: no cost, no lots on an account's page.
+    expect(page).not.toContain("€");
+    expect(page).not.toContain(en.held.colBought);
+  });
+
+  it("shows the holdings where an account's page has no account", () => {
+    const html = shell(accountView("ibkr-9"), "account");
+    expect(/<h1[^>]*>([^<]*)<\/h1>/.exec(html)?.[1]).toBe(en.dash.holdings);
+  });
+
+  it("holds the lots across accounts, each with its account and next rate", () => {
+    const html = text(
+      shell(
+        {
+          view: {
+            ...initialDashboardView,
+            page: "holdings",
+            held: new Set(["US67066G1040"]),
+          },
+        },
+        "holdings",
+      ),
+    );
+    expect(html).toContain(en.held.lotsTitle("NVDA"));
+    expect(html).toContain(en.held.nextNote);
+    expect(html).toContain(en.held.whyDiffer);
+  });
+
+  it("says when the holdings could not be worked out, with no Accounts group", () => {
+    const html = shell(
+      { preview: { ...demoPreview, holdings: null } },
+      "holdings",
+    );
+    expect(text(html)).toContain(en.held.failed);
+    expect(html).not.toContain('class="nav-group"');
+  });
+
+  it("names a lone account on the holdings page, with no Accounts group", () => {
+    const holdings = demoPreview.holdings;
+    if (holdings === null) throw new Error("the demo has holdings");
+    const lone = { ...holdings, accounts: holdings.accounts.slice(0, 1) };
+    const html = shell(
+      { preview: { ...demoPreview, holdings: lone } },
+      "holdings",
+    );
+    expect(html).not.toContain('class="nav-group"');
+    expect(html).toContain('data-explain="acct.card"');
+    expect(text(html)).not.toContain(en.held.whyDiffer);
+  });
+});
+
 describe("ReturnsCard", () => {
   it("offers no row for a form with nothing in it", () => {
     const html = card(
@@ -226,17 +318,28 @@ describe("DashboardShell", () => {
     expect(html).toContain(en.dash.downloadAll);
   });
 
-  it("shows the current page's own rows, and hides the other three", () => {
+  it("shows the current page's own rows, and hides the others", () => {
     // What marks each page, and on no other page.
     const own: Record<DashPage, string> = {
       overview: 'id="returns-title"',
       gains: en.review.estimateTitle,
       dividends: en.review.dividendsCaption,
+      holdings: en.held.noPrices,
       notes: en.review.severity.warning,
+      account: 'data-explain="acct.card"',
     };
-    for (const page of ["overview", "gains", "dividends", "notes"] as const) {
-      const html = shell({}, page);
-      expect(html.match(/class="dash-page" hidden=""/g), page).toHaveLength(3);
+    for (const page of Object.keys(own) as DashPage[]) {
+      const html = shell(
+        {
+          view: {
+            ...initialDashboardView,
+            page,
+            account: page === "account" ? "ibkr-1" : null,
+          },
+        },
+        page,
+      );
+      expect(html.match(/class="dash-page" hidden=""/g), page).toHaveLength(5);
       // The one page not hidden, up to the next page's container.
       const shown = html
         .split('<div class="dash-page"')

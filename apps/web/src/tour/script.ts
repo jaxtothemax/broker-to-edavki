@@ -112,13 +112,22 @@ export interface TourStop {
   readonly notes: readonly [TourNote, ...TourNote[]];
 }
 
-/** A dashboard page, with the sold securities it opens. */
+/**
+ * A dashboard page, with the sold securities it opens, and the held ones and
+ * the account where the page is the holdings or an account's.
+ */
 const dash = (
   page: DashPage,
   sold: readonly string[] = [],
+  shown: { readonly held?: readonly string[]; readonly account?: string } = {},
 ): { readonly screen: FlowStep; readonly dash: DashboardView } => ({
   screen: "dashboard",
-  dash: { page, sold: new Set(sold) },
+  dash: {
+    page,
+    account: shown.account ?? null,
+    sold: new Set(sold),
+    held: new Set(shown.held ?? []),
+  },
 });
 
 const security = (
