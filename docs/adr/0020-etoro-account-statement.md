@@ -216,20 +216,27 @@ open. This ADR records the decisions and what was chosen for each risk.
       return, and no source says what the Type column holds against the Asset type.
       A contract's dividend without its activity row is refused (`pairing`), as a share's.
     - **Required.** An ISIN is required.
+    - **Its ISIN.** A dividend on a closed position must carry the ISIN of the row that
+      closed it, or it is refused (`dividendInconsistent`, `isin`): under either, it would
+      go to another payer and country. A position still open has no such row, so its
+      dividends' ISINs are what its ticker is resolved from (decision 5).
     - **Payer.** The payer's details come from the payers table, as for every broker.
 11. **Reach (D11).** Every eToro refusal is unscoped (ADR 0017) and the adapter never sets
-    `shares`, with one exception: a position still open whose ISIN no row settles
-    (`isinUnresolved`, R2 below).
+    `shares`, with one exception: a position still open that no row of the file names an
+    ISIN for (`isinUnresolved`, cause `missing`, R2 below).
     - **What the adapter states.** `side: "buy"` and the trade's day. It states them only
       after the row's units and amount are checked, and only when no clock from UTC+0 to
       UTC+3 can move the day (`certain`). A row with bad units or amount, or so near
       midnight that its day is a guess, is refused without `side` and withholds both
-      returns of every year, as every other eToro refusal does.
+      returns of every year, as every other eToro refusal does. So is a ticker the file
+      gives two ISINs (cause `ambiguous`): the rows contradict each other, and one of the
+      two may be a dividend's.
     - **What core does** (ADR 0017 §3, last bullet). Doh-KDVP(Y) is withheld when any
       security, in any account, has a sale in Y on or after D − 30, D being the purchase.
       Doh-Div is never withheld: the lot is missing from the ledger, but a dividend reads no
-      lots, and a position that paid one would have its ISIN from the Dividends sheet. In a
-      year the row cannot change it shows as the note `unresolvedElsewhere`.
+      lots, and a position that paid one has its ISIN from the Dividends sheet, so its
+      ticker resolves and the cause is not `missing`. In a year the row cannot change it
+      shows as the note `unresolvedElsewhere`.
     - **Why no security key.** The row has no ISIN. Trade Republic events carry no ticker,
       Trading 212 sets one only when its cell is filled, and IBKR writes its own form, so a
       match by ticker could miss and release a return the lot can change. A ticker taken to
@@ -339,12 +346,6 @@ open. This ADR records the decisions and what was chosen for each risk.
   Positions says CFD (or the reverse) raises no finding. Refusing the disagreement
   (`tradeInconsistent`) is the conservative answer, but if the two vocabularies differ it
   would refuse every CFD, so it waits for an untouched export.
-- **Two statements read as separate accounts.** Two statements of one eToro account are
-  caught by their shared trade keys, which block. A statement whose every share position
-  is refused leaves no shared trade, and a shared dividend is only a warning
-  (`accountsShareEvents`), so its Doh-Div could count twice. It takes a ticker the file
-  gives two ISINs for and no resolved position, and the account question gives one answer
-  for every broker (#61).
 - **A ticker used twice.** A still-open position's ISIN comes from the file's other rows
   through its ticker. A ticker that names two ISINs in the file is refused, but one reused
   after a delisting, whose only ISIN in the file is the earlier company's, would give the

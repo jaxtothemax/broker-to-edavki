@@ -92,9 +92,11 @@ function scopedOf(finding: Diagnostic): Scoped | null {
 
 /**
  * A purchase whose security the file does not name: `isinUnresolved` with
- * `side: "buy"` and a real date. Anything else is null and withholds
- * everything, as before (ADR 0017 §3, the bullet on a purchase the file does
- * not name). Its cause, missing or ambiguous, only words the finding.
+ * `side: "buy"`, a real date and the cause `missing`. Anything else is null
+ * and withholds everything, as before (ADR 0017 §3, the bullet on a purchase
+ * the file does not name). An `ambiguous` cause is not scoped: the rows name
+ * two securities for it, which contradict each other, and one of them may be
+ * a dividend's.
  */
 function unresolvedBuyOf(
   finding: Diagnostic,
@@ -102,8 +104,13 @@ function unresolvedBuyOf(
   if (finding.severity !== "blocking" || finding.code !== "isinUnresolved") {
     return null;
   }
-  const { broker, date, side } = finding.params;
-  if (side !== "buy" || date === undefined || !isIsoDate(date)) {
+  const { broker, cause, date, side } = finding.params;
+  if (
+    side !== "buy" ||
+    cause !== "missing" ||
+    date === undefined ||
+    !isIsoDate(date)
+  ) {
     return null;
   }
   return { broker, date };

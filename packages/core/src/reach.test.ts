@@ -331,7 +331,7 @@ describe("a purchase whose security the file does not name", () => {
     expect(sold.findings).toEqual([finding]);
   });
 
-  it("withholds everything when the row does not state a purchase of a real day", () => {
+  it("withholds everything when the row does not state a purchase of a real day, or its cause is two securities", () => {
     const unscoped = [
       unnamed("2025-03-15", { side: "sell" }, 13),
       diagnostic(
@@ -347,8 +347,13 @@ describe("a purchase whose security the file does not name", () => {
         source(15),
       ),
       unnamed("2025-02-30", {}, 16),
+      // Two securities for one ticker contradict each other: not scoped,
+      // whatever else the row states.
+      unnamed("2025-03-15", { cause: "ambiguous" }, 17),
     ];
-    const all = [13, 14, 15, 16].map((row) => `isinUnresolved@${String(row)}`);
+    const all = [13, 14, 15, 16, 17].map(
+      (row) => `isinUnresolved@${String(row)}`,
+    );
     expect(withheld(unscoped, [], 2030)).toEqual({
       kdvp: all,
       div: all,

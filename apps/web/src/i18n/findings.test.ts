@@ -150,6 +150,7 @@ describe("the findings catalog", () => {
       "unpaired",
       "netAmount",
       "class",
+      "isin",
     ]);
     expect(findingsEn.historyIncomplete({ broker, gap: "start" })).toMatch(
       /^eToro: the statement does not start when the account was opened/,
@@ -163,19 +164,24 @@ describe("the findings catalog", () => {
     const broker = "eToro";
     const date = "2024-02-20";
     for (const catalog of [findingsEn, findingsSl]) {
-      for (const cause of ["missing", "ambiguous"]) {
-        const bare = catalog.isinUnresolved({ broker, cause, date });
-        const scoped = catalog.isinUnresolved({
-          broker,
-          cause,
-          date,
-          side: "buy",
-        });
-        // Scoped, it says which return waits and which does not.
-        expect(scoped, cause).not.toBe(bare);
-        expect(scoped, cause).toContain("Doh-KDVP");
-        expect(bare, cause).not.toContain("Doh-KDVP");
-      }
+      const bare = catalog.isinUnresolved({ broker, cause: "missing", date });
+      const scoped = catalog.isinUnresolved({
+        broker,
+        cause: "missing",
+        date,
+        side: "buy",
+      });
+      // Scoped, it says which return waits and which does not.
+      expect(scoped).not.toBe(bare);
+      expect(scoped).toContain("Doh-KDVP");
+      expect(bare).not.toContain("Doh-KDVP");
+      // Two securities for one ticker is never scoped, so it says no such thing.
+      const ambiguous = catalog.isinUnresolved({
+        broker,
+        cause: "ambiguous",
+        date,
+      });
+      expect(ambiguous).not.toContain("Doh-KDVP");
     }
     const note = { broker, date, year: "2026" };
     expect(findingsEn.unresolvedElsewhere(note)).toMatch(

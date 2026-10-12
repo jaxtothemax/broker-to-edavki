@@ -509,11 +509,12 @@ export interface DiagnosticParams {
   openPositionsAssumed: { readonly broker: string; readonly count: number };
   /**
    * A position still open whose ISIN the file does not settle, so no ISIN
-   * can be stated. With `side` and a date, it holds back only the Doh-KDVP
-   * of the years it can change (ADR 0017 §3); without either, both returns
-   * of every year. `side: "buy"` is an adapter's claim that the row is a
-   * long purchase made at a certain `date`, which is the trade's, never a
-   * booking's.
+   * can be stated. With `side`, a date and the cause `missing`, it holds
+   * back only the Doh-KDVP of the years it can change (ADR 0017 §3); without
+   * any of them, and for an `ambiguous` cause whatever else it states, both
+   * returns of every year. `side: "buy"` is an adapter's claim that the row
+   * is a long purchase made at a certain `date`, which is the trade's, never
+   * a booking's.
    */
   isinUnresolved: Pick<MaybeWhere, "date"> & {
     readonly broker: string;
@@ -537,7 +538,12 @@ export interface DiagnosticParams {
        * Its type (a share's or a contract's) is not the class its position
        * was read as: which return it belongs on would be a guess.
        */
-      | "class";
+      | "class"
+      /**
+       * Its ISIN is not the one on the row that closed its position: filed
+       * under either, the payer and country could be the wrong ones.
+       */
+      | "isin";
   };
   // The pipeline
   /**

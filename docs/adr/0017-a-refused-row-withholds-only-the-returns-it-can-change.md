@@ -37,8 +37,9 @@ takeover in a user's history blocks every later Doh-KDVP. The user could downloa
    before. So does every other code. One refusal states less, because it has no ISIN to state:
    `isinUnresolved` (a position still open whose ISIN the file does not settle) carries the
    row's date and `side: "buy"`, an adapter's claim that the row is a long purchase made on
-   that day. Without either, or with either malformed, it too withholds both returns of every
-   year.
+   that day, and only when its cause is `missing` (no row names an ISIN). Without either, with
+   either malformed, or for the cause `ambiguous` (the rows name two securities for its
+   ticker, which contradict each other), it too withholds both returns of every year.
 2. **Trading 212 states them only in the shapes research has seen** (06 §4.3):
    - a sale at a price of exactly 0 gives its shares up (`invalidPrice`, `"out"`), but only
      when it pairs with its new shares as below. A takeover's new shares can also arrive "not
@@ -76,7 +77,7 @@ takeover in a user's history blocks every later Doh-KDVP. The user could downloa
    - **Doh-Div(Y)** is withheld by a refusal that receives shares or rights when [D − 31, D]
      overlaps Y: what is received might be income of its year (#29). A sale at 0 is no income.
    - **A purchase whose security the file does not name** (`isinUnresolved` with
-     `side: "buy"`, traded on D): Doh-KDVP(Y) is withheld when any security, in any account,
+     `side: "buy"` and the cause `missing`, traded on D): Doh-KDVP(Y) is withheld when any security, in any account,
      has a sale in Y on or after D − 30. With no ISIN, no key is safe: other brokers' rows
      lack a ticker or write it differently, and a missed match would release a return the lot
      can change. A later sale can take this lot however long after D (FIFO, research 04
@@ -109,7 +110,7 @@ What the rule assumes a scoped refusal does not do, and why each holds:
 | Rights change no other security's cost | No source found gives free rights a basis taken from the parent (#29); the 30-day reach is covered by the rights clause. |
 | A refused row hides no dividend of another year | Shares or rights received within a month of the year count for it; `Dividend adjustment`, which can reverse an earlier year, stays unscoped. |
 | The ISIN is the engine's identity of a security | True today: ISIN changes are refused and unscoped. Widen this check with the engine when ISINs are linked. A refusal with no ISIN reaches every security: see the last bullet of decision 3. |
-| An unresolved purchase is long and dated by its trade | The eToro adapter states `side: "buy"` only for a row with positive units and amount, whose day no clock from UTC+0 to UTC+3 can move. A broker that books late would break it, and would need the lag margin. |
+| An unresolved purchase is long and dated by its trade | The eToro adapter states `side: "buy"` only for a row with positive units and amount, whose day no clock from UTC+0 to UTC+3 can move. A broker that books late would break it, and would need the lag margin. A position still open carries no direction or leverage, so a short or leveraged one opened too recently to pay an overnight fee is taken as a purchase (ADR 0020, "Where the spec left a gap"). |
 | Every disposal of the missing lot's security is a ledger sale or refused | A sale refused elsewhere is itself unscoped or scoped by its own rule, and withholds what it can change; a sale the ledger lacks is not seen by the any-sale test. |
 | A later sale of shares the ledger lacks is caught | Only when it exceeds what the ledger holds: `insufficientHistory` (`packages/furs/src/build-kdvp.ts`). A purchase that covers it hides the gap, which is why a sale at 0 is scoped only when its new shares are paired with it. |
 

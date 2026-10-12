@@ -143,6 +143,7 @@ const DIVIDEND_MISMATCHES_EN: Clauses<"dividendInconsistent", "mismatch"> = {
   unpaired: "a dividend in Account Activity is not on the Dividends sheet",
   netAmount: "its amount in its own currency is not its amount in dollars",
   class: "its type is not the type its position was read as",
+  isin: "its ISIN is not the one on the row that closed its position",
 };
 
 const REPORT_EN =
@@ -432,12 +433,11 @@ export const findingsEn: FindingMessages = {
   isinUnresolved: (p) =>
     at(
       p,
-      // With `side`, core holds back only the Doh-KDVP of the years the lot
-      // can change (ADR 0017 §3); without it, both returns of every year.
+      // With `side` (stated only for `missing`), core holds back just the
+      // Doh-KDVP of the years the lot can change (ADR 0017 §3); without it,
+      // and for `ambiguous`, both returns of every year.
       p.cause === "ambiguous"
-        ? p.side === undefined
-          ? `the ticker of a position still open in the ${p.broker} statement names two securities elsewhere in it, so its ISIN is not known. It is not chosen on a guess; please report it.`
-          : `the ticker of a position still open in the ${p.broker} statement names two securities elsewhere in it, so its ISIN is not known, and it is not chosen on a guess. Doh-KDVP waits for each year with a sale of any security from 30 days before the purchase on; dividends are not affected. Please report it.`
+        ? `the ticker of a position still open in the ${p.broker} statement names two securities elsewhere in it, so its ISIN is not known. It is not chosen on a guess; please report it.`
         : p.side === undefined
           ? `a position still open in the ${p.broker} statement has no ISIN: the statement gives one only for closed positions and dividends. Without it, its shares cannot be matched with sales of the same security, so the returns wait; please report it.`
           : `a position still open in the ${p.broker} statement has no ISIN: the statement gives one only for closed positions and dividends. Without it, its shares cannot be matched with sales of the same security. Doh-KDVP waits for each year with a sale of any security from 30 days before the purchase on; dividends are not affected. Please report it.`,
@@ -629,6 +629,7 @@ const DIVIDEND_MISMATCHES_SL: Clauses<"dividendInconsistent", "mismatch"> = {
   unpaired: "dividende z lista »Account Activity« ni na listu »Dividends«",
   netAmount: "znesek v njeni valuti ni enak znesku v dolarjih",
   class: "njena vrsta ni vrsta, kot je bila prebrana njena pozicija",
+  isin: "njena koda ISIN ni koda iz vrstice, ki je zaprla njeno pozicijo",
 };
 
 const REPORT_SL =
@@ -930,15 +931,14 @@ export const findingsSl: FindingMessages = {
   isinUnresolved: (p) =>
     at(
       p,
-      // With `side`, core holds back only the Doh-KDVP of the years the lot
-      // can change (ADR 0017 §3); without it, both returns of every year.
+      // With `side` (stated only for `missing`), core holds back just the
+      // Doh-KDVP of the years the lot can change (ADR 0017 §3); without it,
+      // and for `ambiguous`, both returns of every year.
       p.cause === "ambiguous"
-        ? p.side === undefined
-          ? `oznaka še odprte pozicije v izpisku ${p.broker} drugje v izpisku označuje dva vrednostna papirja, zato njena koda ISIN ni znana. Ne izbere se na slepo; sporočite to.`
-          : `oznaka še odprte pozicije v izpisku ${p.broker} drugje v izpisku označuje dva vrednostna papirja, zato njena koda ISIN ni znana in se ne izbere na slepo. Napoved Doh-KDVP počaka za vsako leto s prodajo katerega koli vrednostnega papirja od 30 dni pred nakupom naprej; dividende to ne prizadene. Sporočite to.`
+        ? `oznaka še odprte pozicije v izpisku ${p.broker} drugje v izpisku označuje dva vrednostna papirja, zato njena koda ISIN ni znana. Ne izbere se na slepo; sporočite to.`
         : p.side === undefined
           ? `še odprta pozicija v izpisku ${p.broker} nima kode ISIN: izpisek jo navaja le pri zaprtih pozicijah in dividendah. Brez nje njenih delnic ni mogoče povezati s prodajami istega vrednostnega papirja, zato napovedi počakajo; sporočite to.`
-          : `še odprta pozicija v izpisku ${p.broker} nima kode ISIN: izpisek jo navaja le pri zaprtih pozicijah in dividendah. Brez nje njenih delnic ni mogoče povezati s prodajami istega vrednostnega papirja. Napoved Doh-KDVP počaka za vsako leto s prodajo katerega koli vrednostnega papirja od 30 dni pred nakupom naprej; dividende to ne prizadene. Sporočite to.`,
+          : `še odprta pozicija v izpisku ${p.broker} nima kode ISIN: izpisek jo navaja le pri zaprtih pozicijah in dividendah. Brez nje njenih delnic ni mogoče povezati s prodajami istega vrednostnega papirja. Napoved Doh-KDVP počaka za vsako leto s prodajo katerega koli vrednostnega papirja od 30 dni pred nakupom naprej; na dividende to ne vpliva. Sporočite to.`,
     ),
   dividendInconsistent: (p) =>
     at(

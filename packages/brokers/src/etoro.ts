@@ -375,11 +375,18 @@ function dayOf(cell: Cell | undefined): IsoDate | null {
 const isBlank = (row: SheetRow) =>
   [...row.cells.values()].every((c) => c.kind === "string" && c.text === "");
 
-/** "AAPL/USD" as its ticker and currency, or null. */
+/** The longest quote: a ticker of 24, the slash, a currency of 3. */
+const QUOTE_LENGTH = 28;
+
+/**
+ * "AAPL/USD" as its ticker and currency, or null. A cell of up to 32,767
+ * characters is asked once per row that refers to it, so one too long to
+ * be a quote is turned away before it is scanned.
+ */
 function quoteOf(
   details: string | null,
 ): { readonly ticker: string; readonly currency: string } | null {
-  if (details === null) return null;
+  if (details === null || details.length > QUOTE_LENGTH) return null;
   const slash = details.lastIndexOf("/");
   const ticker = details.slice(0, slash);
   const currency = details.slice(slash + 1);
@@ -787,8 +794,14 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     set.add(isin);
     isinsByTicker.set(quote.ticker, set);
   };
+  // What each closed position's own row says its ISIN is, which its
+  // dividends must agree with: a dividend on another ISIN would be filed
+  // under another payer and country.
+  const closedIsinById = new Map<string, string>();
   for (const row of closed) {
-    learn(row.id, textOf(cellOf(closedTable, row.row, "ISIN")) ?? "");
+    const isin = textOf(cellOf(closedTable, row.row, "ISIN")) ?? "";
+    learn(row.id, isin);
+    if (row.id !== null && isIsin(isin)) closedIsinById.set(row.id, isin);
   }
   for (const payment of payments) learn(payment.id, payment.isin);
 
@@ -1016,13 +1029,16 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     // can claim a real long purchase, and it states `side` only when the
     // time zone cannot move its day. Core then holds back just the Doh-KDVP
     // of the years the lot can change (ADR 0017 §3). Without `side`, as for
-    // a time near midnight, it withholds every return.
+    // a time near midnight, it withholds every return. So does a ticker the
+    // file gives two ISINs: the rows contradict each other, and one of the
+    // two may be a dividend's, which Doh-Div would then file.
     if (isins.size !== 1) {
+      const missing = isins.size === 0;
       block("isinUnresolved", {
         broker: ETORO,
         date: dated.date,
-        cause: isins.size === 0 ? "missing" : "ambiguous",
-        ...(certain(open.at) ? { side: "buy" as const } : {}),
+        cause: missing ? "missing" : "ambiguous",
+        ...(missing && certain(open.at) ? { side: "buy" as const } : {}),
       });
       return;
     }
@@ -1207,6 +1223,18 @@ function read(book: Workbook, context: ReadContext): ImportResult {
     }
     if (!isIsin(isin)) {
       block("invalidIsin", {});
+      continue;
+    }
+    // A closed position's dividend is filed under the ISIN of the row that
+    // closed it; another one is a cell that was changed, or an ISIN that
+    // changed while it was held, and ISIN changes are refused (ADR 0017).
+    const own = closedIsinById.get(id);
+    if (own !== undefined && own !== isin) {
+      block("dividendInconsistent", {
+        broker: ETORO,
+        ...at,
+        mismatch: "isin",
+      });
       continue;
     }
     if (net === null) {

@@ -854,19 +854,22 @@ describe("etoro, lots", () => {
         dividendPaid("1001", "16/02/2024 12:00:00", "AAPL/USD", "0.1"),
       ],
     });
-    expect(blocking(result)).toContainEqual(
-      refusal(
-        "isinUnresolved",
-        {
-          broker: ETORO,
-          date: "2024-01-08",
-          cause: "ambiguous",
-          side: "buy",
-        },
-        "accountActivity",
-        4,
-      ),
+    const finding = refusal(
+      "isinUnresolved",
+      { broker: ETORO, date: "2024-01-08", cause: "ambiguous" },
+      "accountActivity",
+      4,
     );
+    expect(blocking(result)).toContainEqual(finding);
+    // Never scoped (ADR 0017 §3): the rows name two securities for one
+    // ticker and contradict each other, so it withholds both returns of a
+    // year it is not in.
+    const scope = scopeLedger(
+      validateLedger(result.events, result.diagnostics),
+      2026,
+    );
+    expect(scope.kdvp).toContainEqual(finding);
+    expect(scope.div).toContainEqual(finding);
   });
 
   describe("a position still open with no ISIN in the file (R2, option b)", () => {
@@ -973,6 +976,30 @@ describe("etoro, lots", () => {
         });
         expect(codes(result), `${amount} ${units}`).toEqual([code]);
       }
+    });
+
+    it("takes a ticker of 24 characters as a quote, and turns a longer cell away unscanned", () => {
+      // A cell of up to 32,767 characters is asked once per row that refers
+      // to it, so one too long to be a quote is refused at its length.
+      const quoted = (ticker: string) =>
+        codes(
+          read({
+            ...ROUND_TRIP,
+            activity: [
+              ...ROUND_TRIP.activity,
+              opened(
+                "1004",
+                "20/02/2024 15:00:00",
+                `${ticker}/USD`,
+                "400",
+                "1",
+              ),
+            ],
+          }),
+        );
+      expect(quoted("A".repeat(24))).toEqual(["isinUnresolved"]);
+      expect(quoted("A".repeat(25))).toEqual(["unconfirmedAction"]);
+      expect(quoted("A".repeat(32_000))).toEqual(["unconfirmedAction"]);
     });
   });
 });
@@ -1400,24 +1427,17 @@ describe("etoro, dividends", () => {
 
   it("refuses a dividend whose type is not the class its closed position was read as", () => {
     // A closed position's class comes from its Closed Positions row, not from
-    // its activity rows: a closed CFD's dividend called a share's would go on
-    // Doh-Div.
+    // its activity rows (which here say Stocks): a closed CFD's dividend
+    // called a share's would go on Doh-Div.
     const details = "NVDA/USD";
     expect(
       mismatch({
         ...ROUND_TRIP,
         activity: [
           ...ROUND_TRIP.activity,
-          opened("1003", "20/02/2024 15:00:00", details, "100", "2", "CFD"),
+          opened("1003", "20/02/2024 15:00:00", details, "100", "2"),
           dividendPaid("1003", "21/02/2024 12:00:00", details, "0.3"),
-          closing(
-            "1003",
-            "22/02/2024 15:00:00",
-            details,
-            "100.5",
-            n("2"),
-            "CFD",
-          ),
+          closing("1003", "22/02/2024 15:00:00", details, "100.5", n("2")),
         ],
         closed: [
           ...ROUND_TRIP.closed,
@@ -1448,6 +1468,49 @@ describe("etoro, dividends", () => {
         ],
       }),
     ).toEqual(["class"]);
+  });
+
+  it("refuses a dividend whose ISIN is not the one on the row that closed its position", () => {
+    // Exxon, bought on 21 February, paid a dividend that day and sold on the
+    // 22nd. Filed under Apple's ISIN, the dividend would go to another payer
+    // and country.
+    const exxon = (isin: string) =>
+      mismatch({
+        ...ROUND_TRIP,
+        activity: [
+          ...ROUND_TRIP.activity,
+          opened("1006", "21/02/2024 10:00:00", "XOM/USD", "200", "2"),
+          dividendPaid("1006", "21/02/2024 12:00:00", "XOM/USD", "0.3"),
+          closing("1006", "22/02/2024 10:00:00", "XOM/USD", "202", n("2")),
+        ],
+        closed: [
+          ...ROUND_TRIP.closed,
+          position({
+            id: "1006",
+            amount: "200",
+            units: "2",
+            open: "21/02/2024 10:00:00",
+            close: "22/02/2024 10:00:00",
+            profit: "2",
+            openRate: "100",
+            closeRate: "101",
+            isin: EXXON,
+          }),
+        ],
+        dividends: [
+          ...swapPayment({}),
+          payment({
+            date: "21/02/2024",
+            id: "1006",
+            net: "0.3",
+            rate: "0%",
+            withheld: n("0"),
+            isin,
+          }),
+        ],
+      });
+    expect(exxon(APPLE)).toEqual(["isin"]);
+    expect(exxon(EXXON)).toEqual([]);
   });
 
   it("refuses a dividend with a sign it cannot have", () => {

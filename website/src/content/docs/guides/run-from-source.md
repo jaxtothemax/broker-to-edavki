@@ -22,9 +22,11 @@ file.
   open, and their dividends. It leaves out CFDs with a note, sets crypto aside, and counts a
   CFD's dividend adjustments with interest, which belongs on another return. A statement that
   starts later, a short or leveraged position, a position still open that paid an overnight
-  fee or whose ISIN the file does not give, a position closed in part, a share in another
-  currency, an activity type TaxReporter does not know, or a trade too close to midnight to
-  date stops both returns, and the finding says why. The reader was written from other
+  fee, a position closed in part, a share in another currency, an activity type TaxReporter
+  does not know, or a trade too close to midnight to date stops both returns, and the finding
+  says why. A position still open whose ISIN the file does not give is refused too, but it
+  holds back only the Doh-KDVP of a year with a sale of any security from 30 days before its
+  purchase on, never the Doh-Div. The reader was written from other
   tools' code and one published sample, never from a real statement, so check its figures
   against eToro's with extra care
   ([#8](https://github.com/jaxtothemax/broker-to-edavki/issues/8)).
