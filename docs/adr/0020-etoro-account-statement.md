@@ -334,7 +334,17 @@ open. This ADR records the decisions and what was chosen for each risk.
 - **Does Profit(USD) include fees?** If it includes fees or dividends, the close check
   would refuse real positions.
 - **Asset type.** Does Account Activity's Asset type use Closed Positions' Type
-  vocabulary (Stocks, ETF, CFD)?
+  vocabulary (Stocks, ETF, CFD)? Until it is known, a closed position is read by its
+  Closed Positions Type alone, and a statement whose Activity says Stocks where Closed
+  Positions says CFD (or the reverse) raises no finding. Refusing the disagreement
+  (`tradeInconsistent`) is the conservative answer, but if the two vocabularies differ it
+  would refuse every CFD, so it waits for an untouched export.
+- **Two statements read as separate accounts.** Two statements of one eToro account are
+  caught by their shared trade keys, which block. A statement whose every share position
+  is refused leaves no shared trade, and a shared dividend is only a warning
+  (`accountsShareEvents`), so its Doh-Div could count twice. It takes a ticker the file
+  gives two ISINs for and no resolved position, and the account question gives one answer
+  for every broker (#61).
 - **A ticker used twice.** A still-open position's ISIN comes from the file's other rows
   through its ticker. A ticker that names two ISINs in the file is refused, but one reused
   after a delisting, whose only ISIN in the file is the earlier company's, would give the

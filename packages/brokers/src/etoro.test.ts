@@ -1663,4 +1663,22 @@ describe("etoro, privacy", () => {
       "CANARY",
     );
   });
+
+  it("keeps a position's ticker out of every finding, though it may name a security's symbol", () => {
+    // An Open Position's Details is file text. Its ticker half is held to a
+    // short list of characters and a position's refusal is built from it,
+    // but no finding's parameter carries it.
+    const result = read({
+      ...ROUND_TRIP,
+      activity: [
+        ...ROUND_TRIP.activity,
+        opened("1004", "20/02/2024 15:00:00", `${CANARY}/USD`, "400", "1"),
+      ],
+    });
+    expect(blocking(result).map((d) => d.code)).toEqual(["isinUnresolved"]);
+    expect(JSON.stringify(result.diagnostics)).not.toContain("CANARY");
+    expect(JSON.stringify(result.diagnostics.map(forExport))).not.toContain(
+      "CANARY",
+    );
+  });
 });
