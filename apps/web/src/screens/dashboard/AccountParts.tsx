@@ -110,18 +110,18 @@ export function PositionsTable({
                     {position.symbol === "" ? position.isin : position.symbol}
                   </span>
                   <span className="security-name">{position.name}</span>
+                  {/* Under the name, not beside the count: on a phone the
+                      count stays in view. */}
+                  {isShort(position.quantity) ? (
+                    <span className="position-flag">
+                      <Chip tone="warn">{t.acct.short}</Chip>
+                    </span>
+                  ) : null}
                 </span>
               </span>
             </th>
-            <td className="end">
-              <span className="position-quantity">
-                {isShort(position.quantity) ? (
-                  <Chip tone="warn">{t.acct.short}</Chip>
-                ) : null}
-                <span className="num">
-                  {formatNumber(position.quantity, locale, { maxFraction: 8 })}
-                </span>
-              </span>
+            <td className="end num">
+              {formatNumber(position.quantity, locale, { maxFraction: 8 })}
             </td>
           </tr>
         ))}

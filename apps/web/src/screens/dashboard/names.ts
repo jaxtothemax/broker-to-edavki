@@ -3,7 +3,11 @@
  * the page headers, the tab title and the tour, so each says the same.
  */
 import type { Messages } from "../../i18n/messages";
-import type { AccountRef, ReturnPreview } from "../../model/preview";
+import type {
+  AccountRef,
+  HeldLotRow,
+  ReturnPreview,
+} from "../../model/preview";
 import type { DashboardView } from "./view";
 
 /** "Interactive Brokers", or "Interactive Brokers · account 2" where a broker has two. */
@@ -43,3 +47,9 @@ export function pageTitle(
   const account = shownAccount(preview, view);
   return account === undefined ? t.dash.overview : accountName(t, account);
 }
+
+/** A lot's key for its anchor: its source row, which no other lot shares. */
+export const lotKey = (lot: HeldLotRow) =>
+  lot.source.part === undefined
+    ? `${lot.source.file}:${String(lot.source.row)}`
+    : `${lot.source.file}:${lot.source.part}:${String(lot.source.row)}`;

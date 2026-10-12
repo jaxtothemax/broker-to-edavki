@@ -128,7 +128,10 @@ function Frame({
     if (state.screen !== "dashboard") setDashView(initialDashboardView);
   }
   const previousScreen = useRef(state.screen);
-  const previousPage = useRef(dashView.page);
+  // The page shown, and the account where it is an account's: going from one
+  // account to another is a new page too.
+  const shownPage = `${dashView.page}:${dashView.account ?? ""}`;
+  const previousPage = useRef(shownPage);
   // Each added file, by id, and its bytes once the engine first needs them:
   // a file refused unread is never read at all.
   const handles = useRef(new Map<string, File>());
@@ -240,14 +243,14 @@ function Frame({
   // A new page of the dashboard is a new screen to the user: the same move
   // to its heading, from a navigation button that stays where it was.
   useEffect(() => {
-    if (previousPage.current === dashView.page) return;
-    previousPage.current = dashView.page;
+    if (previousPage.current === shownPage) return;
+    previousPage.current = shownPage;
     if (tourOpen.current || state.screen !== "dashboard") return;
     window.scrollTo({ top: 0 });
     document
       .querySelector<HTMLElement>("#main h1")
       ?.focus({ preventScroll: true });
-  }, [dashView.page, state.screen]);
+  }, [shownPage, state.screen]);
 
   // A file no longer listed (or never listed, from a drop larger than a
   // session) takes its bytes with it.

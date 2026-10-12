@@ -1569,6 +1569,120 @@ input {
   display: none;
 }
 
+/* The broker accounts (#47): a titled list after the pages, in the same
+   <nav>. A desktop only: on the rail and the bottom bar the holdings page
+   lists them instead (.held-accounts). */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.nav-group-title {
+  padding: 0 10px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+
+.nav-label-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nav-detail {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+}
+
+@media (max-width: 1023px) {
+  .nav-group {
+    display: none;
+  }
+}
+
+/* ─── Holdings and accounts (#47) ─────────────────────────────────────────── */
+
+.fine-print {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.held-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--card-pad);
+}
+
+/* On a desktop the sidebar's Accounts group lists them. */
+@media (min-width: 1024px) {
+  .held-accounts {
+    display: none;
+  }
+}
+
+.held-account-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.held-account-list .btn {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  height: auto;
+  min-height: 44px;
+  border-color: var(--border);
+  white-space: normal;
+}
+
+.account-card,
+.account-strip,
+.account-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-card,
+.account-strip {
+  padding: var(--card-pad);
+}
+
+.position-flag {
+  margin-top: 6px;
+}
+
+.account-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.account-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 @media (min-width: 1024px) {
   .returns-grid {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);

@@ -175,6 +175,44 @@ exports[`the sentences the tour renders > en: says what was reviewed, word for w
     ]
   },
   {
+    "stop": "stillHeld",
+    "title": "What you still hold",
+    "intro": "The lots left after every sale, matched across brokers, as of the files' last day rather than the tax year.",
+    "notes": [
+      {
+        "lead": "18 Jun 2026",
+        "body": "Lots are as of 18 Jun 2026, the last day every account holding this security covers. A trade after it is not in your files."
+      },
+      {
+        "lead": "20% from 6 Aug 2029",
+        "body": "From 6 Aug 2029 a sale of this lot is taxed at 20%: the day after its anniversary, safe however FURS counts that day."
+      },
+      {
+        "lead": "Interactive Brokers",
+        "body": "The sale at Interactive Brokers used the oldest lot, bought at Trading 212: first in, first out runs across all your brokers. The lot left is at Interactive Brokers."
+      }
+    ]
+  },
+  {
+    "stop": "accountCheck",
+    "title": "Check an account against its broker",
+    "intro": "Each account's own count of the shares, to compare with its broker's app.",
+    "notes": [
+      {
+        "lead": "As of 13 Aug 2026",
+        "body": "The last day this account's files cover. Nothing after 13 Aug 2026 is in these figures."
+      },
+      {
+        "lead": "May not match your broker",
+        "body": "Moving shares between your own accounts creates no lot and ends none, so the first-in, first-out lots are not affected. Only this account's count is off, until transfers are read."
+      },
+      {
+        "lead": "NVDA",
+        "body": "This is the account's own count at Interactive Brokers, to compare with its app. It is below zero because the shares sold here were moved in from Trading 212, and moves between accounts are not read yet."
+      }
+    ]
+  },
+  {
     "stop": "download",
     "title": "Download, then you submit",
     "intro": "Last stop. The demo's files are written exactly like yours, but for a made-up taxpayer: never import them into eDavki.",
@@ -368,6 +406,44 @@ exports[`the sentences the tour renders > sl: says what was reviewed, word for w
       {
         "lead": "Trading 212: vrstice z obrestmi (6) niso v teh napovedih.",
         "body": "Vrstice, ki jih ni v teh napovedih, so navedene tukaj, namesto da bi bile izpuščene brez besede, zato nič iz datoteke ne izgine neopazno."
+      }
+    ]
+  },
+  {
+    "stop": "stillHeld",
+    "title": "Kaj še imate",
+    "intro": "Loti, ki ostanejo po vseh prodajah, povezani prek posrednikov, na zadnji dan datotek in ne za davčno leto.",
+    "notes": [
+      {
+        "lead": "18. 6. 2026",
+        "body": "Loti veljajo na dan 18. 6. 2026, zadnji dan, ki ga pokrivajo vsi računi s tem papirjem. Posla po tem dnevu ni v vaših datotekah."
+      },
+      {
+        "lead": "20\\u00a0% od 6. 8. 2029",
+        "body": "Od 6. 8. 2029 je prodaja tega lota obdavčena po 20\\u00a0%: dan po obletnici, varno ne glede na to, kako FURS šteje ta dan."
+      },
+      {
+        "lead": "Interactive Brokers",
+        "body": "Prodaja pri Interactive Brokers je porabila najstarejši lot, kupljen pri Trading 212: FIFO velja prek vseh vaših posrednikov. Preostali lot je pri Interactive Brokers."
+      }
+    ]
+  },
+  {
+    "stop": "accountCheck",
+    "title": "Preverite račun pri posredniku",
+    "intro": "Stanje delnic na vsakem računu, da ga primerjate z aplikacijo posrednika.",
+    "notes": [
+      {
+        "lead": "Stanje na dan 13. 8. 2026",
+        "body": "Zadnji dan, ki ga pokrivajo datoteke tega računa. Nič po dnevu 13. 8. 2026 ni v teh številkah."
+      },
+      {
+        "lead": "Morda se ne ujema s posrednikom",
+        "body": "Prenos delnic med vašimi računi ne ustvari lota in nobenega ne konča, zato loti po metodi FIFO niso prizadeti. Napačno je le stanje tega računa, dokler prenosov ne beremo."
+      },
+      {
+        "lead": "NVDA",
+        "body": "To je stanje pri Interactive Brokers, ki ga primerjate z njegovo aplikacijo. Pod ničlo je, ker so bile delnice, prodane tu, prenesene od Trading 212, prenosov med računi pa aplikacija še ne bere."
       }
     ]
   },

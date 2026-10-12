@@ -24,17 +24,11 @@ import type {
 import { bucketLabel, Eur, RateText, SourceText } from "../../ui/bits";
 import { Button, Chip, DataTable, Note, SecurityMark } from "../../ui/kit";
 import { AccountStrip } from "./AccountParts";
-import { accountName } from "./names";
+import { accountName, lotKey } from "./names";
 
 /** A security's name on the screen: its ticker, or its ISIN without one. */
 const labelOf = (security: HeldSecurity) =>
   security.symbol === "" ? security.isin : security.symbol;
-
-/** A lot's key: its source row, which no other lot shares. */
-export const lotKey = (lot: HeldLotRow) =>
-  lot.source.part === undefined
-    ? `${lot.source.file}:${String(lot.source.row)}`
-    : `${lot.source.file}:${lot.source.part}:${String(lot.source.row)}`;
 
 /** The day the next, lower rate is certain, or why there is none. */
 function NextRate({ lot }: { readonly lot: HeldLotRow }) {

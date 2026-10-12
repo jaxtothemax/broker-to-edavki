@@ -163,12 +163,14 @@ for (const exit of ["Escape", "Skip", "Finish"] as const) {
     await page.keyboard.press("Enter");
     await expect(dialog).toBeVisible();
     // Go to the stop that opens Apple's row on the gains tab.
-    const apple = page.locator('details[data-explain-key="US0378331005"]');
+    const apple = page.locator(
+      'details[data-explain="sec.item"][data-explain-key="US0378331005"]',
+    );
     const appleOpen = () =>
       page.evaluate(
         () =>
           document.querySelector(
-            'details[data-explain-key="US0378331005"][open]',
+            'details[data-explain="sec.item"][data-explain-key="US0378331005"][open]',
           ) !== null,
       );
     for (let k = 0; k < 12 && !(await appleOpen()); k += 1) {
@@ -374,7 +376,9 @@ test("a page of the dashboard takes focus to its heading, and leaving the dashbo
   await expect(page.locator("#main h1")).toHaveText(GAINS);
   await expect(page.locator("#main h1")).toBeFocused();
   await page
-    .locator('details[data-explain-key="US0378331005"] > summary')
+    .locator(
+      'details[data-explain="sec.item"][data-explain-key="US0378331005"] > summary',
+    )
     .click();
   await results(page).getByRole("button", { name: DIVIDENDS }).click();
   await page

@@ -1158,7 +1158,7 @@ export const en: Messages = {
     lotLeft: (soldAt, oldestAt, leftAt) =>
       `The sale at ${soldAt} used the oldest lot, bought at ${oldestAt}: first in, first out runs across all your brokers. The lot left is at ${leftAt}.`,
     accountPosition: (broker, other) =>
-      `This is ${broker}'s own count, to compare with its app. It is below zero because the shares sold here were moved in from ${other}, and moves between accounts are not read yet.`,
+      `This is the account's own count at ${broker}, to compare with its app. It is below zero because the shares sold here were moved in from ${other}, and moves between accounts are not read yet.`,
     transferNotRead:
       "Moving shares between your own accounts creates no lot and ends none, so the first-in, first-out lots are not affected. Only this account's count is off, until transfers are read.",
     accountAsOf: (date) =>
