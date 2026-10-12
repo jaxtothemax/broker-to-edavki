@@ -5,11 +5,14 @@ description: What has shipped, what is being built now, and what is planned. Eve
 
 This page is the single source of truth for the status of each TaxReporter version. A feature
 is described in the past or present tense anywhere on this site only once its version is listed
-under **Shipped**. Until then, every page uses the future tense: "will", "planned for".
+under **Shipped**. Until then, every page uses the future tense: "will", "planned for". The one
+exception is the preview of the browser app (under v0.1 below): pages describe it as it is
+today, and always as a preview, never as a release.
 
 ## Shipped
 
-Nothing yet. TaxReporter has not had a release, and there is nothing to install.
+Nothing yet. TaxReporter has not had a release, and there is nothing to install. The preview
+of the browser app described under v0.1 is not a release either.
 
 ## Underway
 
@@ -35,6 +38,10 @@ Planned scope:
   After you add your files and details, it will open a dashboard of your results: the tax to
   pay as an estimate, the two returns to download, and a page each for your gains, dividends
   and notes, with the shares you still hold and a section per broker account to follow.
+  A **preview** of it, built from the current code, is published with this site under `app/`
+  (**Try the browser app** in the sidebar). It runs on your device like the finished app will,
+  but how it reads broker exports has not been checked against real exports yet, so treat
+  every figure in it as a draft to check, not a return to file.
 - **Command-line tool (CLI):** the same results, for scripts and repeatable runs.
 - **FURS XML format:** files built to FURS's published schemas, with tests that check the output
   against them.

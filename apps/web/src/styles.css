@@ -3738,3 +3738,38 @@ button.step-item:hover {
     }
   }
 }
+
+/* ─── Preview notice and the framed page (#70, #4) ────────────────────────
+   The notice sits in the page flow under the sticky header, never inside it:
+   the header's height is --header-h, which the dashboard's sidebar and the
+   guided tour measure against. */
+
+.preview-notice {
+  padding-top: 16px;
+}
+
+.app.has-shell .preview-notice .container {
+  max-width: none;
+}
+
+/* What index.ts shows instead of the app inside another site's frame
+   (frameGuard.ts): plain text outside .app, on the page's own colors. */
+.frame-guard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 62ch;
+  margin-inline: auto;
+  padding: 32px 24px;
+}
+
+.frame-guard > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.frame-guard a {
+  color: var(--accent-text);
+  text-underline-offset: 3px;
+}

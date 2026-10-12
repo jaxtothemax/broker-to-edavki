@@ -45,6 +45,29 @@ tools show every request a page makes.
 If you prepare returns for clients, this also means their data is not handed to another
 company.
 
+## When another website frames the app
+
+A website can show a page from another site inside a frame on its own page. A web server can
+forbid that with the `frame-ancestors` rule of a Content Security Policy, but only in a header it
+sends with the page. GitHub Pages, which hosts this site and the preview of the browser app,
+sends no custom headers, and a policy written into the page itself cannot carry that rule. So
+any website can put the app in a frame.
+
+So the preview of the browser app has a frame guard, and the finished app will keep it: when
+it finds itself inside a frame, it does not start. The frame shows a short note and a link that
+opens TaxReporter in its own tab instead.
+
+This is defense in depth, not a guarantee. The guard does not stop another site from framing
+the page; it only keeps the app from starting there. It is part of the app's own code, not a
+rule the browser enforces, so it runs only where the app's code runs: a frame that turns
+scripts off stops the guard and the app alike. These documentation pages have no guard and can
+be framed too.
+
+The exposure is small. The app has no account and no backend, and it sends nothing anywhere,
+so there is no login for a framing site to misuse and nothing it could make the app send. A
+site that frames a page from another site cannot read what that page shows or what you type
+into it.
+
 ## The optional AI check
 
 A later version is planned to offer an optional "second opinion" from a large language model

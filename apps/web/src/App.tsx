@@ -52,6 +52,7 @@ import {
   AppFooter,
   AppHeader,
   Main,
+  PreviewNotice,
   SkipLink,
   type Theme,
 } from "./ui/AppChrome";
@@ -402,6 +403,7 @@ function Frame({
           setTheme(theme === "dark" ? "light" : "dark");
         }}
       />
+      <PreviewNotice />
       {inShell ? (
         // The shell renders its own <main>; this boundary catches what
         // fails in the shell itself, outside its pages' own boundaries.

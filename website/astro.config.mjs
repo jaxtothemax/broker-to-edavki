@@ -77,6 +77,18 @@ const markdownLinksPlugin = {
   image: rewriteNodeUrl,
 };
 
+// ─── The link to the web app ─────────────────────────────────────────────────
+//
+// The web app (apps/web) is published with this site, under app/, only when
+// the repository variable PUBLISH_WEB_APP is "true". .github/workflows/docs.yml
+// makes that decision once and passes it to this build as PUBLISH_WEB_APP, so
+// the sidebar links the app exactly when the app is in the same artifact.
+// Starlight puts `base` in front of a sidebar link, so "/app/" opens
+// /<repo>/app/ on a project site and /app/ on a custom domain. It is a sidebar
+// entry rather than a Markdown link because scripts/check-docs-internal-links.py
+// resolves Markdown links against the docs pages, and /app/ is not one of them.
+const webAppPublished = process.env.PUBLISH_WEB_APP === "true";
+
 /** @returns {import("astro").AstroIntegration} */
 function markdownLinks() {
   return {
@@ -139,6 +151,22 @@ export default defineConfig({
           label: "Project",
           items: [{ slug: "roadmap" }, { slug: "contributing" }],
         },
+        // Last, because Starlight's previous and next links follow the sidebar:
+        // between two pages the app would break the docs' reading order; here
+        // it is only the last page's "Next".
+        ...(webAppPublished
+          ? [
+              {
+                label: "Try the browser app",
+                link: "/app/",
+                badge: {
+                  text: "Preview",
+                  // A literal, not a string: the spread hides Starlight's type.
+                  variant: /** @type {const} */ ("caution"),
+                },
+              },
+            ]
+          : []),
       ],
     }),
   ],

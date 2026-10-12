@@ -8,9 +8,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONTENT_SECURITY_POLICY } from "../../content-security-policy.mjs";
 
 // The check is a command-line script, so these tests run it the way the
-// website-build job does: as a child process on a build output directory, and
-// they demand the exact exit code and the message. Importing it would hide a
-// crash behind a thrown exception.
+// web-app and website-build jobs do: as a child process on a build output
+// directory, and they demand the exact exit code and the message. Importing it
+// would hide a crash behind a thrown exception.
 
 const SCRIPT = fileURLToPath(
   new URL("./check-pages-build.mjs", import.meta.url),

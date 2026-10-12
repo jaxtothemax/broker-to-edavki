@@ -428,6 +428,17 @@ export interface Messages {
     readonly edavkiImport: string;
     readonly youReviewAndSubmit: string;
   };
+  /**
+   * Publishing the app as a preview (#70): the notice on every screen, and
+   * what the page shows instead of the app when another site frames it (#4,
+   * frameGuard.ts). The framed page is plain text, outside React.
+   */
+  readonly preview: {
+    readonly noticeTitle: string;
+    readonly noticeBody: string;
+    readonly framedBody: string;
+    readonly framedLink: string;
+  };
 }
 
 export const en: Messages = {
@@ -967,6 +978,14 @@ export const en: Messages = {
       "Written on this device and saved there; nothing is uploaded. In eDavki, a file like this is imported under Dokumenti, then Uvoz.",
     youReviewAndSubmit:
       "After the import, eDavki shows the form for you to compare with these results and submit yourself. TaxReporter never files, and eDavki calculates the final tax.",
+  },
+  preview: {
+    noticeTitle: "Preview.",
+    noticeBody:
+      "How TaxReporter reads broker exports has not been checked against real exports yet, so check every figure before you file. Nothing leaves this device.",
+    framedBody:
+      "TaxReporter does not start inside another website. Open it in its own tab to use it.",
+    framedLink: "Open TaxReporter in its own tab",
   },
 };
 
@@ -1540,6 +1559,14 @@ export const sl: Messages = {
       "Zapisana je na tej napravi in tam shranjena, ničesar se ne naloži. V eDavkih se taka datoteka uvozi pod Dokumenti, nato Uvoz.",
     youReviewAndSubmit:
       "Po uvozu eDavki prikažejo obrazec, ki ga primerjate s temi rezultati in sami oddate. TaxReporter napovedi nikoli ne odda, končni davek pa izračunajo eDavki.",
+  },
+  preview: {
+    noticeTitle: "Predogled.",
+    noticeBody:
+      "Branje izvozov borznih posrednikov še ni preverjeno na pravih izvozih, zato pred oddajo napovedi preverite vsako številko. Nič ne zapusti te naprave.",
+    framedBody:
+      "TaxReporter se znotraj drugega spletnega mesta ne zažene. Za uporabo ga odprite v samostojnem zavihku.",
+    framedLink: "Odpri TaxReporter v samostojnem zavihku",
   },
 };
 

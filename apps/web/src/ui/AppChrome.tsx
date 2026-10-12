@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 
 import { LOCALES } from "../i18n/format";
 import { useI18n } from "../i18n/i18n";
-import { Chip, IconButton } from "./kit";
+import { Chip, IconButton, Note } from "./kit";
 
 /**
  * Where "Source code" points. The repository is not public yet, so the build
@@ -99,6 +99,27 @@ export function AppHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * The preview notice under the header, on every screen and in both themes
+ * (#70): the readers are not yet checked against real exports. It cannot be
+ * dismissed, and it is a named region, so a screen reader lists it with the
+ * page's landmarks; the note's icon and bold title say "caution" without
+ * relying on its color.
+ */
+export function PreviewNotice() {
+  const { t } = useI18n();
+  return (
+    <section className="preview-notice" aria-labelledby="preview-notice-title">
+      <div className="container">
+        <Note tone="warn">
+          <strong id="preview-notice-title">{t.preview.noticeTitle}</strong>{" "}
+          {t.preview.noticeBody}
+        </Note>
+      </div>
+    </section>
   );
 }
 

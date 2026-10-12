@@ -9,9 +9,11 @@
 // and stylesheet once deployed. GitHub Pages also cannot send response headers,
 // so the Content Security Policy travels as a <meta> tag that only the
 // production build adds (apps/web/vite.config.ts); a build without it would
-// publish an app that nothing restricts. The website-build job runs this check on
+// publish an app that nothing restricts. The web-app job runs this check on
 // every pull request and push, so a wrong prefix or a lost policy is red before
-// anyone sets PUBLISH_WEB_APP.
+// anyone sets PUBLISH_WEB_APP. When the app is published, the website-build job
+// runs it again on the copy it downloaded from web-app, before that copy joins
+// the Pages artifact: the build ran third-party code, the checkout did not.
 //
 // ## What it checks
 //
