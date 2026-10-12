@@ -67,7 +67,7 @@ at a time on a phone; and the demo data stays as it is (#26).
    When the dialog opens, Next has focus (`autofocus`), so Enter goes on; Skip is first in
    the DOM and Tab order. Focus goes back to a named element, never to whatever had it: the
    heading of the screen the demo opened on, or the button that started the tour where the
-   page still shows it (the banner's replay, or "Use demo files" with the scroll the user
+   page still shows it (the replay beside the demo's chip, or "Use demo files" with the scroll the user
    left), since WebKit does not focus a button on a click. That element is focused just
    before the dialog opens, because WebKit gives focus back to it on close after the app's
    own restore. The tab title keeps following the user's screen, not the stop shown.
@@ -159,7 +159,7 @@ at a time on a phone; and the demo data stays as it is (#26).
   says so instead of waiting; and anchors are found by name with their keys compared
   as text, never parsed, since keys will come from the user's own files.
 - **Removing the tour is cheap:** the tour module, the override in the app frame and the
-  banner action. The anchors, the review's view and the explanations stay useful.
+  replay button beside the demo's chip. The anchors, the review's view and the explanations stay useful.
 
 Alternatives considered: a tour library (decision 1); driving the wizard and restoring a
 snapshot, which loses the user's tab and rows when the screen changes; a non-modal panel

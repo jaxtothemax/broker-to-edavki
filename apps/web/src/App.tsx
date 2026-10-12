@@ -52,11 +52,10 @@ import {
   AppFooter,
   AppHeader,
   Main,
-  PreviewNotice,
   SkipLink,
   type Theme,
 } from "./ui/AppChrome";
-import { DemoBanner, TOUR_BUTTON_ID } from "./ui/bits";
+import { DemoMark, TOUR_BUTTON_ID } from "./ui/bits";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { Button, cx, Note } from "./ui/kit";
 import { Stepper } from "./ui/Stepper";
@@ -403,7 +402,6 @@ function Frame({
           setTheme(theme === "dark" ? "light" : "dark");
         }}
       />
-      <PreviewNotice />
       {inShell ? (
         // The shell renders its own <main>; this boundary catches what
         // fails in the shell itself, outside its pages' own boundaries.
@@ -466,9 +464,7 @@ function Frame({
                   dispatch({ type: "goTo", screen });
                 }}
               />
-              {state.mode === "demo" ? (
-                <DemoBanner onTour={replayTour} />
-              ) : null}
+              {state.mode === "demo" ? <DemoMark onTour={replayTour} /> : null}
               <ErrorBoundary
                 resetKey={shownScreen}
                 fallback={

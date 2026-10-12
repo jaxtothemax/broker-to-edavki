@@ -324,7 +324,7 @@ describe("DashboardShell", () => {
   it("keeps the demo's tour on the page header, once", () => {
     const html = shell({ demo: true, onTour: () => undefined });
     expect(html.match(/id="demo-tour"/g)).toHaveLength(1);
-    expect(text(html)).toContain(en.demoBanner.title);
+    expect(text(html)).toContain(en.demoData.chip);
   });
 
   it("keeps Back to details and Start over within reach on a phone, in every state", () => {

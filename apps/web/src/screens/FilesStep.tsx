@@ -442,6 +442,14 @@ export function FilesStep({
             })}
           </ul>
         )}
+        {/* Once, where the user's own files are listed (#70): the readers
+            are not checked against real exports yet. The Returns card says
+            it again by the downloads. */}
+        {hasOwnFiles ? (
+          <Note tone="warn">
+            <strong>{t.preview.noticeTitle}</strong> {t.preview.noticeBody}
+          </Note>
+        ) : null}
         <p className="visually-hidden" aria-live="polite">
           {announcement}
         </p>
@@ -486,10 +494,6 @@ export function FilesStep({
           ) : null}
         </section>
       )}
-
-      {hasOwnFiles ? (
-        <Note tone="neutral">{t.files.ownFilesNotice}</Note>
-      ) : null}
 
       <div className="actions">
         <div className="actions-row">
