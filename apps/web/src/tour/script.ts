@@ -893,7 +893,7 @@ export const TOUR: readonly TourStop[] = [
           ["acct.card", transferredId],
           ["acct.position", `${transferredId}:${DEMO_NVDA}`],
         ),
-        text: ({ t, locale, preview }) => {
+        text: ({ t, preview }) => {
           const account = accountOf(preview, transferredId);
           const position = account?.positions.find((p) => p.isin === DEMO_NVDA);
           const other = preview.holdings?.accounts.find(
