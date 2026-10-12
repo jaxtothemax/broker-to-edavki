@@ -5,7 +5,7 @@
 # application's own lint/typecheck/test/build jobs live in .github/workflows/ci.yml
 # — see .github/workflows/CLAUDE.md for what that file must carry. Sibling workflows:
 #   security.yml — osv-scan (dependency advisories) + gitleaks-scan (secrets)
-#   docs.yml     — docs-internal-links, website-build, GitHub Pages deploy
+#   docs.yml     — docs-internal-links, base-path, web-app, website-build, GitHub Pages deploy
 #   release.yml  — tag pushes: release-pipeline-gate, then publish the release
 #
 # Read .github/workflows/CLAUDE.md (which imports scripts/CLAUDE.md) before

@@ -9,9 +9,11 @@
 // and stylesheet once deployed. GitHub Pages also cannot send response headers,
 // so the Content Security Policy travels as a <meta> tag that only the
 // production build adds (apps/web/vite.config.ts); a build without it would
-// publish an app that nothing restricts. The website-build job runs this check on
+// publish an app that nothing restricts. The web-app job runs this check on
 // every pull request and push, so a wrong prefix or a lost policy is red before
-// anyone sets PUBLISH_WEB_APP.
+// anyone sets PUBLISH_WEB_APP. When the app is published, the website-build job
+// runs it again on the copy it downloaded from web-app, before that copy joins
+// the Pages artifact: the build ran third-party code, the checkout did not.
 //
 // ## What it checks
 //
@@ -40,12 +42,24 @@
 //      <textarea> are ordinary elements, not text, so a <script> in an SVG
 //      <title> runs while a reader that takes <title> for text skips it. The
 //      app's index.html has none.
+//   6. No <meta http-equiv="refresh">, <base>, <form>, <iframe>, <frame> or
+//      <frameset>. The app's index.html has none, and each can take the page,
+//      or what is typed into it, somewhere else; a refresh is a navigation no
+//      policy directive governs.
+//   7. The output holds index.html at its root and, directly under assets/,
+//      .js, .css, .woff2 and .woff files, and nothing else: no other file, no
+//      directory, no symbolic link, at any depth. The policy travels inside
+//      index.html and covers that page only, so any other page published with
+//      it (an .html or .svg file, say) would run with no policy at all, on the
+//      app's own origin.
 //
 // ## What it does not check
 //
-// Only index.html is read. Other elements that load resources (<img>, <iframe>,
-// <link rel="icon">), inline event-handler attributes and javascript: URLs are
-// not inspected; the Content Security Policy itself blocks them in the browser.
+// Only index.html is read; the other files are judged by name and place, and
+// what is inside a script, stylesheet or font is not inspected. Other elements
+// that load resources (<img>, <link rel="icon">), inline event-handler
+// attributes and javascript: URLs are not inspected either; the Content
+// Security Policy itself blocks them in the browser.
 // Character references in URLs are not decoded: a URL containing "&" is
 // rejected instead. In the policy and http-equiv values only numeric references
 // and &amp; &lt; &gt; &quot; &apos; are decoded (escape-html, which Vite uses,
@@ -62,6 +76,11 @@
 // file content, hence nothing to backtrack), and nothing in it is executed.
 // Values quoted from it in messages are JSON-escaped and truncated, so a newline
 // in an attribute cannot start a line of its own (a GitHub Actions command).
+// The output directory is listed two levels deep at most (its root and
+// assets/), never recursively, and the listing stops after MAX_ENTRIES names;
+// file names are matched by one anchored pattern without nested repetition
+// and quoted the same way. A symbolic link is refused and never followed:
+// index.html is read only when it is a regular file.
 //
 // ## Usage
 //
@@ -78,12 +97,15 @@
 
 import { spawnSync } from "node:child_process";
 import {
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  opendirSync,
   realpathSync,
   rmSync,
   statSync,
   readFileSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -118,6 +140,32 @@ const RAW_TEXT_ELEMENTS = new Set(["script", "style", "textarea", "title"]);
 
 // Elements that switch the HTML parser to foreign content.
 const FOREIGN_ELEMENTS = new Set(["svg", "math"]);
+
+// Elements the app's index.html never has, each of which can take the page or
+// what is typed into it elsewhere (check 6): a <base> re-points every relative
+// URL, a <form> submits, and a frame loads another page into this one.
+const NAVIGATING_ELEMENTS = new Set([
+  "base",
+  "form",
+  "iframe",
+  "frame",
+  "frameset",
+]);
+
+const NAVIGATING =
+  "index.html may not contain a refresh, <base>, <form>, <iframe>, <frame> or <frameset>: the app's page has none, and each can take the page, or what is typed into it, somewhere else";
+
+// The only names allowed directly under assets/ (check 7): what Vite writes for
+// the scripts, the stylesheet and the self-hosted fonts. Anchored, with no
+// nested repetition, so a hostile name cannot make it backtrack.
+const ASSET_NAME = /^[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:js|css|woff2|woff)$/u;
+
+// The real build writes about twenty files. Far more is not a build of this
+// app, and a directory is not listed past this many names.
+const MAX_ENTRIES = 1000;
+
+const OUTSIDE_LAYOUT =
+  "is not index.html at the root or a .js, .css, .woff2 or .woff file directly under assets/: the Content Security Policy is in index.html and covers no other page, so nothing else may be published";
 
 // The named character references decoded in the policy (see the header).
 const NAMED_REFERENCES = new Map([
@@ -522,6 +570,21 @@ function isPolicyMeta(tag) {
 }
 
 /**
+ * Whether a tag is a <meta http-equiv> that is, or may be, a refresh (check 6):
+ * its value decodes to "refresh", ASCII case-insensitively and ignoring
+ * surrounding whitespace, or holds a character reference this check does not
+ * decode, which a browser might read as "refresh". Both err toward refusing.
+ * @param {Tag} tag
+ */
+function isRefreshMeta(tag) {
+  if (tag.closing || tag.name !== "meta") return false;
+  const raw = tag.attrs.get("http-equiv");
+  if (raw === undefined) return false;
+  const equiv = decodeReferences(raw);
+  return equiv === null || asciiLower(equiv).trim() === "refresh";
+}
+
+/**
  * The first token before tokenList[end] that may not precede the policy tag, or
  * null. In order, only these may: a doctype, an <html> start tag, the first
  * <head> start tag, with comments anywhere. Whitespace-only text never becomes
@@ -672,16 +735,20 @@ function assetExists(url, base, distDir) {
 }
 
 /**
+ * @typedef {{ script: number, stylesheet: number, modulepreload: number, inline: number, csp: PolicyStatus }} HtmlCounts
+ */
+
+/**
  * @typedef {object} Report
  * @property {string[]} problems
- * @property {{ script: number, stylesheet: number, modulepreload: number, inline: number, csp: PolicyStatus }} counts
+ * @property {HtmlCounts & { files: number }} counts
  */
 
 /**
  * @param {string} html
  * @param {string} base
  * @param {string} distDir
- * @returns {Report}
+ * @returns {{ problems: string[], counts: HtmlCounts }}
  */
 function checkHtml(html, base, distDir) {
   const lineOf = makeLineOf(html);
@@ -707,6 +774,20 @@ function checkHtml(html, base, distDir) {
     if (FOREIGN_ELEMENTS.has(tag.name)) {
       problems.push(
         `<${tag.name}> at line ${lineOf(tag.start)}: index.html may not contain svg or math, because inside them <title>, <style> and <textarea> hold markup rather than text, and a <script> there would run unseen by this check`,
+      );
+      continue;
+    }
+
+    if (NAVIGATING_ELEMENTS.has(tag.name)) {
+      problems.push(
+        `<${tag.name}> at line ${lineOf(tag.start)}: ${NAVIGATING}`,
+      );
+      continue;
+    }
+
+    if (isRefreshMeta(tag)) {
+      problems.push(
+        `<meta http-equiv=${quoted(tag.attrs.get("http-equiv") ?? "")}> at line ${lineOf(tag.start)}: ${NAVIGATING}`,
       );
       continue;
     }
@@ -779,6 +860,92 @@ function baseProblem(base) {
   return null;
 }
 
+/** @param {import("node:fs").Dirent} entry */
+function describeEntry(entry) {
+  if (entry.isFile()) return "a file";
+  if (entry.isDirectory()) return "a directory";
+  if (entry.isSymbolicLink()) return "a symbolic link";
+  return "neither a file nor a directory";
+}
+
+/**
+ * The entries of directory `dir`, at most `limit + 1` of them (so the caller
+ * can tell there were more than `limit`), or null when it cannot be opened.
+ * @param {string} dir
+ * @param {number} limit
+ * @returns {import("node:fs").Dirent[] | null}
+ */
+function listEntries(dir, limit) {
+  let handle;
+  try {
+    handle = opendirSync(dir);
+  } catch {
+    return null;
+  }
+  /** @type {import("node:fs").Dirent[]} */
+  const entries = [];
+  try {
+    while (entries.length <= limit) {
+      const entry = handle.readSync();
+      if (entry === null) break;
+      entries.push(entry);
+    }
+  } finally {
+    handle.closeSync();
+  }
+  return entries;
+}
+
+/**
+ * Check 7 of the header: index.html at the root, .js, .css, .woff2 and .woff
+ * files directly under assets/, and nothing else. Entries are judged by the
+ * type the directory listing reports, so a symbolic link is refused, never
+ * followed.
+ * @param {string} distDir
+ * @returns {{ problems: string[], files: number }}
+ */
+function checkLayout(distDir) {
+  /** @type {string[]} */
+  const problems = [];
+  let files = 0;
+  const root = listEntries(distDir, MAX_ENTRIES);
+  // A directory that cannot be opened is reported as a missing index.html.
+  if (root === null) return { problems, files };
+
+  const hasAssets = root.some(
+    (entry) => entry.name === "assets" && entry.isDirectory(),
+  );
+  const assets = hasAssets
+    ? listEntries(join(distDir, "assets"), MAX_ENTRIES)
+    : [];
+  if (assets === null) problems.push('"assets" cannot be listed');
+  if (root.length > MAX_ENTRIES || (assets ?? []).length > MAX_ENTRIES) {
+    problems.push(
+      `a directory of the output holds more than ${MAX_ENTRIES} entries; a build of this app writes about twenty files`,
+    );
+  }
+
+  for (const entry of root) {
+    if (entry.name === "index.html" && entry.isFile()) {
+      files += 1;
+    } else if (!(entry.name === "assets" && entry.isDirectory())) {
+      problems.push(
+        `${quoted(entry.name)} (${describeEntry(entry)}) ${OUTSIDE_LAYOUT}`,
+      );
+    }
+  }
+  for (const entry of assets ?? []) {
+    if (entry.isFile() && ASSET_NAME.test(entry.name)) {
+      files += 1;
+    } else {
+      problems.push(
+        `${quoted(`assets/${entry.name}`)} (${describeEntry(entry)}) ${OUTSIDE_LAYOUT}`,
+      );
+    }
+  }
+  return { problems, files };
+}
+
 /**
  * Runs the check on `distDir`. Throws an Error with `.exitCode = 2` when the
  * check cannot run.
@@ -787,18 +954,23 @@ function baseProblem(base) {
  * @returns {Report}
  */
 function checkBuild(distDir, base) {
+  const layout = checkLayout(distDir);
   const indexPath = join(distDir, "index.html");
   /** @type {import("node:fs").Stats | undefined} */
   let stats;
   try {
-    stats = statSync(indexPath);
+    // lstat, not stat: an index.html that is a link is never read through.
+    stats = lstatSync(indexPath);
   } catch {
     stats = undefined;
   }
   if (stats === undefined || !stats.isFile()) {
     return {
       problems: [
-        `${indexPath} does not exist: the build produced no index.html`,
+        stats === undefined
+          ? `${indexPath} does not exist: the build produced no index.html`
+          : `${indexPath} is not a regular file, so it is not read`,
+        ...layout.problems,
       ],
       counts: {
         script: 0,
@@ -806,6 +978,7 @@ function checkBuild(distDir, base) {
         modulepreload: 0,
         inline: 0,
         csp: "missing",
+        files: layout.files,
       },
     };
   }
@@ -819,7 +992,11 @@ function checkBuild(distDir, base) {
       },
     );
   }
-  return checkHtml(readFileSync(indexPath, "utf8"), base, distDir);
+  const page = checkHtml(readFileSync(indexPath, "utf8"), base, distDir);
+  return {
+    problems: [...page.problems, ...layout.problems],
+    counts: { ...page.counts, files: layout.files },
+  };
 }
 
 /** @param {string} line */
@@ -855,7 +1032,7 @@ function runCheck(args) {
   const { counts, problems } = report;
   out(
     `${TOOL}: base ${base}: ${counts.script} script, ${counts.stylesheet} stylesheet and ${counts.modulepreload} modulepreload URL(s) checked, ` +
-      `${counts.inline} inline script(s), Content Security Policy meta ${counts.csp}`,
+      `${counts.inline} inline script(s), Content Security Policy meta ${counts.csp}, ${counts.files} allowed file(s) in the output`,
   );
   if (problems.length === 0) {
     out(`${TOOL}: OK`);
@@ -952,8 +1129,17 @@ function selfTest() {
    * @param {number} wantExit
    * @param {string} wantText
    * @param {boolean} [withAssets]
+   * @param {(dist: string) => void} [prepare] Adds to the output before the run.
    */
-  const run = (name, html, useBase, wantExit, wantText, withAssets = true) => {
+  const run = (
+    name,
+    html,
+    useBase,
+    wantExit,
+    wantText,
+    withAssets = true,
+    prepare = () => {},
+  ) => {
     cases += 1;
     const dist = join(root, `case-${cases}`);
     mkdirSync(join(dist, "assets"), { recursive: true });
@@ -962,6 +1148,7 @@ function selfTest() {
       writeFileSync(join(dist, "assets", "index-abc123.js"), "");
       writeFileSync(join(dist, "assets", "index-abc123.css"), "");
     }
+    prepare(dist);
     const result = spawnSync(process.execPath, [script, dist, useBase], {
       encoding: "utf8",
       timeout: 20_000,
@@ -1177,6 +1364,86 @@ function selfTest() {
       1,
       "not in the build output",
       false,
+    );
+    run(
+      "a refresh is rejected",
+      fixtureHtml(base, {
+        extra:
+          '<meta http-equiv="Refresh" content="0; url=https://example.invalid/">',
+      }),
+      base,
+      1,
+      `<meta http-equiv="Refresh"> at line 8: index.html may not contain a refresh`,
+    );
+    for (const element of ["<iframe></iframe>", "<form></form>", "<base>"]) {
+      const named = element.slice(0, element.indexOf(">") + 1);
+      run(
+        `a ${named} is rejected`,
+        fixtureHtml(base, { extra: element }),
+        base,
+        1,
+        `${named} at line 8: index.html may not contain a refresh`,
+      );
+    }
+    run(
+      "fonts under assets/ are accepted",
+      fixtureHtml(base),
+      base,
+      0,
+      "5 allowed file(s) in the output",
+      true,
+      (dist) => {
+        writeFileSync(join(dist, "assets", "geist-latin-Ab_1-x.woff2"), "");
+        writeFileSync(join(dist, "assets", "geist-latin-Ab_1-x.woff"), "");
+      },
+    );
+    run(
+      "another page at the root of the output is rejected",
+      fixtureHtml(base),
+      base,
+      1,
+      '"about.html" (a file) is not index.html at the root',
+      true,
+      (dist) => {
+        writeFileSync(join(dist, "about.html"), "<p>no policy here</p>");
+      },
+    );
+    run(
+      "an SVG file under assets/ is rejected",
+      fixtureHtml(base),
+      base,
+      1,
+      '"assets/logo.svg" (a file) is not index.html at the root',
+      true,
+      (dist) => {
+        writeFileSync(join(dist, "assets", "logo.svg"), "<svg></svg>");
+      },
+    );
+    run(
+      "a script one directory deeper is rejected",
+      fixtureHtml(base),
+      base,
+      1,
+      '"assets/nested" (a directory) is not index.html at the root',
+      true,
+      (dist) => {
+        mkdirSync(join(dist, "assets", "nested"));
+        writeFileSync(join(dist, "assets", "nested", "x.js"), "");
+      },
+    );
+    run(
+      "a symbolic link under assets/ is rejected",
+      fixtureHtml(base),
+      base,
+      1,
+      '"assets/linked.js" (a symbolic link) is not index.html at the root',
+      true,
+      (dist) => {
+        symlinkSync(
+          join(dist, "assets", "index-abc123.js"),
+          join(dist, "assets", "linked.js"),
+        );
+      },
     );
     run(
       "a base without a trailing slash is a usage error",

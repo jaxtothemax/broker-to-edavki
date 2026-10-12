@@ -132,13 +132,45 @@ path: apps/web/content-security-policy.mjs
 call: "worker-src 'self' blob:",
 why:  The only grant for the engine's blob: bootstrap, which makes the worker inherit the page's policy (ADR 0013 §3). Drop blob: and every test and build stays green while the deployed app can no longer start its engine, so no file of the user's is read.
 
+path: apps/web/content-security-policy.mjs
+call: "frame-src 'none'",
+why:  The only thing that stops the app from framing a page: without it default-src 'self' lets the app frame any page on its origin, which it shares with these docs and every Pages site of the account (ADR 0009). The Pages build check compares the built tag with this module, so it follows the deletion, and no test or e2e spec names the directive: delete it and everything stays green.
+
 path: .github/workflows/ci.yml
 call: pnpm --dir apps/web exec playwright test
 why:  The only place CI runs the browser tests: the guided tour's keyboard path, focus and scroll restore, no sideways scroll at 320px, and the zero-violation check of the Content Security Policy on the built app. Delete it and the e2e job passes having run nothing.
 
 path: .github/workflows/docs.yml
 call: node apps/web/scripts/pages-build/check-pages-build.mjs apps/web/dist "$WEB_BASE"
-why:  The only run of the Pages build check on the real build output. check-gate-selftest-parity now fails when this line goes but the step keeps its --self-test line, yet delete the whole step and every parity gate stays green (neither can see a step that is gone) while a wrong base, a lost Content Security Policy tag or an inline script reaches the artifact.
+why:  The only run of the Pages build check on every pull request and push (job web-app); website-build runs it again only when the app is published. check-gate-selftest-parity now fails when this line goes but the step keeps its --self-test line, yet delete the whole step and every parity gate stays green (neither can see a step that is gone) while a wrong base, a lost Content Security Policy tag, an inline script or a stray page goes unreported until the day PUBLISH_WEB_APP is set.
+
+path: .github/workflows/docs.yml
+call: node apps/web/scripts/pages-build/check-pages-build.mjs "$WEB_APP_DIR" "$WEB_BASE"
+why:  The only check of the copy that actually joins the Pages artifact (job website-build, when the app is published, run just before the copy), and with it the refusal of any file but index.html and the scripts, stylesheets and fonts under assets/. Delete it and the step runs only the self-test, which keeps check-gate-selftest-parity green, while whatever web-app's build handed over (a page with no policy, a weakened policy) is published unchecked; the shell refusal beside it catches links and other non-files only.
+
+path: .github/workflows/docs.yml
+call: odd="$(find "$WEB_APP_DIR" ! -type f ! -type d)"
+why:  website-build's walk of the whole downloaded app for links and other non-files, before the checker reads it and the copy publishes it (upload-pages-artifact archives with tar --dereference, so a link would publish what it points at). Today the checker refuses the same entries too, at the root and in assets/, and refuses every other directory, so deleting this line leaves every run green and the artifact still refused. It is the only refusal that does not depend on the checker's list of allowed places: widen that list (a subdirectory of assets/, say) after deleting it, and a link there is published with every gate green.
+
+path: .github/workflows/docs.yml
+call: if: steps.publish.outputs.app == 'true' && steps.recheck.outcome == 'success'
+why:  The only guard on the step that copies the web app into the Pages artifact: only when it is published, and only after its re-check itself succeeded (continue-on-error on the re-check would not let it through). Delete it while PUBLISH_WEB_APP is true, as it is once the app is live, and every run stays green, so the merge goes through; the day the variable is unset to take the app down, the copy fails on the download that no longer happens, website-build goes red, and the takedown is never deployed, so the app stays published. With the variable unset, deleting it is red at once.
+
+path: .github/workflows/docs.yml
+call: id: recheck
+why:  The id the copy step's guard reads (steps.recheck.outcome). Delete or rename it and that outcome reads empty, so the copy never runs: with PUBLISH_WEB_APP true, website-build stays green and uploads docs whose sidebar links an app/ that is not in the artifact (the sidebar check compares the link with the variable, not with what was copied), and the next deploy takes the app down. actionlint reports the undefined step, but only where someone runs it before a push; no CI job or pre-push gate does.
+
+path: .github/workflows/docs.yml
+call: if: ${{ !cancelled() && needs.detect.outputs.site == 'true' }}
+why:  Keeps website-build running when web-app or base-path fails (but not in a canceled run), so its first step can fail it. Delete !cancelled() and a failed web-app skips website-build, a skipped required check counts as passed, and a lost Content Security Policy or a wrong base path no longer blocks the merge.
+
+path: .github/workflows/docs.yml
+call: if [ "$BASE_PATH_RESULT" != "success" ] || [ "$WEB_APP_RESULT" != "success" ]; then
+why:  The only thing that turns a failed web-app or base-path into a red website-build, the job branch protection requires. Delete this if block (or the whole step) and website-build builds the docs and passes while web-app is red, so the merge goes through. Deleting only this line is a shell syntax error, red at once; the stanza names the if line, as the guards above do, so either deletion fails this gate.
+
+path: .github/workflows/docs.yml
+call: if [ "$linked" != "$PUBLISHED" ]; then
+why:  The only check that the docs sidebar links the web app exactly when the app is in the Pages artifact. Delete the comparison (this if block, or the whole step) and every run stays green while the sidebar can link an app that is not published, a 404, or the app can be published with no link to it. Deleting only this line is a shell syntax error, red at once; the stanza names the if line, as the guards above do, so either deletion fails this gate.
 
 path: .github/workflows/docs.yml
 call: if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then

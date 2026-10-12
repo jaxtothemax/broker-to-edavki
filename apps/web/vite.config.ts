@@ -1,5 +1,10 @@
 import react from "@vitejs/plugin-react";
-import { defaultClientConditions, defineConfig, type Plugin } from "vite";
+import {
+  defaultAllowedOrigins,
+  defaultClientConditions,
+  defineConfig,
+  type Plugin,
+} from "vite";
 // The policy itself lives in its own module, which the Pages build check
 // (scripts/pages-build/check-pages-build.mjs) also imports, so the check
 // compares the tag in the output with exactly what this plugin injects.
@@ -42,4 +47,11 @@ export default defineConfig({
   // The engine worker loads the rate snapshot with import() when first
   // needed (ADR 0013), which only a module worker can split out.
   worker: { format: "es" },
+  // `vite preview` serves the e2e tests only; it is never deployed. Besides
+  // the loopback origins it allows by default, it answers "null", the origin
+  // of a sandboxed frame, as GitHub Pages does (it allows every origin): the
+  // app's module script and stylesheet are cross-origin requests there, and
+  // e2e/frame-guard.spec.ts needs them to load to show the guard still stops
+  // the app.
+  preview: { cors: { origin: [defaultAllowedOrigins, "null"] } },
 });

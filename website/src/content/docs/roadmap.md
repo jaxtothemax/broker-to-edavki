@@ -9,7 +9,8 @@ under **Shipped**. Until then, every page uses the future tense: "will", "planne
 
 ## Shipped
 
-Nothing yet. TaxReporter has not had a release, and there is nothing to install.
+Nothing yet. TaxReporter has not had a release, and there is nothing to install. A preview of
+the browser app, when one is published, is not a release either.
 
 ## Underway
 
@@ -58,6 +59,15 @@ based on feedback.
   be off by default, send only a redacted summary you have seen and approved, and never change
   a figure. See
   [Privacy and security](/guides/privacy-and-security/#the-optional-ai-check).
+
+## A preview of the browser app
+
+The maintainer can publish a **preview** of the browser app with this site, built from the
+current code. When it is published, it is under `app/` and the sidebar has a **Try the browser
+app** entry; when the sidebar has no such entry, it is not published, and you can
+[run it from source](/guides/run-from-source/) instead. A preview runs on your device, but how it
+reads broker exports has not been checked against real exports yet, so treat every figure in it
+as a draft to check, not a return to file.
 
 ## Follow progress or ask for something
 

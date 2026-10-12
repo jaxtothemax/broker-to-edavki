@@ -1,6 +1,6 @@
-# ─── Documentation site (Astro Starlight → GitHub Pages) ─────────────────────
+# ─── Documentation site and web app (Astro Starlight, apps/web → GitHub Pages) ─
 #
-# Three jobs after a detection step:
+# Five jobs after a detection step:
 #
 #   docs-internal-links  scripts/check-docs-internal-links.py — a broken
 #                        internal link, cross-page/same-page anchor, relative
@@ -8,13 +8,26 @@
 #                        under DOCS_ROOT fails the run. See that script's module
 #                        docstring for what is configurable here versus
 #                        hard-coded to the Astro Starlight shape.
-#   website-build        builds and checks the web app, compiles and VERIFIES the
-#                        site, then uploads the Pages artifact (on PRs too, so the
-#                        artifact a PR would publish is inspectable). The app is
-#                        in that artifact only when the repository variable
-#                        PUBLISH_WEB_APP is "true"; see "The web app" below.
+#   base-path            decides where the site is served, ONCE, for the docs
+#                        and for the web app, and hands it to the jobs below as
+#                        outputs. The only job with `pages: read`.
+#   web-app              installs, builds and checks the web app with
+#                        `contents: read` only, on every run (pull requests
+#                        too), and uploads the build as the workflow artifact
+#                        `web-app`. See "The web app" below.
+#   website-build        compiles and VERIFIES the docs site, adds the web app
+#                        only when PUBLISH_WEB_APP is "true", then uploads the
+#                        Pages artifact (on PRs too, so the artifact a PR would
+#                        publish is inspectable). It never installs or runs the
+#                        web app's toolchain, and restores no cache. It still
+#                        runs when base-path or web-app fails (not when the run
+#                        is canceled), and then fails at once: skipped, it
+#                        would count as passed.
 #   pages                publishes that already-verified artifact from main,
 #                        without rebuilding
+#
+#   detect ─┬─ docs-internal-links
+#           └─ base-path ── web-app ── website-build ── pages (push to main only)
 #
 # A green `astro build` is not proof the docs rendered — Starlight's content
 # loader catches a per-page render error, drops that page's whole body, and
@@ -23,12 +36,13 @@
 # must be larger than a bare-chrome shell.
 #
 # No docs site, no docs jobs. `detect` decides: a clone with no DOCS_CONFIG
-# skips docs-internal-links, and one with no website/package.json skips the
-# build and the deploy — skipped, not failed, and not a green no-op that claims
-# to have checked something. Checked against DOCS_CONFIG specifically (not
-# DOCS_ROOT) because a content directory can exist mid-migration with no working
-# config; the config file is what says "this docs site is wired up." The
-# Makefile's check-docs-links target mirrors the same test locally.
+# skips docs-internal-links, and one with no website/package.json skips
+# base-path, web-app, the build and the deploy — skipped, not failed, and not a
+# green no-op that claims to have checked something. Checked against DOCS_CONFIG
+# specifically (not DOCS_ROOT) because a content directory can exist
+# mid-migration with no working config; the config file is what says "this docs
+# site is wired up." The Makefile's check-docs-links target mirrors the same
+# test locally.
 #
 # Customize (only needed if your docs site does not use the recommended shape —
 # website/src/content/docs, built with Astro Starlight):
@@ -40,26 +54,79 @@
 #
 # One-time repository setting: Settings → Pages → Source = "GitHub Actions".
 # A project site is served at https://<owner>.github.io/<repo>/ unless a custom
-# domain is set. website-build reads the real origin and base path from
-# actions/configure-pages and passes them to the build as SITE_URL and
-# BASE_PATH (see website/astro.config.mjs), so no file hardcodes the repository
+# domain is set. base-path reads the real origin and base path from
+# actions/configure-pages; website-build passes them to the docs build as
+# SITE_URL and BASE_PATH (see website/astro.config.mjs), and web-app builds the
+# app under the same base followed by app/, so no file hardcodes the repository
 # name. configure-pages runs only on pushes to main (the only builds that
 # deploy), because it fails until the setting above is made; pull-request
 # builds use the default project-site origin and /<repo> base instead, which is
 # all a build check needs.
 #
-# The web app (apps/web, ADR 0009). website-build builds it on every run, with
-# its public path set to the docs base followed by app/ (so /<repo>/app/ on a
-# project site, /app/ on a custom domain), and apps/web/scripts/pages-build/
+# The web app (apps/web, ADR 0009). web-app builds it on every run with its
+# public path set to the docs base followed by app/ (/<repo>/app/ on a project
+# site, /app/ on a custom domain), and apps/web/scripts/pages-build/
 # check-pages-build.mjs fails the job if the build's Content Security Policy meta
 # tag is missing, not first in <head> or not the policy vite.config.ts injects,
 # or the build references a script or stylesheet outside that path, or has an
-# inline script. Publishing is OFF: the app is copied into the Pages artifact
-# only when the repository variable PUBLISH_WEB_APP equals "true" (Settings ->
-# Secrets and variables -> Actions -> Variables). The pages job deploys that
-# artifact on pushes to main, so setting the variable is the whole opt-in. Two
-# questions to settle first, both open: the page cannot send frame-ancestors on
-# Pages (#4), and the blob: worker bootstrap in Safari and Firefox (#3).
+# inline script, a refresh, a <base>, a <form> or a frame, or holds any file but
+# index.html and the .js, .css, .woff2 and .woff files directly under assets/
+# (the policy is inside index.html, so another page would be published with
+# none).
+#
+# Publishing is OFF until the repository variable PUBLISH_WEB_APP equals "true"
+# (Settings -> Secrets and variables -> Actions -> Variables). Only then does
+# website-build download the app, check it again and copy it under app/, and
+# the docs sidebar link it (website/astro.config.mjs), so the link and its page
+# appear together; a step checks the built docs for the link either way. The
+# pages job deploys that artifact on pushes to main, so setting the variable is
+# the whole opt-in; unset it and the next push removes the app again. Issue #70
+# lists what must be true before it is set.
+#
+# Why the app is built in a job of its own: its toolchain (Vite, Rolldown, the
+# React plugin and what they pull in) is the largest body of third-party code
+# this workflow runs, and code that runs in a job can tamper with every later
+# step of that job. So it runs in web-app, whose token can only read the
+# repository and which has no step that builds, uploads or deploys the Pages
+# artifact. website-build never installs it: it takes the built app only as a
+# downloaded artifact and, just before copying the files under app/ (after npm
+# ci and the docs build, so no later step can change what it checked), refuses
+# it unless it is small and holds nothing but regular files and directories,
+# and re-runs the checker from its own checkout (the verifier is the
+# repository's script, never anything from the artifact).
+#
+# website-build restores no cache, on purpose. Code in any job can write the
+# Actions cache (web-app's build on a push to main, or any `cache: pnpm` job in
+# ci.yml), cache keys are public, and setup-node restores a cache archive with
+# tar -P, which keeps absolute and ".." paths: a poisoned cache restored there
+# could overwrite the checker, node or a later action before the re-check runs.
+# So its setup-node has no `cache:` and automatic caching off, which costs about
+# 30 seconds a run. Nothing but this comment keeps a cache out of website-build:
+# a reviewer must reject any `cache:` input or actions/cache step there.
+#
+# What is left, stated plainly. No step of web-app runs in website-build or
+# pages: they run on other machines, restore no cache, and take web-app's work
+# only as the web-app artifact, which website-build checks and never runs. But:
+#   - Compromised build code still writes the app's own files: a script it
+#     hides inside a bundle the policy allows passes every check here and is
+#     published with the app, on the same origin as these docs and every other
+#     Pages site of the account (ADR 0009), where it runs for anyone who opens
+#     the app. A file it adds beside them is refused.
+#   - website-build runs third-party code of its own: npm ci and the docs build
+#     (Astro, Starlight) run in the same job before the re-check, so they could
+#     change the checker, or the files it reads, as they could change every
+#     docs page they build. They are trusted that far.
+#   - Unverified: code in web-app may be able to take that job's runtime token
+#     (what its actions use to upload artifacts) and, while the run lasts, use
+#     it to delete the github-pages artifact after website-build uploads it and
+#     upload another under the same name; deploy-pages picks the artifact by
+#     name. Comparing the run's github-pages artifact ID with the one
+#     website-build uploaded, before deploying, would close that path: an idea,
+#     not implemented. This path does not depend on
+#     PUBLISH_WEB_APP: web-app builds the app on every run, so it exists with
+#     the variable unset, and "publishing is off" does not mean merging adds no
+#     exposure. It is smaller than before this layout, when the same build code
+#     ran inside the job that uploads the Pages artifact.
 
 name: docs
 
@@ -103,7 +170,7 @@ jobs:
           fi
           if [ -f website/package.json ]; then echo "site=true" >> "$GITHUB_OUTPUT"; else
             echo "site=false" >> "$GITHUB_OUTPUT"
-            echo "No website/package.json — website-build and pages will be skipped."
+            echo "No website/package.json — base-path, web-app, website-build and pages will be skipped."
           fi
 
   docs-internal-links:
@@ -121,24 +188,24 @@ jobs:
       - run: python3 scripts/check-docs-internal-links.py --self-test
       - run: python3 scripts/check-docs-internal-links.py --docs-root "$DOCS_ROOT" --config "$DOCS_CONFIG"
 
-  website-build:
+  base-path:
     needs: detect
     if: needs.detect.outputs.site == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     # configure-pages reads the Pages site through GET /repos/{owner}/{repo}/pages,
     # which needs `pages: read`. A job-level block replaces the workflow default,
-    # so `contents: read` is listed again.
+    # so `contents: read` is listed again: the pair configure-pages already ran
+    # with on main, moved here from website-build, which now runs with the
+    # workflow default alone.
     permissions:
       contents: read
       pages: read
-    defaults:
-      run:
-        working-directory: website
+    outputs:
+      site: ${{ steps.base.outputs.site }}
+      docs: ${{ steps.base.outputs.docs }}
+      app: ${{ steps.base.outputs.app }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       # origin: "https://<owner>.github.io" (or the custom domain);
       # base_path: "/<repo>", or "" when the site is served at the root.
       - id: pages
@@ -150,14 +217,18 @@ jobs:
       # `outputs.base_path || fallback` reads that "" as "not set" and falls back
       # to /<repo>, which 404s every asset. So this keys on whether configure-pages
       # RAN (it is skipped on pull requests), not on the value it returned. For
-      # this repository's project site both paths give /<repo>, the same string as
-      # before, so the docs build is unchanged.
+      # this repository's project site both paths give /<repo>.
+      #   site: the origin, as configure-pages reports it, else the default
+      #         project-site origin
       #   docs: "" or "/<repo>", as configure-pages reports it
       #   app:  where the web app lives, "/app/" or "/<repo>/app/"
+      # Expressions are resolved into env vars, never into the script itself.
       - id: base
         env:
           PAGES_OUTCOME: ${{ steps.pages.outcome }}
+          PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          FALLBACK_ORIGIN: ${{ format('https://{0}.github.io', github.repository_owner) }}
           FALLBACK_BASE_PATH: ${{ format('/{0}', github.event.repository.name) }}
         run: |
           if [ "$PAGES_OUTCOME" = "success" ]; then
@@ -165,31 +236,35 @@ jobs:
           else
             docs_base="$FALLBACK_BASE_PATH"
           fi
+          site="${PAGES_ORIGIN:-$FALLBACK_ORIGIN}"
           trimmed="$docs_base"
           while [ "${trimmed#/}" != "$trimmed" ]; do trimmed="${trimmed#/}"; done
           while [ "${trimmed%/}" != "$trimmed" ]; do trimmed="${trimmed%/}"; done
           if [ -n "$trimmed" ]; then app_base="/${trimmed}/app/"; else app_base="/app/"; fi
-          printf 'docs=%s\n' "$docs_base" >> "$GITHUB_OUTPUT"
-          printf 'app=%s\n' "$app_base" >> "$GITHUB_OUTPUT"
-          echo "docs base path: '${docs_base}'; web app public path: '${app_base}'"
-      # ── The web app (apps/web, ADR 0009) ───────────────────────────────────
-      # Built and checked on EVERY run, pull requests included, so a wrong base
-      # path or a lost Content Security Policy is red in the PR that causes it.
-      # It joins the Pages artifact only when the repository variable
-      # PUBLISH_WEB_APP is "true" (the copy step after the docs build);
-      # otherwise the artifact is exactly the docs site.
-      #
-      # These steps run BEFORE the docs build on purpose. The app's toolchain
-      # (Vite, Rolldown, the React plugin and what they pull in) runs here even
-      # with publishing off, so a compromised build-time dependency could write
-      # into website/dist. The docs build refuses to start over an existing
-      # website/dist and then writes it from scratch, so the app gets into the
-      # artifact only through the copy step. That narrows the exposure; it does
-      # not remove it, because code that runs in this job can still tamper with
-      # the steps after it.
-      # The job's default working directory is website/, so each `run:` in this
-      # block, and the copy step after the docs build, says `working-directory: .`
-      # to run at the repository root.
+          {
+            printf 'site=%s\n' "$site"
+            printf 'docs=%s\n' "$docs_base"
+            printf 'app=%s\n' "$app_base"
+          } >> "$GITHUB_OUTPUT"
+          echo "site: '${site}'; docs base path: '${docs_base}'; web app public path: '${app_base}'"
+
+  # ── The web app (apps/web, ADR 0009) ───────────────────────────────────────
+  # Built and checked on EVERY run, pull requests included, so a wrong base
+  # path or a lost Content Security Policy is red in the PR that causes it.
+  # Whatever runs here is treated as untrusted by website-build; see "Why the
+  # app is built in a job of its own" at the top of this file.
+  web-app:
+    needs: [detect, base-path]
+    if: needs.detect.outputs.site == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Read the repository, and nothing else: no `pages`, no `id-token`.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -198,27 +273,104 @@ jobs:
       # Only apps/web and the workspace packages it imports. Vite bundles those
       # from their TypeScript sources, so no package build is needed first.
       - name: Install the workspace packages apps/web needs
-        working-directory: .
         run: pnpm install --frozen-lockfile --filter "@taxreporter/web..."
       - name: Build the web app
-        working-directory: .
         env:
-          TAXREPORTER_WEB_BASE: ${{ steps.base.outputs.app }}
+          TAXREPORTER_WEB_BASE: ${{ needs.base-path.outputs.app }}
         run: pnpm --filter @taxreporter/web build
       # Self-test first, in this same job (scripts/CLAUDE.md), then the real check.
       - name: Check the web app build for Pages
-        working-directory: .
         env:
-          WEB_BASE: ${{ steps.base.outputs.app }}
+          WEB_BASE: ${{ needs.base-path.outputs.app }}
         run: |
           node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
           node apps/web/scripts/pages-build/check-pages-build.mjs apps/web/dist "$WEB_BASE"
-      # ── The documentation site ─────────────────────────────────────────────
+      # upload-artifact follows symbolic links, and upload-pages-artifact
+      # archives with `tar --dereference`, so a link in the build would put
+      # whatever it points at into the artifact and then the public site. Vite
+      # writes only regular files and directories, so anything else fails here,
+      # on every run (a pull request shows it). website-build checks again.
+      - name: Refuse anything in the build that is not a file or a directory
+        run: |
+          odd="$(find apps/web/dist ! -type f ! -type d)"
+          if [ -n "$odd" ]; then
+            echo "::error::apps/web/dist holds entries that are neither regular files nor directories; refusing to hand it on:"
+            find apps/web/dist ! -type f ! -type d -exec printf '  %q\n' {} \;
+            exit 1
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-app
+          path: apps/web/dist
+          retention-days: 7
+          if-no-files-found: error
+
+  website-build:
+    needs: [detect, base-path, web-app]
+    # !cancelled(): when base-path or web-app fails, this job still runs, and
+    # its first step fails it. A skipped job counts as passed for a required
+    # check, so without this a lost Content Security Policy or a wrong base path
+    # would turn web-app red and leave the merge unblocked. Unlike always(), a
+    # canceled run does not start it. Wrapped in ${{ }} because YAML reads a
+    # leading "!" as a tag.
+    if: ${{ !cancelled() && needs.detect.outputs.site == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The workflow default, `contents: read`: the Pages lookup is base-path's.
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      # First, and outside website/, which the checkout has not written yet.
+      # The results are read through env, never interpolated into the script.
+      - name: Require base-path and web-app to have passed
+        working-directory: .
+        env:
+          BASE_PATH_RESULT: ${{ needs.base-path.result }}
+          WEB_APP_RESULT: ${{ needs.web-app.result }}
+        run: |
+          if [ "$BASE_PATH_RESULT" != "success" ] || [ "$WEB_APP_RESULT" != "success" ]; then
+            echo "::error::base-path is \"${BASE_PATH_RESULT}\" and web-app is \"${WEB_APP_RESULT}\"; both must succeed before the Pages artifact is built."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # PUBLISH_WEB_APP must be a repository or organization variable: this job
+      # has no `environment:`, so a variable set on the github-pages environment
+      # is invisible here. It is read through env, never interpolated into the
+      # script. Unset, empty or anything but "true" leaves the artifact alone.
+      # This step is the one decision: the docs build (for the sidebar link), the
+      # download, the check and the copy below all read its output.
+      - name: Decide whether the web app joins the Pages artifact
+        id: publish
+        env:
+          PUBLISH_WEB_APP: ${{ vars.PUBLISH_WEB_APP }}
+        run: |
+          if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then
+            echo "app=false" >> "$GITHUB_OUTPUT"
+            echo "PUBLISH_WEB_APP is not \"true\": the web app is built and checked (job web-app) but is NOT in the Pages artifact."
+            exit 0
+          fi
+          echo "app=true" >> "$GITHUB_OUTPUT"
+          echo "PUBLISH_WEB_APP is \"true\": the web app joins the Pages artifact under app/."
+      # No `cache:`, and automatic caching off: this job restores no cache,
+      # because any job can write one (see the top of this file).
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          package-manager-cache: false
+      # ── The web app, only when PUBLISH_WEB_APP is "true" ───────────────────
+      # Downloaded outside the checkout (runner.temp), so nothing from it lands
+      # in website/ or next to the scripts that check it. It is checked later,
+      # just before the copy.
+      - name: Download the web app that web-app built
+        if: steps.publish.outputs.app == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-app
+          path: ${{ runner.temp }}/web-app
+      # ── The documentation site ─────────────────────────────────────────────
       - run: npm ci
       # astro build empties its output directory, but not completely: Astro's
       # emptyDir is passed new Set(".git"), a set of the characters ".", "g", "i"
@@ -231,13 +383,12 @@ jobs:
             echo "::error::website/dist exists before the docs build, so an earlier step wrote it; refusing to build the Pages artifact on top of it."
             exit 1
           fi
-      # Expressions are resolved into env vars, never into the script itself.
-      # A skipped configure-pages step has empty outputs, so pull requests fall
-      # back to the default project-site origin.
       - run: npm run build
         env:
-          SITE_URL: ${{ steps.pages.outputs.origin || format('https://{0}.github.io', github.repository_owner) }}
-          BASE_PATH: ${{ steps.base.outputs.docs }}
+          SITE_URL: ${{ needs.base-path.outputs.site }}
+          BASE_PATH: ${{ needs.base-path.outputs.docs }}
+          # "true" adds the sidebar link to the app (website/astro.config.mjs).
+          PUBLISH_WEB_APP: ${{ steps.publish.outputs.app }}
       - name: Verify every source page rendered
         run: |
           MIN_BYTES=2000
@@ -267,43 +418,81 @@ jobs:
             exit 1
           fi
           echo "Docs build verification passed: every source page rendered a non-trivial output file."
-      # PUBLISH_WEB_APP must be a repository or organization variable: this job
-      # has no `environment:`, so a variable set on the github-pages environment
-      # is invisible here. It is read through env, never interpolated into the
-      # script. Unset, empty or anything but "true" leaves the artifact alone.
-      # To publish: set PUBLISH_WEB_APP to true; the next push to main deploys
-      # the app under the docs base followed by app/ (/<repo>/app/ on a project
-      # site, /app/ on a custom domain). Unset it and the next push removes the
-      # app again.
-      #
-      # upload-pages-artifact archives with `tar --dereference`, so a symbolic
-      # link in the copy would put whatever it points at into the public site.
-      # Vite never emits one, so any link in apps/web/dist fails the step, on
-      # every run (publishing off too, so a pull request shows it), and the copy
-      # itself never follows links (cp -P).
-      - name: Add the web app to the Pages artifact (only if PUBLISH_WEB_APP is true)
-        working-directory: .
+      # The sidebar links the app exactly when the app is in the artifact
+      # (website/astro.config.mjs); this proves it on every run, for whichever
+      # way the variable is set. The link's href is what tells them apart: the
+      # roadmap names the sidebar entry in its text, but no docs page links
+      # /app/ in Markdown (check-docs-internal-links.py would refuse it).
+      - name: Check the sidebar links the app exactly when it is published
         env:
-          PUBLISH_WEB_APP: ${{ vars.PUBLISH_WEB_APP }}
+          APP_HREF: ${{ format('href="{0}/app/"', needs.base-path.outputs.docs) }}
+          PUBLISHED: ${{ steps.publish.outputs.app }}
         run: |
-          links="$(find apps/web/dist -type l)"
-          if [ -n "$links" ]; then
-            echo "::error::apps/web/dist contains symbolic links, which the Pages artifact would follow; refusing to publish:"
-            printf '%s\n' "$links"
+          found=0
+          grep -rqF --include='*.html' -e "$APP_HREF" dist || found=$?
+          case "$found" in
+            0) linked=true ;;
+            1) linked=false ;;
+            *) echo "::error::could not search website/dist for the link to the web app."; exit 1 ;;
+          esac
+          if [ "$linked" != "$PUBLISHED" ]; then
+            echo "::error::the built docs link the web app: ${linked}; the web app is published: ${PUBLISHED}. The sidebar entry and the app must come and go together."
             exit 1
           fi
-          if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then
-            echo "PUBLISH_WEB_APP is not \"true\": the web app was built and checked but is NOT in the Pages artifact."
-            exit 0
+          echo "The built docs link the web app: ${linked}, as PUBLISH_WEB_APP says."
+      # ── The web app again, only when PUBLISH_WEB_APP is "true" ─────────────
+      # The artifact is not trusted; this job's checkout is. So the checker that
+      # runs here is the repository's own script, self-tested first in this job
+      # (scripts/CLAUDE.md), and it reads the downloaded files without running
+      # them. It runs last before the copy, after npm ci and the docs build, so
+      # no later step can change the files it checked; the copy runs only if
+      # this step itself succeeded (its outcome, not just the job's state, so
+      # continue-on-error here would not let an unchecked app through). The
+      # shell prints no entry names (they come from the artifact); the
+      # checker prints them JSON-escaped, so none can start a line of its own.
+      # The caps sit far above a real build (about 20 files: index.html, six
+      # scripts, a stylesheet and the fonts, about 2.5 MB) and refuse a flood of
+      # files or bytes before the checks below read it.
+      - name: Check the downloaded web app again
+        id: recheck
+        if: steps.publish.outputs.app == 'true'
+        working-directory: .
+        env:
+          WEB_APP_DIR: ${{ runner.temp }}/web-app
+          WEB_BASE: ${{ needs.base-path.outputs.app }}
+          MAX_ENTRIES: "200"
+          MAX_KIB: "51200"
+        run: |
+          entries="$(find "$WEB_APP_DIR" | wc -l)"
+          kib="$(du -sk --apparent-size "$WEB_APP_DIR" | cut -f1)"
+          if [ "$entries" -gt "$MAX_ENTRIES" ] || [ "$kib" -gt "$MAX_KIB" ]; then
+            echo "::error::the downloaded web app has ${entries} entries and ${kib} KiB, over the caps of ${MAX_ENTRIES} entries and ${MAX_KIB} KiB; refusing to publish it."
+            exit 1
           fi
+          odd="$(find "$WEB_APP_DIR" ! -type f ! -type d)"
+          if [ -n "$odd" ]; then
+            echo "::error::the downloaded web app holds entries that are neither regular files nor directories (job web-app lists them); refusing to publish it."
+            exit 1
+          fi
+          node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
+          node apps/web/scripts/pages-build/check-pages-build.mjs "$WEB_APP_DIR" "$WEB_BASE"
+      # The app goes under the docs base followed by app/ (/<repo>/app/ on a
+      # project site, /app/ on a custom domain). The copy never follows links
+      # (cp -P), and the check above refused any.
+      - name: Add the web app to the Pages artifact
+        if: steps.publish.outputs.app == 'true' && steps.recheck.outcome == 'success'
+        working-directory: .
+        env:
+          WEB_APP_DIR: ${{ runner.temp }}/web-app
+        run: |
           if [ -e website/dist/app ] || [ -L website/dist/app ]; then
             echo "::error::website/dist/app already exists (a docs page at /app/?); refusing to overwrite it."
             exit 1
           fi
           mkdir website/dist/app
-          cp -R -P apps/web/dist/. website/dist/app/
+          cp -R -P "$WEB_APP_DIR"/. website/dist/app/
           test -s website/dist/app/index.html
-          echo "PUBLISH_WEB_APP is \"true\": the web app is in the Pages artifact under app/."
+          echo "The web app is in the Pages artifact under app/."
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: website/dist
