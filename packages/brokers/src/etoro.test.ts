@@ -978,9 +978,9 @@ describe("etoro, lots", () => {
       }
     });
 
-    it("takes a ticker of 24 characters as a quote, and turns a longer cell away unscanned", () => {
-      // A cell of up to 32,767 characters is asked once per row that refers
-      // to it, so one too long to be a quote is refused at its length.
+    it("takes a ticker of 24 characters as a quote, and refuses a longer one", () => {
+      // The length bound itself is in load-bearing.declarations: it changes
+      // no result, only how often a cell of up to 32,767 characters is scanned.
       const quoted = (ticker: string) =>
         codes(
           read({

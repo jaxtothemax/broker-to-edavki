@@ -218,7 +218,8 @@ open. This ADR records the decisions and what was chosen for each risk.
     - **Required.** An ISIN is required.
     - **Its ISIN.** A dividend on a closed position must carry the ISIN of the row that
       closed it, or it is refused (`dividendInconsistent`, `isin`): under either, it would
-      go to another payer and country. A position still open has no such row, so its
+      go to another payer and country. The two differ for a changed cell, or for an ISIN
+      that changed while the position was held, and ADR 0017 refuses ISIN changes. A position still open has no such row, so its
       dividends' ISINs are what its ticker is resolved from (decision 5).
     - **Payer.** The payer's details come from the payers table, as for every broker.
 11. **Reach (D11).** Every eToro refusal is unscoped (ADR 0017) and the adapter never sets
@@ -355,6 +356,11 @@ open. This ADR records the decisions and what was chosen for each risk.
   statement is mostly caught (a day past 12 is no month, and the date-order gate), but one
   whose every day is 12 or less would be read with day and month swapped, consistently
   across its sheets, so no cross-check would notice. An untouched export settles the order.
+- **How deep the start check goes.** The history gate's `start` compares Realized Equity
+  with Realized Equity Change on Account Activity's first row only. A history cut cleanly
+  after a first row that was edited would pass `start`, `order` and `openRow`. Whether
+  Realized Equity includes the capital invested, and so whether a running-balance check
+  across rows is possible, depends on the same untouched export.
 - **The owner's answer to R1.** One real, untouched export. R2 and R3 are settled above.
 
 ## On Acceptance

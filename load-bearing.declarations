@@ -179,3 +179,7 @@ why:  The only thing keeping the web app out of the Pages artifact until PUBLISH
 path: eslint.config.js
 call: "@taxreporter/*/testing",
 why:  The only guard that keeps the packages' test helpers (the workbook writer, the XSD check) out of application code. They resolve under the `source` condition, which the web build sets, so an import from apps/web or a package's src would bundle them silently. Delete the rule and lint, every test and every build stay green.
+
+path: packages/brokers/src/etoro.ts
+call: details.length > QUOTE_LENGTH
+why:  The only bound on a cell that the reader allows up to 32,767 characters and that is asked once per row referring to it (each Dividends row, each closed row): without it a crafted file with one long Details cell and many sparse dividend rows is rescanned about 400,000 times. It changes no result, since a longer string was never a quote, so every test stays green when it is deleted.
