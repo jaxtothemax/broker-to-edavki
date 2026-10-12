@@ -33,7 +33,6 @@ import { Button, cx } from "../ui/kit";
 import {
   BOX_WIDTH,
   cardBand,
-  centerY,
   choose,
   cutoutOf,
   dimPath,
@@ -43,13 +42,12 @@ import {
   linePath,
   placeGutter,
   placeRow,
-  right,
   roundedRect,
   rowCardBand,
   rowWidth,
   scrollDelta,
   scrollLeftFor,
-  SPACE,
+  placeSheetRing,
   union,
   within,
   type Box,
@@ -466,11 +464,12 @@ export function TourLayer({
         const target =
           note === undefined ? null : visibleBox(note.target, frame, false);
         if (target !== null) {
-          const leftRing = target.left - SPACE.ring;
-          sheetRing =
-            leftRing >= SPACE.ring
-              ? [leftRing, centerY(target)]
-              : [right(target) + SPACE.ring, centerY(target)];
+          sheetRing = placeSheetRing(
+            target,
+            frame,
+            cutoutOf(lit, stop.pad, frame),
+            seen(),
+          );
         }
       }
       const given = basis.current;

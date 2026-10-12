@@ -11,6 +11,7 @@ import {
   linePath,
   placeGutter,
   placeRow,
+  placeSheetRing,
   right,
   rowCardBand,
   rowWidth,
@@ -406,6 +407,93 @@ describe("lines that keep off the text and the controls", () => {
     expect(
       lineClear(around?.line ?? [], [text], CLEARANCE.comfortable - 0.01),
     ).toBe(true);
+  });
+});
+
+describe("a box outside the band between the header and the dock", () => {
+  const f = frame(1280, 800);
+  const w = rowWidth(f, 1) ?? 0;
+  const aim: Box = { left: 400, top: 140, width: 60, height: 20 };
+
+  it("blocks a row above a card that sits high, where the box would go under the header", () => {
+    // The card's top at 130: a 136px box above it would start at y = -38.
+    const high = cutoutOf(
+      { left: 120, top: 130, width: 1040, height: 200 },
+      8,
+      f,
+    );
+    const [above] = placeRow(f, high, [aim], [136], w, ["above"]);
+    expect(above?.box.top).toBeLessThan(f.headerBottom + SPACE.header);
+    expect(above?.blocked).toBe(true);
+    // The same box below the card is in the band, and kept.
+    const [below] = placeRow(f, high, [aim], [136], w, ["below"]);
+    expect(below?.blocked).toBe(false);
+  });
+
+  it("blocks a row below a card that sits low, where the box would go behind the dock", () => {
+    const low = cutoutOf(
+      { left: 120, top: 450, width: 1040, height: 150 },
+      8,
+      f,
+    );
+    const target: Box = { left: 400, top: 470, width: 60, height: 20 };
+    const [below] = placeRow(f, low, [target], [120], w, ["below"]);
+    expect(below?.blocked).toBe(true);
+  });
+
+  it("blocks a gutter box taller than the band", () => {
+    // Pushed up to the band's top, it still reaches past the dock.
+    const card = cutoutOf(
+      { left: 144, top: 200, width: 676, height: 300 },
+      8,
+      f,
+    );
+    const target: Box = { left: 740, top: 220, width: 64, height: 24 };
+    const [tall] = placeGutter(f, card, [target], [700], 320);
+    expect(tall?.box.top).toBe(f.headerBottom + SPACE.header);
+    expect(tall?.blocked).toBe(true);
+  });
+});
+
+describe("the sheet's ring", () => {
+  const f = frame(1280, 800);
+  const target: Box = { left: 400, top: 300, width: 100, height: 24 };
+
+  it("sits left of the target where it has room", () => {
+    expect(placeSheetRing(target, f, null, [])).toEqual([
+      400 - SPACE.ring,
+      312,
+    ]);
+  });
+
+  it("moves to another side where text crowds the left", () => {
+    const text: Box = { left: 360, top: 300, width: 30, height: 24 };
+    expect(placeSheetRing(target, f, null, [text])).toEqual([
+      500 + SPACE.ring,
+      312,
+    ]);
+  });
+
+  it("keeps off the highlight's frame", () => {
+    // The frame's left edge runs right where the left ring would sit.
+    const cutout: Box = { left: 386, top: 280, width: 400, height: 100 };
+    expect(placeSheetRing(target, f, cutout, [])).toEqual([
+      500 + SPACE.ring,
+      312,
+    ]);
+  });
+
+  it("still marks the target where no side is clear", () => {
+    const crowd: Box = { left: 360, top: 260, width: 200, height: 110 };
+    expect(placeSheetRing(target, f, null, [crowd])).toEqual([
+      400 - SPACE.ring,
+      312,
+    ]);
+  });
+
+  it("never sits outside the window", () => {
+    const edge: Box = { left: 2, top: 300, width: 100, height: 24 };
+    expect(placeSheetRing(edge, f, null, [])).toEqual([102 + SPACE.ring, 312]);
   });
 });
 

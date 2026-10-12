@@ -48,6 +48,12 @@ export interface RouteInput {
   readonly rings: readonly End[];
   /** The ring's own room: no obstacle comes closer to its center than this. */
   readonly ringClearance: number;
+  /**
+   * Thin bands a line may cross but not run along: around the highlight's
+   * frame, so a line never rides its outline. A wide band stops travel along
+   * its length (sideways), a tall one travel up and down; crossing it is free.
+   */
+  readonly along?: readonly Box[];
 }
 
 export interface Route {
@@ -58,11 +64,34 @@ export interface Route {
 /** What a bend costs, in pixels of line. */
 const BEND = 24;
 /**
- * The most grid nodes a search may build. The page the tour runs over is the
- * demo's, a few hundred obstacles and about 100,000 nodes; past this there is
- * no route rather than a tab that stops answering.
+ * A last stretch shorter than this into the ring reads as a hook, not an
+ * arrival: such a route pays `STUB_PRICE` more, so a cleaner one wins.
  */
-export const MAX_NODES = 500_000;
+const STUB = 8;
+const STUB_PRICE = 40;
+
+/**
+ * The work a search may do, each a limit on one stage. The page the tour runs
+ * over is the demo's: a few hundred obstacles and at most about 110,000 grid
+ * nodes. Past any limit there is no route (the stop is shown as the sheet)
+ * rather than a tab that stops answering. The grid size alone does not bound
+ * the work: marking what each obstacle blocks costs the cells it spans, and
+ * the search pops a state many times, so each stage has its own limit.
+ */
+export interface Limits {
+  /** Grid nodes. */
+  readonly nodes: number;
+  /** Cells visited while marking what the obstacles and bands block. */
+  readonly marks: number;
+  /** States taken off the search's queue. */
+  readonly pops: number;
+}
+
+export const LIMITS: Limits = {
+  nodes: 300_000,
+  marks: 1_200_000,
+  pops: 400_000,
+};
 /** Of a segment's length, the part not used for a start or a ring. */
 const OFF_CENTER = 0.35;
 
@@ -233,8 +262,12 @@ function along(
  * obstacles, or null where there is none. Cost is the line's length, a price
  * per bend, and what the chosen start and ring cost.
  */
-export function route(input: RouteInput): Route | null {
+export function route(
+  input: RouteInput,
+  limits: Limits = LIMITS,
+): Route | null {
   const { bounds, clearance } = input;
+  const bands = input.along ?? [];
   const room: Box = bounds;
   const roomRight = room.left + room.width;
   const roomBottom = room.top + room.height;
@@ -256,6 +289,10 @@ export function route(input: RouteInput): Route | null {
       if (x >= room.left && x <= roomRight) xValues.push(x);
     for (const y of [o.top, o.top + o.height])
       if (y >= room.top && y <= roomBottom) yValues.push(y);
+  }
+  for (const band of bands) {
+    xValues.push(band.left, band.left + band.width);
+    yValues.push(band.top, band.top + band.height);
   }
   // Each end's coordinates, and the one along it that costs nothing, so a line
   // can run exactly where the layout would put it.
@@ -282,7 +319,7 @@ export function route(input: RouteInput): Route | null {
   const ys = axis(yValues.filter((y) => y >= room.top && y <= roomBottom));
   const nx = xs.length;
   const ny = ys.length;
-  if (nx < 2 || ny < 2 || nx * ny > MAX_NODES) return null;
+  if (nx < 2 || ny < 2 || nx * ny > limits.nodes) return null;
 
   // Blocked nodes and edges: those strictly inside a grown obstacle.
   const nodeBlocked = new Uint8Array(nx * ny);
@@ -296,11 +333,25 @@ export function route(input: RouteInput): Route | null {
     high: number,
   ) =>
     v < low - 0.01 ? -1 : v > high + 0.01 ? values.length : indexOf(values, v);
-  for (const o of grown) {
+  // Each obstacle's span in grid cells, so the marking below is bounded
+  // before it starts: one wide obstacle over a fine grid costs as much as
+  // many small ones.
+  const spanOf = (o: Box) => {
     const i0 = edgeIndex(o.left, xs, room.left, roomRight);
     const i1 = edgeIndex(o.left + o.width, xs, room.left, roomRight);
     const j0 = edgeIndex(o.top, ys, room.top, roomBottom);
     const j1 = edgeIndex(o.top + o.height, ys, room.top, roomBottom);
+    const cells =
+      Math.max(0, Math.min(i1, nx - 1) - Math.max(i0, 0) + 1) *
+      Math.max(0, Math.min(j1, ny - 1) - Math.max(j0, 0) + 1);
+    return { i0, i1, j0, j1, cells };
+  };
+  const spans = grown.map(spanOf);
+  const bandSpans = bands.map((band) => ({ band, ...spanOf(band) }));
+  let marks = 0;
+  for (const { cells } of [...spans, ...bandSpans]) marks += cells;
+  if (marks > limits.marks) return null;
+  for (const { i0, i1, j0, j1 } of spans) {
     for (let j = Math.max(j0, 0); j <= Math.min(j1, ny - 1); j += 1) {
       for (let i = Math.max(i0, 0); i <= Math.min(i1, nx - 1); i += 1) {
         const inside = i > i0 && i < i1 && j > j0 && j < j1;
@@ -309,6 +360,19 @@ export function route(input: RouteInput): Route | null {
         if (i < i1 && j > j0 && j < j1) edgeBlocked[(j * nx + i) * 2] = 1;
         // The edge down runs through the inside along columns i0 < i < i1.
         if (j < j1 && i > i0 && i < i1) edgeBlocked[(j * nx + i) * 2 + 1] = 1;
+      }
+    }
+  }
+  // A band blocks only travel along it: a wide one the sideways edges inside
+  // it, a tall one the edges up and down. Its nodes stay open to cross.
+  for (const { band, i0, i1, j0, j1 } of bandSpans) {
+    const wide = band.width >= band.height;
+    for (let j = Math.max(j0, 0); j <= Math.min(j1, ny - 1); j += 1) {
+      for (let i = Math.max(i0, 0); i <= Math.min(i1, nx - 1); i += 1) {
+        if (wide && i < i1 && j > j0 && j < j1)
+          edgeBlocked[(j * nx + i) * 2] = 1;
+        if (!wide && j < j1 && i > i0 && i < i1)
+          edgeBlocked[(j * nx + i) * 2 + 1] = 1;
       }
     }
   }
@@ -373,8 +437,37 @@ export function route(input: RouteInput): Route | null {
     }
   }
 
+  // The length of the straight stretch that ends at a state: back along its
+  // parents while the direction holds, to the bend or the start.
+  const stretch = (state: number): number => {
+    const d = state % 4;
+    let at = state;
+    let length = 0;
+    for (;;) {
+      const node = (at - (at % 4)) / 4;
+      const i = node % nx;
+      const here: Point = [xs[i] ?? 0, ys[(node - i) / nx] ?? 0];
+      const before = parent[at] ?? -1;
+      const from =
+        before < 0
+          ? startPoint.get(at)
+          : (() => {
+              const n = (before - (before % 4)) / 4;
+              const bi = n % nx;
+              return [xs[bi] ?? 0, ys[(n - bi) / nx] ?? 0] as Point;
+            })();
+      if (from === undefined) return length;
+      length += Math.abs(here[0] - from[0]) + Math.abs(here[1] - from[1]);
+      if (before < 0 || before % 4 !== d) return length;
+      at = before;
+    }
+  };
+
   let best = -1;
+  let pops = 0;
   while (heap.size > 0) {
+    pops += 1;
+    if (pops > limits.pops) return null;
     const [cost, item] = heap.pop();
     if (item < 0) {
       best = -1 - item;
@@ -386,7 +479,11 @@ export function route(input: RouteInput): Route | null {
     const i = node % nx;
     const j = (node - i) / nx;
     const price = finish.get(item);
-    if (price !== undefined) heap.push(cost + price, -1 - item);
+    if (price !== undefined)
+      heap.push(
+        cost + price + (stretch(item) < STUB ? STUB_PRICE : 0),
+        -1 - item,
+      );
     for (const turn of [0, 1, 3]) {
       const nd = ((d + turn) % 4) as Dir;
       if (!edgeOpen(i, j, nd)) continue;

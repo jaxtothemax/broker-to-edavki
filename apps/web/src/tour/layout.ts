@@ -53,9 +53,11 @@ export interface Placed {
   readonly line: readonly Point[] | null;
   readonly ring: Point | null;
   /**
-   * True where the target is in view but no line from the box reaches it
-   * without crossing text or a control: the line and the ring are then left
-   * out, and the stop is shown another way.
+   * True where this presentation cannot show the explanation properly, so the
+   * stop is shown another way: the box would leave the band between the
+   * sticky header and the dock, or the target is in view but no line from the
+   * box reaches it without crossing text or a control (the line and the ring
+   * are then left out).
    */
   readonly blocked: boolean;
 }
@@ -75,7 +77,7 @@ export const SPACE = {
   /** Kept free at the window's edges. */
   edge: 16,
   /** From a target's edge to its ring's center. */
-  ring: 9,
+  ring: 12,
   /** A line leaves a box at least this far from its corners. */
   inset: 16,
   /** Below the header, before the focus card. */
@@ -85,13 +87,21 @@ export const SPACE = {
 /** How far a line keeps from text and controls (px). */
 export const CLEARANCE = {
   /** A line that already runs straight is kept if it clears by this much. */
-  straight: 3,
+  straight: 6,
   /** A routed line keeps this far from them where there is room for it... */
   comfortable: 8,
   /** ...and this far where there is not, so it never grazes a word. */
   routed: 4,
-  /** A ring (8px across with its halo) needs this much room around its center. */
-  ring: 7,
+  /**
+   * A ring needs this much room around its center: its halo is drawn 8px
+   * out, so nothing may come nearer than that and a little air.
+   */
+  ring: 10,
+  /**
+   * Half the width of the band along the highlight's frame that a routed
+   * line may cross but not run along.
+   */
+  frame: 10,
 } as const;
 
 export const BOX_WIDTH = { min: 240, max: 320, rowMin: 200 } as const;
@@ -168,6 +178,16 @@ function boxBand(frame: Frame): {
     top: Math.max(SPACE.edge, frame.headerBottom + SPACE.header),
     bottom: frame.dockTop - SPACE.edge,
   };
+}
+
+/**
+ * Whether a box lies inside the band boxes may use. A box outside it is under
+ * the sticky header or behind the dock: the presentation that put it there is
+ * not used for the stop (`blocked`).
+ */
+function inBand(box: Box, frame: Frame): boolean {
+  const band = boxBand(frame);
+  return box.top >= band.top - 0.5 && bottom(box) <= band.bottom + 0.5;
 }
 
 /** The band the focus card must stay in: below the header, above the dock. */
@@ -290,18 +310,22 @@ export function placeGutter(
   }
   const room = lineRoom(frame);
   const boxes = placed.map((p) => p.box);
+  const frameBands = alongFrame(cutout);
   return placed.map((p, i) => {
     const target = targets[i] ?? null;
+    const line = joined(
+      gutterLine(p.box, p.side, cutout, target),
+      target === null ? null : gutterEnds(p.box, p.side, target),
+      room,
+      obstacles,
+      boxes,
+      i,
+      frameBands,
+    );
     return {
       ...p,
-      ...joined(
-        gutterLine(p.box, p.side, cutout, target),
-        target === null ? null : gutterEnds(p.box, p.side, target),
-        room,
-        obstacles,
-        boxes,
-        i,
-      ),
+      ...line,
+      blocked: line.blocked || !inBand(p.box, frame),
     };
   });
 }
@@ -447,18 +471,25 @@ export function placeRow(
   }
   const room = lineRoom(frame);
   const boxes = placed.map((p) => p.box);
+  const frameBands = alongFrame(cutout);
   return placed.map((p, i) => {
     const target = targets[i] ?? null;
+    const line = joined(
+      rowLine(p.box, p.side, cutout, target),
+      target === null ? null : rowEnds(p.box, p.side, target),
+      room,
+      obstacles,
+      boxes,
+      i,
+      frameBands,
+    );
+    // A box above the card is not held below the header (nor one below it
+    // above the dock): the card's place decides the box's, so a card scrolled
+    // near an edge would push its row out of the band.
     return {
       ...p,
-      ...joined(
-        rowLine(p.box, p.side, cutout, target),
-        target === null ? null : rowEnds(p.box, p.side, target),
-        room,
-        obstacles,
-        boxes,
-        i,
-      ),
+      ...line,
+      blocked: line.blocked || !inBand(p.box, frame),
     };
   });
 }
@@ -551,6 +582,41 @@ function uncovered(
   );
 }
 
+/**
+ * Thin bands over the highlight's frame, one per edge: a routed line may
+ * cross the frame but not run along it, where it would read as part of it.
+ */
+function alongFrame(cutout: Box): readonly Box[] {
+  const t = CLEARANCE.frame;
+  if (cutout.width <= 0 || cutout.height <= 0) return [];
+  return [
+    {
+      left: cutout.left,
+      top: cutout.top - t,
+      width: cutout.width,
+      height: 2 * t,
+    },
+    {
+      left: cutout.left,
+      top: bottom(cutout) - t,
+      width: cutout.width,
+      height: 2 * t,
+    },
+    {
+      left: cutout.left - t,
+      top: cutout.top,
+      width: 2 * t,
+      height: cutout.height,
+    },
+    {
+      left: right(cutout) - t,
+      top: cutout.top,
+      width: 2 * t,
+      height: cutout.height,
+    },
+  ];
+}
+
 /** Whether the ring has room around its center. */
 function ringClear(ring: Point | null, obstacles: readonly Box[]): boolean {
   if (ring === null) return true;
@@ -580,6 +646,7 @@ function joined(
   obstacles: readonly Box[],
   boxes: readonly Box[],
   own: number,
+  frameBands: readonly Box[] = [],
 ): Pick<Placed, "line" | "ring" | "blocked"> {
   if (straight.line === null || ends === null)
     return { ...straight, blocked: false };
@@ -603,6 +670,7 @@ function joined(
       starts: ends.starts,
       rings: ends.rings,
       ringClearance: CLEARANCE.ring,
+      along: frameBands,
     });
     if (found !== null) break;
   }
@@ -732,6 +800,55 @@ function ringsAround(
     base: e.edge === facing ? 0 : e.edge === opposite[facing] ? 90 : 40,
     prefer: e.edge === facing ? e.middle : clamp(e.near, e.low, e.high),
   }));
+}
+
+// ─── The sheet's ring ────────────────────────────────────────────────────────
+
+/** Whether a point lies on the highlight's frame, within a ring's room of it. */
+function onFrame(point: Point, cutout: Box | null): boolean {
+  if (cutout === null) return false;
+  const room = CLEARANCE.ring;
+  const [x, y] = point;
+  const near = (v: number, edge: number) => Math.abs(v - edge) < room;
+  const acrossX = x > cutout.left - room && x < right(cutout) + room;
+  const acrossY = y > cutout.top - room && y < bottom(cutout) + room;
+  return (
+    (acrossX && (near(y, cutout.top) || near(y, bottom(cutout)))) ||
+    (acrossY && (near(x, cutout.left) || near(x, right(cutout))))
+  );
+}
+
+/**
+ * Where the sheet puts its ring: beside the target on the first side, of
+ * left, right, above and below, where it is in the window, has its room
+ * clear of text and controls, and does not sit on the highlight's frame.
+ * Where no side has all that, the first side in the window, as before: the
+ * sheet has no line, so the ring is the only mark on the target.
+ */
+export function placeSheetRing(
+  target: Box,
+  frame: Frame,
+  cutout: Box | null,
+  obstacles: readonly Box[],
+): Point | null {
+  const gap = SPACE.ring;
+  const sides: readonly Point[] = [
+    [target.left - gap, centerY(target)],
+    [right(target) + gap, centerY(target)],
+    [centerX(target), target.top - gap],
+    [centerX(target), bottom(target) + gap],
+  ];
+  const inWindow = ([x, y]: Point) =>
+    x >= gap &&
+    x <= frame.width - gap &&
+    y >= frame.headerBottom + gap &&
+    y <= frame.dockTop - gap;
+  const shown = sides.filter(inWindow);
+  return (
+    shown.find((p) => ringClear(p, obstacles) && !onFrame(p, cutout)) ??
+    shown[0] ??
+    null
+  );
 }
 
 // ─── Choosing, scrolling, drawing ────────────────────────────────────────────

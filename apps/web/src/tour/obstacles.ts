@@ -19,8 +19,15 @@ const CONTROLS =
   "button, a[href], input, select, textarea, img, svg, [role='img'], " +
   ".icon-tile, .note-icon, .chip, .delta, .ticker, .logo";
 
-/** Not on screen: hidden, read aloud only, or the tour itself. */
-const GONE = "[hidden], .visually-hidden, dialog.tour";
+/**
+ * Not on screen: hidden, read aloud only, the tour itself, or folded away in
+ * a closed disclosure. Chromium keeps the last layout of a closed `<details>`
+ * body, so a security unfolded at an earlier stop and folded again still
+ * reports its rows where they were: text no one can see, which a line would
+ * otherwise go round.
+ */
+const GONE =
+  "[hidden], .visually-hidden, dialog.tour, details:not([open]) > :not(summary)";
 
 /** Smaller than this is a hairline or a clip, not something to steer round. */
 const LEAST = 2;

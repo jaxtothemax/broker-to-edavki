@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { Box } from "./layout";
-import { lineClear, route, type Dir, type End, type RouteInput } from "./route";
+import {
+  LIMITS,
+  lineClear,
+  route,
+  type Dir,
+  type End,
+  type RouteInput,
+} from "./route";
 
 /**
  * The router on small, made-up rooms: a box below (its edge at y = 280, the
@@ -175,12 +182,68 @@ describe("a route", () => {
     expect(route(input(crowd))).toBeNull();
   });
 
+  it("ends with a stretch long enough to read as an arrival, not a hook", () => {
+    // A block below the target, reaching to 7px under the ring below it: the
+    // way round it to that ring ends in a 7px hook upward. The ring on the
+    // left costs more but is reached by a real stretch, and wins.
+    const block = box(150, 140, 100, 120);
+    const found = route(input([block]));
+    expect(found).not.toBeNull();
+    const line = found?.line ?? [];
+    const [a, b] = line.slice(-2);
+    const last =
+      a && b ? Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) : Infinity;
+    expect(last).toBeGreaterThanOrEqual(8);
+  });
+
   it("prefers fewer bends to a slightly shorter way", () => {
     const wall = box(190, 170, 20, 20);
     const found = route(input([wall]));
     expect(found).not.toBeNull();
     // Out, along, and back in: never a staircase.
     expect(found?.line.length ?? 99).toBeLessThanOrEqual(5);
+  });
+});
+
+describe("a band along the highlight's frame", () => {
+  // The frame's left edge at x = 150, as a band 8 wide: a line may cross it
+  // but not run up or down inside it.
+  const band = box(146, 0, 8, 300);
+  const leftRing: readonly End[] = [ring([171, 104], [171, 116], 0, 0, 110)];
+
+  it("lets a line cross it", () => {
+    const found = route({
+      ...input([]),
+      starts: [{ a: [20, 110], b: [20, 110], dir: 0, base: 0, prefer: 110 }],
+      rings: leftRing,
+      along: [band],
+    });
+    expect(found?.line).toEqual([
+      [20, 110],
+      [171, 110],
+    ]);
+  });
+
+  it("keeps a line from riding it", () => {
+    // From below, to a ring right of the band: without the band the line
+    // would run straight up along it.
+    const starts: End[] = [
+      { a: [100, 280], b: [200, 280], dir: 3, base: 0, prefer: 150 },
+    ];
+    const free = route({ ...input([]), starts, rings: leftRing });
+    expect(free?.line.some(([x]) => x === 150)).toBe(true);
+    const kept = route({
+      ...input([]),
+      starts,
+      rings: leftRing,
+      along: [band],
+    });
+    expect(kept).not.toBeNull();
+    for (const [p, q] of segments(kept?.line ?? [])) {
+      const vertical = p[0] === q[0];
+      const inside = p[0] > band.left && p[0] < band.left + band.width;
+      expect(vertical && inside && p[1] !== q[1]).toBe(false);
+    }
   });
 });
 
@@ -261,6 +324,23 @@ describe("a route's bounds", () => {
     // never takes long to say which.
     expect(performance.now() - started).toBeLessThan(2000);
     expect(found === null || found.line.length >= 2).toBe(true);
+  });
+
+  it("gives up when marking the obstacles would take too long", () => {
+    // Marking costs the grid cells each obstacle spans, whatever the grid's size.
+    const wall = box(190, 170, 20, 20);
+    expect(route(input([wall]))).not.toBeNull();
+    expect(route(input([wall]), { ...LIMITS, marks: 1 })).toBeNull();
+  });
+
+  it("gives up when the search would take too long", () => {
+    const wall = box(190, 170, 20, 20);
+    expect(route(input([wall]))).not.toBeNull();
+    expect(route(input([wall]), { ...LIMITS, pops: 5 })).toBeNull();
+  });
+
+  it("refuses a grid of more nodes than its limit", () => {
+    expect(route(input([]), { ...LIMITS, nodes: 4 })).toBeNull();
   });
 
   it("refuses at once when the grid would pass the limit", () => {

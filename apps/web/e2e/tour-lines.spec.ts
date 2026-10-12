@@ -26,6 +26,8 @@ interface Hit {
 async function crossings(page: Page): Promise<{
   readonly lines: number;
   readonly hits: readonly Hit[];
+  /** Explanation boxes outside the band between the header and the dock. */
+  readonly outside: readonly string[];
 }> {
   // `place` runs in an animation frame after a scroll: let it finish.
   await page.evaluate(
@@ -79,7 +81,9 @@ async function crossings(page: Page): Promise<{
         : null;
     };
     const gone = (el: Element) =>
-      el.closest("[hidden], .visually-hidden, dialog.tour") !== null;
+      el.closest(
+        "[hidden], .visually-hidden, dialog.tour, details:not([open]) > :not(summary)",
+      ) !== null;
     const obstacles: { rect: Rect; what: string }[] = [];
     const add = (el: Element, r: DOMRect | DOMRectReadOnly, what: string) => {
       const shown = clip(el, r);
@@ -135,7 +139,23 @@ async function crossings(page: Page): Promise<{
           if (through(a, b, o.rect)) hits.push({ line, what: o.what });
       }
     });
-    return { lines: lines.length, hits };
+    // Every explanation box beside the card stays between the sticky header
+    // and the dock (ADR 0016): never under the one or behind the other.
+    const header =
+      document.querySelector(".app-header")?.getBoundingClientRect().bottom ??
+      0;
+    const dock =
+      dialog.querySelector(".tour-dock")?.getBoundingClientRect().top ??
+      window.innerHeight;
+    const [top, bottom] = [Math.max(16, header + 8), dock - 16];
+    const outside = [...dialog.querySelectorAll("li.tour-note.is-placed")]
+      .map((li) => li.getBoundingClientRect())
+      .filter((r) => r.top < top - 0.5 || r.bottom > bottom + 0.5)
+      .map(
+        (r) =>
+          `a box at y ${String(Math.round(r.top))} to ${String(Math.round(r.bottom))}, outside ${String(Math.round(top))} to ${String(Math.round(bottom))}`,
+      );
+    return { lines: lines.length, hits, outside };
   });
 }
 
@@ -154,13 +174,14 @@ async function walk(page: Page): Promise<{
   let stops = 0;
   for (let step = 0; step < 40; step += 1) {
     await expect(dialog).toHaveAttribute("data-ready", "true");
-    const { lines, hits } = await crossings(page);
+    const { lines, hits, outside } = await crossings(page);
     stops += 1;
     if (lines === 0) withoutLines.push(step);
     for (const hit of hits.slice(0, 3))
       problems.push(
         `step ${String(step)}: line ${String(hit.line)} crosses ${hit.what}`,
       );
+    for (const box of outside) problems.push(`step ${String(step)}: ${box}`);
     const label = (await dialog.locator(".tour-next").textContent()) ?? "";
     await dialog.locator(".tour-next").click();
     if (FINISH.test(label)) break;
@@ -178,7 +199,7 @@ for (const { locale, width, height } of WINDOWS) {
   test.describe(`${locale} at ${String(width)}x${String(height)}`, () => {
     test.use({ locale, viewport: { width, height } });
 
-    test("no line crosses text or a control, at any stop", async ({
+    test("no line crosses text or a control, and no box leaves its band, at any stop", async ({
       page,
       browserName,
     }) => {

@@ -17,7 +17,8 @@
 >
 > **Amended 2026-10-12 (§5):** a line crosses no text and no control. It is routed through
 > the free space between them (`tour/route.ts`, `tour/obstacles.ts`), and a presentation
-> whose lines cannot be drawn clear gives way to the sheet.
+> whose lines cannot be drawn clear, or whose boxes would leave the band between the sticky
+> header and the dock, gives way to the sheet.
 
 ## Context
 
@@ -95,13 +96,28 @@ at a time on a phone; and the demo data stays as it is (#26).
    crosses none of them it is kept; otherwise `tour/route.ts` finds the shortest orthogonal
    route with the fewest bends through the free space, leaving the box squarely and reaching
    a ring on whichever edge of the target it can, keeping 8px from them where there is room
-   and 4px where there is not. The ring needs room too. Where no route exists, the line is
+   and 4px where there is not; a straight line is kept only if it clears them by 6px. A
+   routed line may cross the highlight's frame but not run along it (a 20px band over each
+   edge), and a route ending in a stretch shorter than 8px into its ring pays extra, so the
+   line arrives rather than hooks. The ring sits 12px from the target's edge and needs 10px
+   of room round its center: its halo is drawn 8px out. Text inside a closed `<details>` is
+   not an obstacle, though Chromium still reports where it last stood. Where no route exists, the line is
    not drawn: the stop gives up that presentation for the next, the sheet at last, which has
    no line. That is decided once, when the stop has settled, and kept for the stop, so
    scrolling cannot flip it; a line the page's scrolling later leaves without a route is
    left out, as for a target out of view. `apps/web/e2e/tour-lines.spec.ts` walks the tour
    in three windows and both languages and fails on any line that crosses text or a control,
    measured on its own and not by the app's measuring.
+
+   **Every explanation box stays between the sticky header and the dock.** A row's box sits
+   above or below the card wherever the card is, so a card near the header or the dock could
+   push its row out of that band. Such a placement is `blocked` like a line with no route,
+   and the stop gives the presentation up the same way. The same spec fails on any box
+   outside the band. The router's work is bounded at each stage (grid nodes, cells marked,
+   states searched), each far above the demo's densest stop; past a bound there is no route,
+   so a page of many obstacles costs the sheet, never a stalled tab. In the sheet the ring
+   goes beside the target on the first side, of left, right, above and below, that is in the
+   window, clear of text and controls and off the highlight's frame.
 6. **Explanations are concepts in the message catalog, figures come from the preview.**
    Each explanation is a concept entry (`t.explain.*`) in Slovenian and English, written
    descriptively ("here", "this sale"); demo framing lives only in the tour's own intros.
