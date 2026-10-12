@@ -1,7 +1,9 @@
 /**
- * The preview notice (#70) on each kind of screen, in both languages: the
- * start screen, each wizard step and the dashboard shell. Server-rendered, as in
- * App.test.tsx: the tests run in Node without a DOM.
+ * Where the app's notices sit (#70): beside what they are about, never in a
+ * stack above every screen. The preview's caution (the readers are not
+ * checked against real exports yet) is said where the user adds their own
+ * files and again by the downloads, once each; the demo is marked by a chip.
+ * Server-rendered, as in App.test.tsx: the tests run in Node without a DOM.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -19,7 +21,7 @@ function stateAfter(...actions: WizardAction[]): WizardState {
   return actions.reduce(wizardReducer, initialWizardState);
 }
 
-const SCREENS: [string, WizardState][] = [
+const DEMO: [string, WizardState][] = [
   ["start", initialWizardState],
   ["files", stateAfter({ type: "startDemo" })],
   [
@@ -32,40 +34,56 @@ const SCREENS: [string, WizardState][] = [
   ],
 ];
 
-const NOTICE =
-  /<section class="preview-notice" aria-labelledby="preview-notice-title">(.*?)<\/section>/s;
+const withOwnFile = stateAfter(
+  { type: "startOwn" },
+  {
+    type: "addFiles",
+    files: [{ id: "file-1", name: "export.csv", size: 2048 }],
+  },
+);
+
+/** The text as the server writes it into the markup. */
+const escaped = (text: string) =>
+  text
+    .replaceAll("&", "&amp;")
+    .replaceAll("'", "&#x27;")
+    .replaceAll('"', "&quot;");
+
+const count = (html: string, part: string) =>
+  html.split(escaped(part)).length - 1;
 
 for (const [locale, t] of [
   ["sl", sl],
   ["en", en],
 ] as const) {
-  describe(`preview notice (${locale})`, () => {
-    for (const [name, state] of SCREENS) {
-      it(`${name}: a region named by its title, holding a note`, () => {
-        const html = renderToStaticMarkup(
-          <App initialLocale={locale} initialState={state} />,
-        );
-        const notice = NOTICE.exec(html);
-        expect(notice, "the preview notice").not.toBeNull();
-        const inner = notice?.[1] ?? "";
-        expect(inner).toContain('role="note"');
-        expect(inner).toContain(
-          `<strong id="preview-notice-title">${t.preview.noticeTitle}</strong>`,
-        );
-        expect(inner).toContain(t.preview.noticeBody);
-        // Nothing hides it for good: it has no control at all.
-        expect(inner).not.toContain("<button");
-      });
+  const render = (state: WizardState) =>
+    renderToStaticMarkup(<App initialLocale={locale} initialState={state} />);
 
-      it(`${name}: in the page flow after the sticky header, before the content`, () => {
-        const html = renderToStaticMarkup(
-          <App initialLocale={locale} initialState={state} />,
+  describe(`notices in context (${locale})`, () => {
+    for (const [name, state] of DEMO) {
+      it(`${name}: no notice between the header and the content`, () => {
+        const html = render(state);
+        const between = html.slice(
+          html.indexOf("</header>"),
+          html.indexOf("<main"),
         );
-        const at = html.search(NOTICE);
-        expect(html.indexOf("</header>")).toBeGreaterThan(-1);
-        expect(html.indexOf("</header>")).toBeLessThan(at);
-        expect(at).toBeLessThan(html.indexOf("<main"));
+        expect(between).not.toContain('role="note"');
+        expect(count(html, t.preview.noticeBody)).toBe(0);
       });
     }
+
+    it("files: the caution once, by the user's own files", () => {
+      const html = render(withOwnFile);
+      expect(count(html, t.preview.noticeBody)).toBe(1);
+      expect(html.indexOf(escaped(t.preview.noticeBody))).toBeGreaterThan(
+        html.indexOf("export.csv"),
+      );
+    });
+
+    it("files: no caution before the user has added a file", () => {
+      expect(
+        count(render(stateAfter({ type: "startOwn" })), t.preview.noticeBody),
+      ).toBe(0);
+    });
   });
 }

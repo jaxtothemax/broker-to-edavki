@@ -4,7 +4,7 @@
  * returns to download; and a card for each page that holds the rows behind
  * them. Every amount comes from the preview; none is computed here.
  */
-import { ArrowRightIcon, InfoIcon } from "@phosphor-icons/react";
+import { ArrowRightIcon, FlaskIcon, InfoIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
 import { explain } from "../../explain/anchors";
@@ -154,6 +154,7 @@ export function OverviewPage({
   writing,
   demo,
   withheld,
+  attention = null,
   onNavigate,
 }: {
   readonly preview: ReturnPreview;
@@ -161,6 +162,8 @@ export function OverviewPage({
   readonly demo: boolean;
   /** The names of the returns a note withholds. */
   readonly withheld: readonly string[];
+  /** How many notes need the user before a download, beside the downloads. */
+  readonly attention?: ReactNode;
   readonly onNavigate: (page: DashPage) => void;
 }) {
   const { locale, t } = useI18n();
@@ -175,11 +178,18 @@ export function OverviewPage({
         <InfoIcon size={16} weight="bold" aria-hidden />
         {t.review.estimateNote}
       </p>
+      {demo ? (
+        <p className="with-icon muted small">
+          <FlaskIcon size={16} weight="bold" aria-hidden />
+          {t.demoData.body}
+        </p>
+      ) : null}
 
       <ReturnsCard
         preview={preview}
         writing={writing}
         demo={demo}
+        attention={attention}
         onShowNotes={() => {
           onNavigate("notes");
         }}

@@ -133,11 +133,16 @@ describe("App", () => {
     expect(html).toContain('<main id="main"');
   });
 
-  it("marks every flow screen of the demo as demo data", () => {
+  it("marks every flow screen of the demo as demo data, with a chip", () => {
     for (const [name, state] of screens.slice(1)) {
-      expect(text(render(state)), name).toContain(en.demoBanner.body);
+      expect(text(render(state)), name).toContain(en.demoData.chip);
     }
-    expect(text(render(initialWizardState))).not.toContain(en.demoBanner.body);
+    expect(text(render(initialWizardState))).not.toContain(en.demoData.chip);
+  });
+
+  it("says once, on the overview, what in the demo is made up", () => {
+    const shown = text(render(dashboard, "en"));
+    expect(shown.split(en.demoData.body)).toHaveLength(2);
   });
 
   it("previews the XML header from the details as they are typed", () => {
@@ -182,7 +187,7 @@ describe("App", () => {
     const html = text(render(own));
     expect(html).toContain(en.review.preparing);
     expect(html).not.toContain("€1,770.04");
-    expect(html).not.toContain(en.demoBanner.body);
+    expect(html).not.toContain(en.demoData.chip);
   });
 
   it("lists own files as being read, then by broker and the days they cover", () => {
@@ -196,7 +201,8 @@ describe("App", () => {
     const reading = text(render(added));
     expect(reading).toContain("export.csv");
     expect(reading).toContain(`2 kB, ${en.files.reading}`);
-    expect(reading).toContain(en.files.ownFilesNotice);
+    // Once, by the user's own files: the readers are not checked yet.
+    expect(reading.split(en.preview.noticeBody)).toHaveLength(2);
 
     const done = text(render(ownState(read)));
     // From the first dated event to the last: a deposit has no tax date.
@@ -282,7 +288,7 @@ describe("App", () => {
     expect(html).toContain(en.dash.taxToPay("2026"));
     expect(html).toContain("Doh_Div_2026.xml");
     expect(html).not.toContain(en.review.preparing);
-    expect(html).not.toContain(en.demoBanner.body);
+    expect(html).not.toContain(en.demoData.chip);
   });
 
   it("offers own returns for download at once, with the user's details in them", () => {
@@ -438,9 +444,14 @@ describe("App", () => {
     expect(html).toContain("5 more notes are not shown.");
   });
 
-  it("points out the demo's notes on the overview", () => {
+  it("points out the demo's notes once, beside the downloads", () => {
     const html = text(render(dashboard, "en"));
-    expect(html).toContain("2 notes need your attention before you download.");
+    const attention = "2 notes need your attention before you download.";
+    expect(html.split(attention)).toHaveLength(2);
+    // On the Returns card: after its title, before the first download.
+    const at = html.indexOf(attention);
+    expect(at).toBeGreaterThan(html.indexOf(en.dash.returnsTitle));
+    expect(at).toBeLessThan(html.indexOf(en.download.kdvpTitle, at - 1));
   });
 
   it("keeps the download buttons disabled while the files are written, and says so", () => {
