@@ -101,6 +101,51 @@ function at(
 const typedField = (path: string) =>
   /^taxpayer\.|\.payer\.|\.sourceCountry$/.test(path);
 
+/**
+ * A closed list's value as a clause, from the code's own table: the
+ * parameter arrives as written, since no `FindingWords` list names it.
+ */
+function pick<K extends string>(
+  value: string,
+  clauses: Readonly<Record<K, string>>,
+  fallback: string,
+): string {
+  return Object.hasOwn(clauses, value) ? clauses[value as K] : fallback;
+}
+
+type Clauses<
+  C extends DiagnosticCode,
+  P extends keyof DiagnosticParams[C],
+> = Readonly<Record<DiagnosticParams[C][P] & string, string>>;
+
+/** What an eToro statement writes that no number in it is read past. */
+const STATEMENT_FORMATS_EN: Clauses<"statementFormat", "format"> = {
+  regionalDate: "writes dates as 31.12.2025",
+  regionalNumber: "writes numbers with a decimal comma or thousands separators",
+  serialDate: "stores dates as spreadsheet date values, not as text",
+  bracketNegative: "writes negative numbers in brackets",
+};
+
+const HISTORY_GAPS_EN: Clauses<"historyIncomplete", "gap"> = {
+  start:
+    "the statement does not start when the account was opened: money was already in it",
+  order:
+    "the statement's account activity is not in date order, so it was changed",
+  openRow:
+    "a position in the statement has no single opening row in its account activity",
+};
+
+const DIVIDEND_MISMATCHES_EN: Clauses<"dividendInconsistent", "mismatch"> = {
+  rate: "the tax withheld is not the stated rate of the dividend",
+  pairing:
+    "its row in Account Activity is missing, repeated or of another amount",
+  date: "its payment date is not the day of its row in Account Activity",
+  unpaired: "a dividend in Account Activity is not on the Dividends sheet",
+  netAmount: "its amount in its own currency is not its amount in dollars",
+  class: "its type is not the type its position was read as",
+  isin: "its ISIN is not the one on the row that closed its position",
+};
+
 const REPORT_EN =
   "This is TaxReporter's fault, not your file's: please report it, without attaching the file.";
 
@@ -188,6 +233,11 @@ export const findingsEn: FindingMessages = {
       p,
       `${p.shares === "out" ? "a sale priced at zero" : p.shares === "in" ? "a receipt of new shares" : "a receipt of free rights"} is not read, but it changes nothing on the ${p.year} returns: nothing it could affect is sold or received in ${p.year}. It holds back only the returns it can change.`,
     ),
+  unresolvedElsewhere: (p) =>
+    at(
+      p,
+      `a position still open in the ${p.broker} statement has no ISIN, but it changes nothing on the ${p.year} returns: no security is sold in ${p.year} from 30 days before its purchase on, and a purchase is no dividend. It holds back only the returns it can change.`,
+    ),
   lossDisallowed: (p) =>
     at(
       p,
@@ -263,7 +313,7 @@ export const findingsEn: FindingMessages = {
   diagnosticsTruncated: (p) =>
     `More findings for this file are not shown (${p.dropped}).`,
   unknownFormat: () =>
-    "TaxReporter does not recognize this export. It reads Trading 212 history CSV, Trade Republic transaction export CSV and Interactive Brokers Activity Flex Query XML for now; more brokers are coming.",
+    "TaxReporter does not recognize this export. It reads Trading 212 history CSV, Trade Republic transaction export CSV, Interactive Brokers Activity Flex Query XML and the eToro account statement (XLSX) for now; more brokers are coming.",
   ambiguousFormat: () =>
     "This export matches more than one known format, so it is not read.",
   derivativesNotSupported: (p) =>
@@ -357,6 +407,49 @@ export const findingsEn: FindingMessages = {
     p.label === "bonus"
       ? `${p.broker}: a “Dividend (Bonus)” row is read as an ordinary dividend. Cash paid per share you hold is a dividend under ZDoh-2 art. 90, whatever the broker calls it.`
       : `${p.broker}: a “Dividend (Demerger)” row is read as an ordinary dividend. It is usually cash paid instead of a fraction of a spin-off share, whose tax treatment is not settled; counting it as a dividend is the simplest reading. Check it before you file.`,
+  // XLSX workbooks
+  unknownSheet: (p) =>
+    `Sheet ${p.sheet} of this workbook is one TaxReporter does not know, so the file is not read rather than read in part. If you added the sheet, export the file again from your broker, unchanged; otherwise please report it.`,
+  hiddenSheet: (p) =>
+    `Sheet ${p.sheet} of this workbook is hidden, so you cannot see what TaxReporter would read from it. Export the file again from your broker, unchanged.`,
+  hiddenCells: (p) =>
+    `Sheet ${p.sheet} of this workbook has hidden rows or columns. They are read like the rest: unhide them in your spreadsheet program to see everything that counts.`,
+  // eToro account statements
+  columnMissing: (p) =>
+    `${p.broker}: the statement has no “${p.column}” column. It was probably exported in an older layout: export the account statement again from your broker, unchanged.`,
+  statementFormat: (p) =>
+    `${p.broker}: the statement ${pick(p.format, STATEMENT_FORMATS_EN, "writes values in a form TaxReporter does not know")}. TaxReporter does not read that yet, so no number in it is read on a guess. If you opened and saved it in a spreadsheet program, export it again from your broker, unchanged; otherwise please report it.`,
+  historyIncomplete: (p) =>
+    `${p.broker}: ${pick(p.gap, HISTORY_GAPS_EN, "the statement does not hold the account's whole history")}. FIFO needs every purchase since the account was opened, so the statement is not read. Export the account statement again, from the day you opened the account or earlier.`,
+  dateUncertain: (p) =>
+    at(
+      p,
+      `a time in the ${p.broker} statement is so close to midnight that it could fall on either of two days, as the statement does not say which time zone it uses. It is not dated on a guess; please report it.`,
+    ),
+  dividendDatesUncertain: (p) =>
+    `${p.broker}: dividends (${p.count}) were booked near midnight, and the statement does not say which time zone it uses. Each is dated by the payment date the statement gives; check that it is the day the dividend was paid.`,
+  openPositionsAssumed: (p) =>
+    `${p.broker}: positions still open (${p.count}) are taken as purchases of shares, without leverage and not short, at the amount invested divided by the units. The statement does not say this for a position still open: check them against your portfolio at the broker.`,
+  isinUnresolved: (p) =>
+    at(
+      p,
+      // With `side` (stated only for `missing`), core holds back just the
+      // Doh-KDVP of the years the lot can change (ADR 0017 §3); without it,
+      // and for `ambiguous`, both returns of every year.
+      p.cause === "ambiguous"
+        ? `the ticker of a position still open in the ${p.broker} statement names two securities elsewhere in it, so its ISIN is not known. It is not chosen on a guess; please report it.`
+        : p.side === undefined
+          ? `a position still open in the ${p.broker} statement has no ISIN: the statement gives one only for closed positions and dividends. Without it, its shares cannot be matched with sales of the same security, so the returns wait; please report it.`
+          : `a position still open in the ${p.broker} statement has no ISIN: the statement gives one only for closed positions and dividends. Without it, its shares cannot be matched with sales of the same security. Doh-KDVP waits for each year with a sale of any security from 30 days before the purchase on; dividends are not affected. Please report it.`,
+    ),
+  dividendInconsistent: (p) =>
+    at(
+      p,
+      `a dividend's figures in the ${p.broker} statement disagree: ${pick(p.mismatch, DIVIDEND_MISMATCHES_EN, "its amounts do not add up")}. It is not read on a guess: export the statement again, unchanged, and if that does not help, please report it.`,
+    ),
+  // The pipeline
+  secondStatement: (p) =>
+    `${p.first} and ${p.second} are both ${p.broker} statements of one account. Each covers the account from its opening, so keep only the latest. If they come from different accounts, say so in the account question.`,
 };
 
 export const wordsEn: FindingWords = {
@@ -368,11 +461,11 @@ export const wordsEn: FindingWords = {
   },
   refusals: {
     tooLarge: "is larger than any broker export (over 64 MiB)",
-    zip: "is a ZIP archive, not a broker export: export CSV or XML from your broker instead",
+    zip: "is a ZIP archive, not a broker export: export CSV, XML or XLSX from your broker instead",
     spreadsheet:
-      "is an old Excel file: export CSV or XML from your broker instead",
-    pdf: "is a PDF: export CSV or XML from your broker instead",
-    gzip: "is compressed: export CSV or XML from your broker instead",
+      "is an old Excel file (XLS): export CSV, XML or XLSX from your broker instead",
+    pdf: "is a PDF: export CSV, XML or XLSX from your broker instead",
+    gzip: "is compressed: export CSV, XML or XLSX from your broker instead",
     utf16: "is UTF-16 text: export it again from your broker, unchanged",
     utf32: "is UTF-32 text: export it again from your broker, unchanged",
     binary: "contains binary data",
@@ -473,9 +566,17 @@ export const wordsEn: FindingWords = {
     trading212: "Trading 212",
     ibkr: "Interactive Brokers",
     traderepublic: "Trade Republic",
+    etoro: "eToro",
   },
   actions: {
     FOREIGN_CURRENCY_TRADE: "trades in a foreign currency",
+    partialClose: "partly closed positions",
+    short: "short positions",
+    leveraged: "leveraged positions",
+    leveragedOrShort:
+      "positions still open that paid an overnight fee, as only leveraged or short ones do",
+    nonUsd: "instruments in a currency other than US dollars",
+    franked: "franked dividends",
     shortSale: "short sales",
     isinChange: "corporate actions that change an ISIN",
     returnOfCapital: "returns of capital",
@@ -496,7 +597,39 @@ export const wordsEn: FindingWords = {
     multiplier: "its multiplier is not 1, as a share's is",
     amount: "its value is not its quantity times its price",
     cusip: "its CUSIP does not match its ISIN",
+    closeAmount:
+      "its units at the close rate are not its amount plus its profit",
+    dates: "its open or close time is not that of its row in Account Activity",
+    units: "its units differ between the rows that record it",
+    activity: "its rows in Account Activity are missing or repeated",
   },
+};
+
+const STATEMENT_FORMATS_SL: Clauses<"statementFormat", "format"> = {
+  regionalDate: "zapisuje datume v obliki 31.12.2025",
+  regionalNumber: "zapisuje števila z decimalno vejico ali ločili tisočic",
+  serialDate:
+    "hrani datume kot datumske vrednosti preglednice, ne kot besedilo",
+  bracketNegative: "zapisuje negativna števila v oklepajih",
+};
+
+const HISTORY_GAPS_SL: Clauses<"historyIncomplete", "gap"> = {
+  start: "izpisek se ne začne ob odprtju računa, saj je bil v računu že denar",
+  order:
+    "dejavnost računa v izpisku ni razvrščena po datumu, zato je bil izpisek spremenjen",
+  openRow:
+    "pozicija v izpisku nima natanko ene vrstice o odprtju v dejavnosti računa",
+};
+
+const DIVIDEND_MISMATCHES_SL: Clauses<"dividendInconsistent", "mismatch"> = {
+  rate: "odtegnjeni davek ni enak navedeni stopnji od dividende",
+  pairing:
+    "njena vrstica na listu »Account Activity« manjka, se ponovi ali ima drug znesek",
+  date: "datum plačila ni dan njene vrstice na listu »Account Activity«",
+  unpaired: "dividende z lista »Account Activity« ni na listu »Dividends«",
+  netAmount: "znesek v njeni valuti ni enak znesku v dolarjih",
+  class: "njena vrsta ni vrsta, kot je bila prebrana njena pozicija",
+  isin: "njena koda ISIN ni koda iz vrstice, ki je zaprla njeno pozicijo",
 };
 
 const REPORT_SL =
@@ -588,6 +721,11 @@ export const findingsSl: FindingMessages = {
       p,
       `${p.shares === "out" ? "prodaja po ceni nič ni prebrana" : p.shares === "in" ? "prejem novih delnic ni prebran" : "prejem brezplačnih pravic ni prebran"}, vendar ta vrstica ne spremeni ničesar v napovedih za leto ${p.year}: v tem letu ni prodano ali prejeto nič, na kar bi lahko vplivala. Zadrži le napovedi, ki jih lahko spremeni.`,
     ),
+  unresolvedElsewhere: (p) =>
+    at(
+      p,
+      `še odprta pozicija v izpisku ${p.broker} nima kode ISIN, vendar ne spremeni ničesar v napovedih za leto ${p.year}: v tem letu od 30 dni pred njenim nakupom naprej ni prodan noben vrednostni papir, nakup pa ni dividenda. Zadrži le napovedi, ki jih lahko spremeni.`,
+    ),
   lossDisallowed: (p) =>
     at(
       p,
@@ -672,7 +810,7 @@ export const findingsSl: FindingMessages = {
   diagnosticsTruncated: (p) =>
     `Nadaljnjih ugotovitev za to datoteko (${p.dropped}) ni prikazanih.`,
   unknownFormat: () =>
-    "TaxReporter tega izvoza ne prepozna. Zaenkrat bere zgodovino Trading 212 v obliki CSV, izvoz transakcij Trade Republic v obliki CSV in poročila Activity Flex Query pri Interactive Brokers v obliki XML; drugi posredniki prihajajo.",
+    "TaxReporter tega izvoza ne prepozna. Zaenkrat bere zgodovino Trading 212 v obliki CSV, izvoz transakcij Trade Republic v obliki CSV, poročila Activity Flex Query pri Interactive Brokers v obliki XML in izpisek računa eToro v obliki XLSX; drugi posredniki prihajajo.",
   ambiguousFormat: () => "Izvoz ustreza več znanim oblikam, zato ni prebran.",
   derivativesNotSupported: (p) =>
     `${p.broker}: izvoz je iz računa CFD ali drugih izvedenih finančnih instrumentov. Ti se prijavijo na obrazcu D-IFI, ki ga TaxReporter še ne pripravlja.`,
@@ -767,6 +905,49 @@ export const findingsSl: FindingMessages = {
     p.label === "bonus"
       ? `${p.broker}: vrstica »Dividend (Bonus)« je prebrana kot navadna dividenda. Denar, izplačan na delnico v vašem imetništvu, je po 90. členu ZDoh-2 dividenda, ne glede na to, kako ga poimenuje posrednik.`
       : `${p.broker}: vrstica »Dividend (Demerger)« je prebrana kot navadna dividenda. Običajno je to denar, izplačan namesto ulomka delnice iz odcepitve, katerega davčna obravnava ni urejena; štetje med dividende je najpreprostejša razlaga. Pred oddajo to preverite.`,
+  // XLSX workbooks
+  unknownSheet: (p) =>
+    `List ${p.sheet} v tem delovnem zvezku je za TaxReporter neznan, zato datoteka ni prebrana, namesto da bi bila prebrana le delno. Če ste list dodali sami, datoteko pri posredniku izvozite znova, nespremenjeno; sicer nam to sporočite.`,
+  hiddenSheet: (p) =>
+    `List ${p.sheet} v tem delovnem zvezku je skrit, zato ne vidite, kaj bi TaxReporter iz njega prebral. Datoteko pri posredniku izvozite znova, nespremenjeno.`,
+  hiddenCells: (p) =>
+    `List ${p.sheet} v tem delovnem zvezku ima skrite vrstice ali stolpce. Prebrani so kot vse drugo: razkrijte jih v programu za preglednice, da vidite vse, kar se upošteva.`,
+  // eToro account statements
+  columnMissing: (p) =>
+    `${p.broker}: izpisek nima stolpca »${p.column}«. Verjetno je bil izvožen v starejši obliki: izpisek računa pri posredniku izvozite znova, nespremenjen.`,
+  statementFormat: (p) =>
+    `${p.broker}: izpisek ${pick(p.format, STATEMENT_FORMATS_SL, "zapisuje vrednosti v obliki, ki je TaxReporter ne pozna")}. TaxReporter tega še ne bere, zato nobeno število iz njega ni prebrano na slepo. Če ste ga odprli in shranili v programu za preglednice, ga pri posredniku izvozite znova, nespremenjenega; sicer nam to sporočite.`,
+  historyIncomplete: (p) =>
+    `${p.broker}: ${pick(p.gap, HISTORY_GAPS_SL, "izpisek ne zajema celotne zgodovine računa")}. Za FIFO so potrebni vsi nakupi od odprtja računa, zato izpisek ni prebran. Izpisek računa izvozite znova, od dne, ko ste odprli račun, ali od prej.`,
+  dateUncertain: (p) =>
+    at(
+      p,
+      `čas v izpisku ${p.broker} je tako blizu polnoči, da bi lahko padel na enega od dveh dni, izpisek pa ne navaja časovnega pasu. Datum ni določen na slepo; sporočite to.`,
+    ),
+  dividendDatesUncertain: (p) =>
+    `${p.broker}: dividende (${p.count}) so bile knjižene blizu polnoči, izpisek pa ne navaja časovnega pasu. Vsaka je datirana z datumom plačila iz izpiska; preverite, ali je to dan, ko je bila dividenda izplačana.`,
+  openPositionsAssumed: (p) =>
+    `${p.broker}: še odprte pozicije (${p.count}) so upoštevane kot nakupi delnic brez finančnega vzvoda in ne na kratko, po vloženem znesku, deljenem s številom enot. Izpisek tega za odprto pozicijo ne navaja: preverite jih v svojem portfelju pri posredniku.`,
+  isinUnresolved: (p) =>
+    at(
+      p,
+      // With `side` (stated only for `missing`), core holds back just the
+      // Doh-KDVP of the years the lot can change (ADR 0017 §3); without it,
+      // and for `ambiguous`, both returns of every year.
+      p.cause === "ambiguous"
+        ? `oznaka še odprte pozicije v izpisku ${p.broker} drugje v izpisku označuje dva vrednostna papirja, zato njena koda ISIN ni znana. Ne izbere se na slepo; sporočite to.`
+        : p.side === undefined
+          ? `še odprta pozicija v izpisku ${p.broker} nima kode ISIN: izpisek jo navaja le pri zaprtih pozicijah in dividendah. Brez nje njenih delnic ni mogoče povezati s prodajami istega vrednostnega papirja, zato napovedi počakajo; sporočite to.`
+          : `še odprta pozicija v izpisku ${p.broker} nima kode ISIN: izpisek jo navaja le pri zaprtih pozicijah in dividendah. Brez nje njenih delnic ni mogoče povezati s prodajami istega vrednostnega papirja. Napoved Doh-KDVP počaka za vsako leto s prodajo katerega koli vrednostnega papirja od 30 dni pred nakupom naprej; na dividende to ne vpliva. Sporočite to.`,
+    ),
+  dividendInconsistent: (p) =>
+    at(
+      p,
+      `podatki dividende v izpisku ${p.broker} se ne ujemajo: ${pick(p.mismatch, DIVIDEND_MISMATCHES_SL, "njeni zneski se ne seštejejo")}. Dividenda ni prebrana na slepo: izpisek pri posredniku izvozite znova, nespremenjen, in če to ne pomaga, nam to sporočite.`,
+    ),
+  // The pipeline
+  secondStatement: (p) =>
+    `${p.first} in ${p.second} sta izpiska ${p.broker} za isti račun. Vsak zajema račun od odprtja, zato obdržite le najnovejšega. Če sta iz različnih računov, to označite pri vprašanju o računih.`,
 };
 
 export const wordsSl: FindingWords = {
@@ -779,11 +960,11 @@ export const wordsSl: FindingWords = {
   refusals: {
     tooLarge:
       "je večja od katerega koli izvoza borznega posrednika (več kot 64 MiB)",
-    zip: "je arhiv ZIP, ne izvoz posrednika: pri posredniku raje izvozite CSV ali XML",
+    zip: "je arhiv ZIP, ne izvoz posrednika: pri posredniku raje izvozite CSV, XML ali XLSX",
     spreadsheet:
-      "je stara datoteka Excel: pri posredniku raje izvozite CSV ali XML",
-    pdf: "je PDF: pri posredniku raje izvozite CSV ali XML",
-    gzip: "je stisnjena: pri posredniku raje izvozite CSV ali XML",
+      "je stara datoteka Excel (XLS): pri posredniku raje izvozite CSV, XML ali XLSX",
+    pdf: "je PDF: pri posredniku raje izvozite CSV, XML ali XLSX",
+    gzip: "je stisnjena: pri posredniku raje izvozite CSV, XML ali XLSX",
     utf16:
       "je besedilo UTF-16: pri posredniku jo izvozite znova, nespremenjeno",
     utf32:
@@ -891,9 +1072,17 @@ export const wordsSl: FindingWords = {
     trading212: "Trading 212",
     ibkr: "Interactive Brokers",
     traderepublic: "Trade Republic",
+    etoro: "eToro",
   },
   actions: {
     FOREIGN_CURRENCY_TRADE: "posli v tuji valuti",
+    partialClose: "delno zaprte pozicije",
+    short: "pozicije na kratko",
+    leveraged: "pozicije s finančnim vzvodom",
+    leveragedOrShort:
+      "še odprte pozicije s plačanim nadomestilom za čez noč, ki ga plačujejo le pozicije s finančnim vzvodom ali na kratko",
+    nonUsd: "instrumenti v valuti, ki ni ameriški dolar",
+    franked: "dividende z avstralskim davčnim dobropisom (franking)",
     shortSale: "prodaje na kratko",
     isinChange: "korporacijska dejanja, ki spremenijo ISIN",
     returnOfCapital: "vračila kapitala",
@@ -915,5 +1104,12 @@ export const wordsSl: FindingWords = {
     multiplier: "množitelj ni 1, kot je pri delnici",
     amount: "vrednost ni enaka količini, pomnoženi s ceno",
     cusip: "koda CUSIP se ne ujema s kodo ISIN",
+    closeAmount:
+      "enote, pomnožene z zaključnim tečajem, niso enake znesku, povečanemu za dobiček",
+    dates:
+      "čas odprtja ali zaprtja ni enak času njene vrstice na listu »Account Activity«",
+    units: "število enot se razlikuje med vrsticami, ki ga beležijo",
+    activity:
+      "njene vrstice na listu »Account Activity« manjkajo ali se ponovijo",
   },
 };

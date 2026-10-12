@@ -91,6 +91,28 @@ describe("App", () => {
     expect(results).not.toContain("2,026");
   });
 
+  it("names the brokers v0.1 reads as being built, and eToro only as planned", () => {
+    for (const [locale, t] of [
+      ["en", en],
+      ["sl", sl],
+    ] as const) {
+      const html = text(render(initialWizardState, locale));
+      const now = html.slice(
+        html.indexOf(t.start.brokersNowLabel),
+        html.indexOf(t.start.brokersNextLabel),
+      );
+      expect(now).toContain("Trading 212");
+      expect(now).toContain("Trade Republic");
+      expect(now).not.toContain("eToro");
+      expect(html.split("eToro")).toHaveLength(2);
+    }
+  });
+
+  it("lets the file picker offer XLSX statements beside CSV and XML", () => {
+    const html = render(stateAfter({ type: "startOwn" }));
+    expect(html).toMatch(/accept="[^"]*\.xlsx[^"]*"/);
+  });
+
   it("keeps each form name on one line in the hero headline", () => {
     const html = render(initialWizardState, "sl");
     expect(html).toMatch(/<span class="[^"]*\bnowrap\b[^"]*">Doh-KDVP<\/span>/);
@@ -207,9 +229,9 @@ describe("App", () => {
 
   it("asks whether the Trading 212 files are one account, preset to one", () => {
     const html = render(ownState(read));
-    expect(text(html)).toContain(en.files.accountsTitle);
+    expect(text(html)).toContain(en.files.accountsTitle("Trading 212"));
     const radios =
-      html.match(/<input type="radio" name="trading212-accounts"[^>]*>/g) ?? [];
+      html.match(/<input type="radio" name="unnamed-accounts"[^>]*>/g) ?? [];
     expect(radios).toHaveLength(2);
     expect(radios[0]).toContain('value="same"');
     expect(radios[0]).toContain("checked");
@@ -322,7 +344,7 @@ describe("App", () => {
     expect(html).not.toContain(en.dash.downloadAll);
   });
 
-  it("refuses files that are not CSV or XML, and says so", () => {
+  it("refuses files that are not CSV, XML or XLSX, and says so", () => {
     const state = stateAfter(
       { type: "startOwn" },
       {
@@ -408,7 +430,7 @@ describe("App", () => {
     expect(answered.reading.status).toBe("idle");
     const html = render(answered);
     const radios =
-      html.match(/<input type="radio" name="trading212-accounts"[^>]*>/g) ?? [];
+      html.match(/<input type="radio" name="unnamed-accounts"[^>]*>/g) ?? [];
     expect(radios).toHaveLength(2);
     expect(radios[1]).toContain("checked");
     // The files stay shown as read, not as being read.

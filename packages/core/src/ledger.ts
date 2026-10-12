@@ -192,7 +192,13 @@ export type IgnoredReason =
    * a dividend, which is foreign tax on Doh-Div, and never a row that moves
    * any amount but tax.
    */
-  | "brokerTaxSettlement";
+  | "brokerTaxSettlement"
+  /**
+   * A crypto-asset bought or sold outright, unleveraged (eToro's `Crypto`):
+   * on neither return, as Slovenia taxes no gain on it for now (research 07
+   * §3, rule 4). A leveraged or short one is refused, not left out.
+   */
+  | "crypto";
 
 export interface IgnoredRow {
   readonly kind: "ignored";

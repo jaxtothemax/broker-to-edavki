@@ -4,21 +4,28 @@
  */
 import {
   Decimal,
+  validateLedger,
   type AccountScope,
   type DividendEvent,
   type EventKey,
   type FileId,
   type LedgerEvent,
+  type TradeEvent,
 } from "@taxreporter/core";
+import { buildReturns, type ReadExports } from "@taxreporter/pipeline";
 import { describe, expect, it } from "vitest";
 
 import type { Finding } from "../model/preview";
+import { loadRates } from "./rates";
 import {
   bounded,
+  fileIndex,
   MAX_FINDINGS,
   payerPrompts,
+  summarize,
   symbolsOf,
   taxToPay,
+  toPreview,
 } from "./toPreview";
 
 const finding = (severity: Finding["severity"], row: number): Finding => ({
@@ -115,5 +122,80 @@ describe("taxToPay", () => {
     expect(taxToPay(Decimal.parse("1770.044"), Decimal.parse("21.334"))).toBe(
       "1791.37",
     );
+  });
+});
+
+describe("toPreview, an eToro lot", () => {
+  it("names eToro, and shows a price with no finite expansion rounded", async () => {
+    // A position still open is bought at its amount over its units, 200 /
+    // 1.1, kept exact by the adapter (ADR 0020 §5); a later sale takes it.
+    const fileId = "0123456789abcdef" as FileId;
+    const account = "etoro:1" as AccountScope;
+    const security = { isin: "US0378331005", symbol: "AAPL" };
+    const buy: TradeEvent = {
+      kind: "trade",
+      key: "1".repeat(32) as EventKey,
+      broker: "etoro",
+      account,
+      source: { fileId, row: 3, part: "accountActivity" },
+      at: { instant: "2024-01-08T15:00:00Z", brokerDate: "2024-01-08" },
+      side: "buy",
+      date: "2024-01-08",
+      security,
+      quantity: Decimal.parse("1.1"),
+      price: {
+        amount: Decimal.parse("200").dividedBy(Decimal.parse("1.1")),
+        currency: "USD",
+      },
+    };
+    const sale: TradeEvent = {
+      ...buy,
+      key: "2".repeat(32) as EventKey,
+      source: { fileId, row: 2, part: "closedPositions" },
+      at: { instant: "2024-02-20T15:00:00Z", brokerDate: "2024-02-20" },
+      side: "sell",
+      date: "2024-02-20",
+      price: { amount: Decimal.parse("190"), currency: "USD" },
+    };
+    const read: ReadExports = {
+      imports: [
+        {
+          file: "etoro.xlsx",
+          fileId,
+          result: {
+            broker: "etoro",
+            format: "etoro-xlsx-2025.2.15",
+            events: [buy, sale],
+            diagnostics: [],
+            reach: [{ account, lastDate: "2024-02-20" }],
+            wholeHistory: true,
+          },
+        },
+      ],
+      repeats: [],
+      clashes: [],
+      notRead: [],
+      ledger: validateLedger([buy, sale]),
+    };
+    const prepared = buildReturns(read, {
+      taxYear: 2024,
+      taxpayer: { taxNumber: "12345678" },
+      rates: await loadRates(),
+      payers: new Map(),
+    });
+    const index = fileIndex(read, ["etoro.xlsx"]);
+    const files = summarize(read, index, prepared.scope.view);
+    expect(files.map((f) => [f.status, f.broker, f.unnamedAccount])).toEqual([
+      ["read", "etoro", true],
+    ]);
+    const preview = toPreview(prepared, 2024, new Map(), index, files);
+    const purchase = preview.securities[0]?.rows.find(
+      (row) => row.kind === "purchase",
+    );
+    expect(purchase?.price).toEqual({
+      amount: "181.81818182",
+      currency: "USD",
+    });
+    expect(purchase?.broker).toBe("etoro");
   });
 });

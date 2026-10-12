@@ -201,6 +201,30 @@ export function readExports(input: ReadInput): ReadExports {
     events += result.events.length;
     imports.push({ file, fileId, result });
   }
+  // A statement that is its account's whole history (eToro's) has no
+  // second: two of one account cover the same past and can only disagree
+  // (ADR 0020 §3). Taken by file ID, so the order the files came in
+  // names the same two.
+  const wholeHistories = new Map<string, FileId>();
+  for (const { fileId, result } of [...imports].sort((a, b) =>
+    compareText(a.fileId, b.fileId),
+  )) {
+    if (result.wholeHistory !== true) continue;
+    for (const { account } of result.reach) {
+      const first = wholeHistories.get(account);
+      if (first === undefined) {
+        wholeHistories.set(account, fileId);
+      } else {
+        carried.push(
+          diagnostic("blocking", "secondStatement", {
+            broker: result.broker,
+            first: fileRef(first),
+            second: fileRef(fileId),
+          }),
+        );
+      }
+    }
+  }
   if (overBudget) {
     carried.push(
       diagnostic("blocking", "sessionTooLarge", {

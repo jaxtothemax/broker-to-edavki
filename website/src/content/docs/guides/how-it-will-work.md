@@ -40,6 +40,11 @@ that will be:
   trades with a foreign currency leg, will be read once a real export confirms how it writes
   them; until then such a row will stop both returns, with the reason.
 
+eToro is planned next. Its reader will take the account statement (XLSX), and it will be
+released only once a real, untouched statement has confirmed it (see the
+[roadmap](/roadmap/#planned)). An eToro statement will have to cover the account from the day
+it was opened, as the whole history is in that one file.
+
 Export your **whole history**, from the day you opened the account, not only the tax year.
 Each sale is matched against your earliest purchases of the same security first ("first in,
 first out", or FIFO), and those purchases may be years old. If TaxReporter cannot find the
@@ -65,6 +70,9 @@ them in the file. They stay on your device as well.
 Trading 212 exports do not say which account they come from. If you add more than one,
 TaxReporter will ask whether they are from one account (it assumes so until you say otherwise),
 so that overlapping exports of one account are read once and separate accounts are all counted.
+eToro statements, once supported, will get the same question; as each covers its account from
+the day it was opened, a second statement of the same account will be refused, and you will be
+asked to keep the latest.
 Every Trade Republic export will be taken for your one Trade Republic account, so add only
 your own: one person's files per session. A child's (Junior) account is the child's own, so
 its export will be refused.

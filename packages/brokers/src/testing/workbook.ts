@@ -129,3 +129,44 @@ export function makeWorkbook(
     })),
   );
 }
+
+/**
+ * A cell for `sheetRows`: text, a number as the text Excel stores for it
+ * (`{ n: "1.2200000000000001E-2" }`, never a float), or no cell.
+ */
+export type CellSpec = string | { readonly n: string } | null;
+
+/** A column's letters as Excel names it, from 1: A, B, …, Z, AA. */
+export function columnLetters(column: number): string {
+  let name = "";
+  for (let n = column; n > 0; n = Math.floor((n - 1) / 26)) {
+    name = String.fromCharCode(0x41 + ((n - 1) % 26)) + name;
+  }
+  return name;
+}
+
+/**
+ * Rows as `<sheetData>` holds them, from row `first`: text as an inline
+ * string (as Apache POI's streaming writer writes every string), a number
+ * as its stored text, and each cell with its reference, so a gap keeps
+ * the cells after it in their columns.
+ */
+export function sheetRows(
+  rows: readonly (readonly CellSpec[])[],
+  first = 1,
+): string {
+  return rows
+    .map((cells, i) => {
+      const row = first + i;
+      const xmlCells = cells.map((cell, j) => {
+        const ref = `${columnLetters(j + 1)}${String(row)}`;
+        if (cell === null) return "";
+        if (typeof cell !== "string")
+          return `<c r="${ref}"><v>${cell.n}</v></c>`;
+        const edge = cell !== cell.trim() ? ' xml:space="preserve"' : "";
+        return `<c r="${ref}" t="inlineStr"><is><t${edge}>${xml(cell)}</t></is></c>`;
+      });
+      return `<row r="${String(row)}">${xmlCells.join("")}</row>`;
+    })
+    .join("");
+}

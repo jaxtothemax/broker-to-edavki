@@ -94,7 +94,7 @@ describe("isReply", () => {
       { ...read, id: -1 },
       { ...read, id: 1.5 },
       { ...read, kind: "write" },
-      { ...read, files: [{ ...read.files[0], broker: "etoro" }] },
+      { ...read, files: [{ ...read.files[0], broker: "xtb" }] },
       { ...read, files: [{ ...read.files[0], status: "maybe" }] },
       { ...read, payers: [{ isin: "X" }] },
       { ...read, symbols: { X: 1 } },
@@ -120,6 +120,24 @@ describe("isFinding", () => {
         params: { reason: "xlsxFormula", row: 12, sheet: 2, column: 3 },
       }),
     ).toBe(true);
+  });
+
+  it("takes an eToro finding at a sheet named by its part", () => {
+    // The adapter's parts are letters only, as the reply allows.
+    for (const part of ["closedPositions", "accountActivity", "dividends"]) {
+      expect(
+        isFinding({
+          severity: "blocking",
+          code: "secondStatement",
+          params: { broker: "etoro", first: { file: 0 }, second: { file: 1 } },
+          source: { file: 0, row: 2, part },
+        }),
+        part,
+      ).toBe(true);
+    }
+    expect(
+      isFinding({ ...finding, source: { file: 0, row: 2, part: "sheet2" } }),
+    ).toBe(false);
   });
 
   it("drops an unknown code, severity or parameter shape", () => {
@@ -204,7 +222,7 @@ describe("isReply on the review", () => {
         ...preview,
         securities: [{ ...security, rows: [{ ...row, kind: "gift" }] }],
       },
-      { ...preview, securities: [{ ...security, brokers: ["etoro"] }] },
+      { ...preview, securities: [{ ...security, brokers: ["xtb"] }] },
       // Keys that are no ISINs, a bucket that is no bucket.
       { ...preview, symbols: { constructor: "X" } },
       { ...preview, securities: [{ ...security, isin: "AAPL" }] },

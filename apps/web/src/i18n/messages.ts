@@ -32,6 +32,7 @@ export interface Messages {
     readonly trading212: string;
     readonly ibkr: string;
     readonly traderepublic: string;
+    readonly etoro: string;
   };
   readonly start: {
     readonly eyebrow: string;
@@ -85,8 +86,9 @@ export interface Messages {
     readonly stillReading: string;
     readonly problemsTitle: string;
     readonly problemsBody: string;
-    readonly accountsTitle: string;
-    readonly accountsBody: string;
+    /** The brokers asked about, as a list: "Trading 212 and eToro". */
+    readonly accountsTitle: (brokers: string) => string;
+    readonly accountsBody: (brokers: string) => string;
     readonly accountsSame: string;
     readonly accountsSeparate: string;
     readonly announceReading: string;
@@ -463,6 +465,7 @@ export const en: Messages = {
     trading212: "Trading 212",
     ibkr: "Interactive Brokers",
     traderepublic: "Trade Republic",
+    etoro: "eToro",
   },
   start: {
     eyebrow: "Preview with demo data",
@@ -528,7 +531,7 @@ export const en: Messages = {
     taxYear: (year) => `Tax year ${year}`,
     dropTitle: "Drop files here",
     dropBody:
-      "CSV from Trading 212 or Trade Republic, XML from an Interactive Brokers Flex Query",
+      "CSV from Trading 212 or Trade Republic, XML from an Interactive Brokers Flex Query, the XLSX account statement from eToro",
     chooseButton: "Choose files",
     demoButton: "Use demo files",
     listTitle: "Added files",
@@ -547,15 +550,15 @@ export const en: Messages = {
     problemsTitle: "Problems in your files",
     problemsBody:
       "Until these are fixed, the returns are not written. You can still continue and look at the results.",
-    accountsTitle: "Are these Trading 212 files from one account?",
-    accountsBody:
-      "Trading 212 exports do not say which account they come from. Overlapping files of one account are read once; files of separate accounts are all counted.",
+    accountsTitle: (brokers) => `Are these ${brokers} files from one account?`,
+    accountsBody: (brokers) =>
+      `${brokers} exports do not say which account they come from. Say whether these files come from one account or from several, so that nothing is counted twice or left out.`,
     accountsSame: "Yes, one account",
     accountsSeparate: "No, separate accounts",
     announceReading: "Reading your files.",
     announceRead: "Your files are read.",
     announceFailed: "Your files could not be read.",
-    unsupported: "Not a CSV or XML export. Remove it to continue.",
+    unsupported: "Not a CSV, XML or XLSX export. Remove it to continue.",
     tooLarge: (limit) =>
       `Larger than any broker export (over ${limit}), so it is not read. Remove it to continue.`,
     tooMuch: (limit) =>
@@ -574,8 +577,8 @@ export const en: Messages = {
     },
     announceDemo: "The two demo exports were added.",
     announceUnsupported: {
-      one: "{n} of them is not a CSV or XML export.",
-      other: "{n} of them are not CSV or XML exports.",
+      one: "{n} of them is not a CSV, XML or XLSX export.",
+      other: "{n} of them are not CSV, XML or XLSX exports.",
     },
     rows: { one: "{n} row", other: "{n} rows" },
     coverage: (broker, from, to, rows) =>
@@ -1011,6 +1014,7 @@ export const sl: Messages = {
     trading212: "Trading 212",
     ibkr: "Interactive Brokers",
     traderepublic: "Trade Republic",
+    etoro: "eToro",
   },
   start: {
     eyebrow: "Predogled z demo podatki",
@@ -1076,7 +1080,7 @@ export const sl: Messages = {
     taxYear: (year) => `Davčno leto ${year}`,
     dropTitle: "Spustite datoteke sem",
     dropBody:
-      "CSV iz Trading 212 ali Trade Republic, XML iz poročila Flex Query pri Interactive Brokers",
+      "CSV iz Trading 212 ali Trade Republic, XML iz poročila Flex Query pri Interactive Brokers, izpisek računa eToro v obliki XLSX",
     chooseButton: "Izberi datoteke",
     demoButton: "Uporabi demo datoteke",
     listTitle: "Dodane datoteke",
@@ -1095,15 +1099,17 @@ export const sl: Messages = {
     problemsTitle: "Težave v vaših datotekah",
     problemsBody:
       "Dokler niso odpravljene, napovedi niso zapisane. Rezultate si lahko vseeno ogledate.",
-    accountsTitle: "Ali so te datoteke Trading 212 iz enega računa?",
-    accountsBody:
-      "Izvozi Trading 212 ne navajajo, iz katerega računa so. Datoteke istega računa, ki se prekrivajo, so prebrane enkrat; datoteke ločenih računov se upoštevajo vse.",
+    accountsTitle: (brokers) =>
+      `Ali so te datoteke ${brokers} iz enega računa?`,
+    accountsBody: (brokers) =>
+      `Izvozi ${brokers} ne navajajo, iz katerega računa so. Povejte, ali so te datoteke iz enega računa ali iz več, da nič ni upoštevano dvakrat ali izpuščeno.`,
     accountsSame: "Da, en račun",
     accountsSeparate: "Ne, ločeni računi",
     announceReading: "Branje datotek.",
     announceRead: "Datoteke so prebrane.",
     announceFailed: "Datotek ni bilo mogoče prebrati.",
-    unsupported: "To ni izvoz CSV ali XML. Za nadaljevanje ga odstranite.",
+    unsupported:
+      "To ni izvoz CSV, XML ali XLSX. Za nadaljevanje ga odstranite.",
     tooLarge: (limit) =>
       `Večja je od katerega koli izvoza posrednika (več kot ${limit}), zato ni prebrana. Za nadaljevanje jo odstranite.`,
     tooMuch: (limit) =>
@@ -1133,10 +1139,10 @@ export const sl: Messages = {
     },
     announceDemo: "Dodana sta oba demo izvoza.",
     announceUnsupported: {
-      one: "{n} izmed njih ni izvoz CSV ali XML.",
-      two: "{n} izmed njih nista izvoza CSV ali XML.",
-      few: "{n} izmed njih niso izvozi CSV ali XML.",
-      other: "{n} izmed njih ni izvozov CSV ali XML.",
+      one: "{n} izmed njih ni izvoz CSV, XML ali XLSX.",
+      two: "{n} izmed njih nista izvoza CSV, XML ali XLSX.",
+      few: "{n} izmed njih niso izvozi CSV, XML ali XLSX.",
+      other: "{n} izmed njih ni izvozov CSV, XML ali XLSX.",
     },
     rows: {
       one: "{n} vrstica",

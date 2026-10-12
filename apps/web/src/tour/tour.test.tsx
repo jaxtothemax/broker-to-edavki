@@ -549,7 +549,7 @@ describe("what the tour must never say or do", () => {
           .filter(([id]) => !covered.has(id))
           .map(([, name]) => name),
         "Schwab",
-        "eToro",
+        "XTB",
         "Revolut",
       ];
       expect(others.length).toBeGreaterThan(3);

@@ -17,7 +17,7 @@ import type { ReactNode } from "react";
 import { demoPreview } from "../demo/demoPreview";
 import { formatDate, formatMoney, formatNumber } from "../i18n/format";
 import { useI18n } from "../i18n/i18n";
-import { BROKERS, HOLDING_BUCKETS } from "../model/preview";
+import { HOLDING_BUCKETS, V01_BROKERS } from "../model/preview";
 import { bucketLabel, RateChip } from "../ui/bits";
 import { StackBar } from "../ui/charts";
 import {
@@ -229,7 +229,7 @@ export function StartScreen({
             <h2>{t.start.brokersTitle}</h2>
             <h3>{t.start.brokersNowLabel}</h3>
             <ul className="broker-list" role="list">
-              {BROKERS.map((broker) => (
+              {V01_BROKERS.map((broker) => (
                 <li key={broker}>
                   <Ticker symbol={initials(t.brokers[broker])} />
                   {t.brokers[broker]}

@@ -73,7 +73,21 @@ export type NumberColumn =
   | "shares"
   | "price"
   | "fee"
-  | "tax";
+  | "tax"
+  // eToro's account statement, by its own headers (research 07 §4.1).
+  | "Position ID"
+  | "Amount"
+  | "Units / Contracts"
+  | "Leverage"
+  | "Open Rate"
+  | "Close Rate"
+  | "Profit(USD)"
+  | "Realized Equity"
+  | "Realized Equity Change"
+  | "Net Dividend Received (USD)"
+  | "Net dividends"
+  | "Withholding Tax Rate (%)"
+  | "Withholding Tax Amount (USD)";
 
 /** Why a CSV export could not be read (packages/brokers/src/csv.ts). */
 export type CsvReason =
@@ -322,6 +336,15 @@ export interface DiagnosticParams {
     readonly year: string;
     readonly shares: RefusedShares;
   };
+  /**
+   * A purchase whose security the file does not name (`isinUnresolved`)
+   * that holds back neither return of `year`, shown in place of its
+   * refusal (ADR 0017 §3). It names no security, and no text from a file.
+   */
+  unresolvedElsewhere: Pick<Where, "date"> & {
+    readonly broker: string;
+    readonly year: string;
+  };
   lossDisallowed: Where;
   lossPartlyDisallowed: Where & { readonly replaced: string };
   washSaleWindowOpen: Where & { readonly until: IsoDate };
@@ -429,7 +452,19 @@ export interface DiagnosticParams {
   withholdingAmbiguous: MaybeWhere;
   dividendReversalUnmatched: MaybeWhere;
   tradeInconsistent: MaybeWhere & {
-    readonly check: "sign" | "multiplier" | "amount" | "cusip";
+    readonly check:
+      | "sign"
+      | "multiplier"
+      | "amount"
+      | "cusip"
+      /** eToro: the units at the close rate are not the amount plus the profit. */
+      | "closeAmount"
+      /** eToro: its open or close time is not that of its activity row. */
+      | "dates"
+      /** eToro: its units differ between the rows that record it. */
+      | "units"
+      /** eToro: its rows in Account Activity are missing or repeated. */
+      | "activity";
   };
   fundFromName: Isin;
   /**
@@ -439,6 +474,86 @@ export interface DiagnosticParams {
   dividendLabelTreated: {
     readonly broker: string;
     readonly label: "bonus" | "demerger";
+  };
+  // XLSX workbooks (ADR 0014 §6): `sheet` is its position, from 1, never
+  // its name, which is file text.
+  /** A sheet the adapter's revision does not know: the file is not read. */
+  unknownSheet: { readonly sheet: number };
+  /** A sheet the adapter reads is hidden in Excel: the file is not read. */
+  hiddenSheet: { readonly sheet: number };
+  /** Rows or columns hidden in a sheet the adapter reads: read all the same. */
+  hiddenCells: { readonly sheet: number };
+  // eToro account statements (brokers, ADR 0020)
+  /** A column the statement must have; `column` from the adapter's list. */
+  columnMissing: { readonly broker: string; readonly column: string };
+  /** Values written in a way that makes every number in the file doubtful. */
+  statementFormat: {
+    readonly broker: string;
+    readonly format:
+      "regionalDate" | "regionalNumber" | "serialDate" | "bracketNegative";
+  };
+  /**
+   * The statement does not hold the account's whole history, which FIFO
+   * needs: it starts with money in the account, its activity runs out of
+   * order, or a position has no single opening row.
+   */
+  historyIncomplete: {
+    readonly broker: string;
+    readonly gap: "start" | "order" | "openRow";
+  };
+  /** A time so near midnight that the broker's unstated zone decides the day. */
+  dateUncertain: MaybeWhere & { readonly broker: string };
+  /** Dividends dated by the payment date where the time could say otherwise. */
+  dividendDatesUncertain: { readonly broker: string; readonly count: number };
+  /** Positions still open, taken as purchases with no leverage, long. */
+  openPositionsAssumed: { readonly broker: string; readonly count: number };
+  /**
+   * A position still open whose ISIN the file does not settle, so no ISIN
+   * can be stated. With `side`, a date and the cause `missing`, it holds
+   * back only the Doh-KDVP of the years it can change (ADR 0017 §3); without
+   * any of them, and for an `ambiguous` cause whatever else it states, both
+   * returns of every year. `side: "buy"` is an adapter's claim that the row
+   * is a long purchase made at a certain `date`, which is the trade's, never
+   * a booking's.
+   */
+  isinUnresolved: Pick<MaybeWhere, "date"> & {
+    readonly broker: string;
+    readonly cause: "missing" | "ambiguous";
+    readonly side?: "buy";
+  };
+  dividendInconsistent: MaybeWhere & {
+    readonly broker: string;
+    readonly mismatch:
+      /** The tax withheld is not the stated rate of the gross. */
+      | "rate"
+      /** Not exactly one activity row pays it. */
+      | "pairing"
+      /** Its payment date is not the day of its activity row. */
+      | "date"
+      /** An activity row's dividend is in no row of the dividends sheet. */
+      | "unpaired"
+      /** The amount in its own currency is not the amount in dollars. */
+      | "netAmount"
+      /**
+       * Its type (a share's or a contract's) is not the class its position
+       * was read as: which return it belongs on would be a guess.
+       */
+      | "class"
+      /**
+       * Its ISIN is not the one on the row that closed its position: filed
+       * under either, the payer and country could be the wrong ones.
+       */
+      | "isin";
+  };
+  // The pipeline
+  /**
+   * Two statements of one account from a broker whose every statement is
+   * the account's whole history (eToro): one is enough, and two disagree.
+   */
+  secondStatement: {
+    readonly broker: string;
+    readonly first: FileRef;
+    readonly second: FileRef;
   };
 }
 

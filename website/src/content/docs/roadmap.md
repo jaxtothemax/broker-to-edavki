@@ -49,8 +49,9 @@ These come after v0.1. None of them has a version or a date yet, and the order m
 based on feedback.
 
 - **More brokers,** in order of how many Slovenian investors use them: eToro, XTB, DEGIRO,
-  Revolut, Lightyear, Saxo and Robinhood. Robinhood first needs research into how its EU stock
-  tokens are taxed.
+  Revolut, Lightyear, Saxo and Robinhood. A reader for eToro's account statement is in the
+  source; it will be released only once a real, untouched statement has confirmed it.
+  Robinhood first needs research into how its EU stock tokens are taxed.
 - **Equity-plan platforms** for shares from an employer's plan (RSUs and ESPP).
 - **Doh-Obr:** interest, for example interest a broker pays on uninvested cash.
 - **D-IFI:** derivatives such as options, futures and CFDs.

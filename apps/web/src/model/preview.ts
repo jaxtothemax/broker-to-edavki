@@ -19,7 +19,24 @@ export function formFileName(form: "kdvp" | "div", taxYear: number): string {
 }
 
 /** Brokers the dashboard can show, in display order. */
-export const BROKERS = ["trading212", "ibkr", "traderepublic"] as const;
+export const BROKERS = [
+  "trading212",
+  "ibkr",
+  "traderepublic",
+  "etoro",
+] as const;
+
+/**
+ * The brokers v0.1 is built to read, as the roadmap lists them. eToro's
+ * reader is in the app but unverified, and waits for a real statement
+ * before a release names it (ADR 0020): the start screen shows it as
+ * planned, never as being built for v0.1.
+ */
+export const V01_BROKERS = [
+  "trading212",
+  "ibkr",
+  "traderepublic",
+] as const satisfies readonly (typeof BROKERS)[number][];
 export type BrokerId = (typeof BROKERS)[number];
 
 /** ISO 8601 calendar date, e.g. "2026-03-12". */

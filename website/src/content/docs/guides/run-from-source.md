@@ -16,6 +16,20 @@ file.
 - **Interactive Brokers (IBKR):** an Activity Flex Query in XML (see below for its sections).
 - **Trade Republic:** the transaction export (CSV), with all transactions. Its dividends are
   not read yet: a file with one stops both returns and says why.
+- **eToro, not yet checked against a real export:** the account statement (XLSX), from the
+  day you opened the account to today, exported from eToro and not opened or saved in a
+  spreadsheet program. TaxReporter reads US-dollar shares and ETFs held long, closed or still
+  open, and their dividends. It leaves out CFDs with a note, sets crypto aside, and counts a
+  CFD's dividend adjustments with interest, which belongs on another return. A statement that
+  starts later, a short or leveraged position, a position still open that paid an overnight
+  fee or whose ticker the file gives two ISINs, a position closed in part, a share in another
+  currency, an activity type TaxReporter does not know, or a trade too close to midnight to
+  date stops both returns, and the finding says why. A position still open whose ISIN no row
+  of the file gives is refused too, but it holds back only the Doh-KDVP of a year with a sale
+  of any security from 30 days before its purchase on, never the Doh-Div. The reader was written from other
+  tools' code and one published sample, never from a real statement, so check its figures
+  against eToro's with extra care
+  ([#8](https://github.com/jaxtothemax/broker-to-edavki/issues/8)).
 
 Export your **whole history**, from the day you opened the account: each sale is matched
 against your earliest purchases of the same security first.
@@ -67,7 +81,7 @@ and storage functions are removed and which may load only the app's own files. N
 ## On the command line
 
 ```bash
-node apps/cli/dist/bin.js my-exports/*.csv my-exports/*.xml \
+node apps/cli/dist/bin.js my-exports/*.csv my-exports/*.xml my-exports/*.xlsx \
   --year 2026 --tax-number 12345678 --out returns/ --payers payers.json
 ```
 

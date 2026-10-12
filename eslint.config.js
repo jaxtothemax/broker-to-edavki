@@ -33,4 +33,32 @@ export default defineConfig(
       },
     },
   },
+  {
+    // The packages' `./testing` exports (a workbook writer, the XSD check)
+    // resolve under the `source` condition, which the web build also sets:
+    // imported from application code they would ship in the bundle. Tests
+    // and the test helpers themselves may use them.
+    files: ["packages/*/src/**/*.{ts,tsx}", "apps/*/src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/testing/**", "packages/*/test/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@taxreporter/*/testing",
+                "@taxreporter/*/testing/*",
+                "./testing/*",
+                "../testing/*",
+                "../../testing/*",
+              ],
+              message:
+                "Test helpers only: import them from a *.test.ts file, never from application code.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

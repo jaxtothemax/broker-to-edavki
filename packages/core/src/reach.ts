@@ -5,7 +5,9 @@
  * adapter states the security, the date and what the row does to the
  * holding is scoped to the returns it can reach: a takeover paid in shares
  * booked in 2025 changes no figure of a 2026 return in which neither
- * security is sold, and must not withhold it.
+ * security is sold, and must not withhold it. A purchase whose security the
+ * file does not name is scoped without a security: it holds back only the
+ * Doh-KDVP of years with a sale of any security from 30 days before it on.
  */
 import { compareText } from "./compare.js";
 import { isIsoDate, type IsoDate } from "./dates.js";
@@ -88,6 +90,32 @@ function scopedOf(finding: Diagnostic): Scoped | null {
   return { isin, date, shares };
 }
 
+/**
+ * A purchase whose security the file does not name: `isinUnresolved` with
+ * `side: "buy"`, a real date and the cause `missing`. Anything else is null
+ * and withholds everything, as before (ADR 0017 §3, the bullet on a purchase
+ * the file does not name). An `ambiguous` cause is not scoped: the rows name
+ * two securities for it, which contradict each other, and one of them may be
+ * a dividend's.
+ */
+function unresolvedBuyOf(
+  finding: Diagnostic,
+): { readonly broker: string; readonly date: IsoDate } | null {
+  if (finding.severity !== "blocking" || finding.code !== "isinUnresolved") {
+    return null;
+  }
+  const { broker, cause, date, side } = finding.params;
+  if (
+    side !== "buy" ||
+    cause !== "missing" ||
+    date === undefined ||
+    !isIsoDate(date)
+  ) {
+    return null;
+  }
+  return { broker, date };
+}
+
 /** One row's refusal, the same in the ledger and in its file's findings. */
 function rowOf(finding: Diagnostic): string | null {
   const { source } = finding;
@@ -160,7 +188,45 @@ export function scopeLedger(
   const div: Diagnostic[] = [];
   const findings: Diagnostic[] = [];
   const replaced = new Map<string, Diagnostic>();
+  /** Shows `note` in place of `finding`, in the review and in its file. */
+  const replaceWith = (finding: Diagnostic, note: Diagnostic) => {
+    findings.push(note);
+    const row = rowOf(finding);
+    if (row !== null) replaced.set(row, note);
+  };
   for (const finding of ledger.diagnostics) {
+    const bought = unresolvedBuyOf(finding);
+    if (bought !== null) {
+      // The lot is missing from the ledger and its security is unknown, so
+      // no key is safe: another broker's rows may lack a ticker or write it
+      // differently, and a missed match would release a return the lot can
+      // change. Any later sale, of any security, can take it under FIFO
+      // however long after the purchase (research 04 §4.4); and a loss sale
+      // reads a purchase 30 days either side (ZDoh-2 art. 97(5), 04 §5.3),
+      // so a sale from 30 days before the purchase on is reached. An earlier
+      // sale can neither take the lot nor be replaced by it. The date is the
+      // trade's, not a booking's, so no BOOKING_LAG_DAYS. Doh-Div reads no
+      // lots, and a purchase is no income: it is never withheld here.
+      if (anySaleBetween(addDays(bought.date, -WASH_SALE_DAYS), yearEnd)) {
+        kdvp.push(finding);
+        findings.push(finding);
+      } else {
+        replaceWith(
+          finding,
+          diagnostic(
+            "info",
+            "unresolvedElsewhere",
+            {
+              broker: bought.broker,
+              date: bought.date,
+              year: String(taxYear),
+            },
+            finding.source,
+          ),
+        );
+      }
+      continue;
+    }
     const scoped = scopedOf(finding);
     if (scoped === null) {
       if (finding.severity === "blocking") {
@@ -209,15 +275,15 @@ export function scopeLedger(
       findings.push(finding);
       continue;
     }
-    const note = diagnostic(
-      "info",
-      "refusedElsewhere",
-      { isin, date, year: String(taxYear), shares },
-      finding.source,
+    replaceWith(
+      finding,
+      diagnostic(
+        "info",
+        "refusedElsewhere",
+        { isin, date, year: String(taxYear), shares },
+        finding.source,
+      ),
     );
-    findings.push(note);
-    const row = rowOf(finding);
-    if (row !== null) replaced.set(row, note);
   }
   const view = (list: readonly Diagnostic[]) =>
     list.map((finding) => {

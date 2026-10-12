@@ -119,6 +119,79 @@ describe("the findings catalog", () => {
     expect(findingsSl.formIssue(typed)).toContain("v koraku s podatki");
   });
 
+  it("words each value of an eToro finding's closed list as its own clause", () => {
+    const broker = "eToro";
+    const says = (
+      code: "statementFormat" | "historyIncomplete" | "dividendInconsistent",
+      name: string,
+      values: readonly string[],
+    ) => {
+      for (const catalog of [findingsEn, findingsSl]) {
+        const message = catalog[code] as (p: Record<string, string>) => string;
+        const texts = values.map((value) => message({ broker, [name]: value }));
+        // Each value its own clause, none of them the fallback's.
+        const fallback = message({ broker, [name]: "‹other›" });
+        expect(new Set([...texts, fallback]).size, code).toBe(
+          values.length + 1,
+        );
+      }
+    };
+    says("statementFormat", "format", [
+      "regionalDate",
+      "regionalNumber",
+      "serialDate",
+      "bracketNegative",
+    ]);
+    says("historyIncomplete", "gap", ["start", "order", "openRow"]);
+    says("dividendInconsistent", "mismatch", [
+      "rate",
+      "pairing",
+      "date",
+      "unpaired",
+      "netAmount",
+      "class",
+      "isin",
+    ]);
+    expect(findingsEn.historyIncomplete({ broker, gap: "start" })).toMatch(
+      /^eToro: the statement does not start when the account was opened/,
+    );
+    expect(findingsSl.isinUnresolved({ broker, cause: "missing" })).toMatch(
+      /^Še odprta pozicija v izpisku eToro nima kode ISIN/,
+    );
+  });
+
+  it("words an unnamed purchase by whether core can scope it, and its note", () => {
+    const broker = "eToro";
+    const date = "2024-02-20";
+    for (const catalog of [findingsEn, findingsSl]) {
+      const bare = catalog.isinUnresolved({ broker, cause: "missing", date });
+      const scoped = catalog.isinUnresolved({
+        broker,
+        cause: "missing",
+        date,
+        side: "buy",
+      });
+      // Scoped, it says which return waits and which does not.
+      expect(scoped).not.toBe(bare);
+      expect(scoped).toContain("Doh-KDVP");
+      expect(bare).not.toContain("Doh-KDVP");
+      // Two securities for one ticker is never scoped, so it says no such thing.
+      const ambiguous = catalog.isinUnresolved({
+        broker,
+        cause: "ambiguous",
+        date,
+      });
+      expect(ambiguous).not.toContain("Doh-KDVP");
+    }
+    const note = { broker, date, year: "2026" };
+    expect(findingsEn.unresolvedElsewhere(note)).toMatch(
+      /^2024-02-20: a position still open in the eToro statement has no ISIN, but it changes nothing on the 2026 returns/,
+    );
+    expect(findingsSl.unresolvedElsewhere(note)).toMatch(
+      /^2024-02-20: še odprta pozicija v izpisku eToro nima kode ISIN, vendar ne spremeni ničesar v napovedih za leto 2026/,
+    );
+  });
+
   it("has the same closed lists in both languages", () => {
     for (const list of [
       "kinds",

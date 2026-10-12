@@ -89,12 +89,19 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
 
 **Export path.** Portfolio → History (clock icon) → settings cog → *Account statement* → choose start/end date → XLS icon [H, `masbug` README]. In 2021 eToro moved it under Settings → Account → "View" next to Account Statement, with presets such as "Last Year" [M].
 
-**Workbook.** Formats are PDF and XLS(X). The XLSX has five sheets: `Account Summary`, `Closed Positions`, `Account Activity` (formerly "Transactions Report"), `Dividends` and `Financial Summary` [M].
+> **Corrections (2026-10-11, #8).** An evidence review for the eToro adapter (ADR 0020) checked
+> this section against `masbug/etoro-edavki` pinned at commit
+> `5f607d9e99334939875e5cf92f3a1d55b9b04a20` (MIT), seven other parsers and the one published
+> statement (below). It corrected: `Action` often has no verb; the withholding rate is also
+> written `10 %`; some statements lack the EUR columns; and each claim now carries its
+> evidence tag. The header tables below are quoted from that commit.
+
+**Workbook.** Formats are PDF and XLS(X). The XLSX has five sheets: `Account Summary`, `Closed Positions`, `Account Activity` (formerly "Transactions Report"), `Dividends` and `Financial Summary` [M]. The data sheets have their header on row 1; `Account Summary` has a preamble (name, username, currency and the statement's dates), with its table's header on row 10 [M]. `Account Summary` holds the holder's **Name and Username**, so a reader should never open it.
 
 - Sheet names and headers are translated with the UI language. The Spanish export uses `Posiciones cerradas`, `Actividad de la cuenta` and `Dividendos`, with headers such as `Acción`, `Ganancias (EUR)` and `Tipo de cambio de apertura (USD)` [M].
 - Use the **XLSX**; the PDF is for humans.
 
-**`Closed Positions` header history** (verbatim from `masbug/etoro-edavki`, versions dated by the maintainer) [H]:
+**`Closed Positions` header history** (verbatim from `masbug/etoro-edavki` at `5f607d9`, versions dated by the maintainer) [H for the header text; the maintainer's dates M]:
 
 | Version | Columns |
 |---|---|
@@ -123,12 +130,14 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
 
 **Values and enumerations:**
 
-- `Action` = `"Buy <instrument name>"` / `"Sell <instrument name>"`. The ticker comes from Account Activity `Details` = `"AAPL/USD"` (ticker/quote currency), joined on `Position ID`.
-- `Long / Short` ∈ {`Long`, `Short`}.
-- `Type` (closed positions) seen: `Stocks`, `ETF`, `Crypto`, `CFD`. The `masbug` derivative list also contains `OPT`, `FUT`, `FOP` and `Crypto Margin`. Commodity, currency and index rows are always CFDs.
-- Account Activity `Type` seen: `Open Position`, `Position closed`, `Dividend`, `Overnight fee`, `Overnight refund`, `Interest Payment`, `SDRT`, `Withdraw Request`, `Withdraw Fee`, `Withdrawal Conversion Fee` [M].
-- `"-"` marks N/A, including the FX columns for USD-quoted instruments.
-- Withholding rate is written like `15%`.
+- `Action` is often the instrument's name and ticker with no verb, `"Apple (AAPL)"` [M]; older sources show `"Buy <instrument name>"` / `"Sell <instrument name>"` [L]. Read the direction from `Long / Short`, never from `Action`. The ticker comes from Account Activity `Details` = `"AAPL/USD"` (ticker/quote currency), joined on `Position ID` [H, `masbug`].
+- `Long / Short` ∈ {`Long`, `Short`} [H].
+- `Type` (closed positions) seen: `Stocks`, `ETF`, `Crypto`, `CFD` [M]. The `masbug` derivative list also contains `OPT`, `FUT`, `FOP` and `Crypto Margin` [H for the list]. Commodity, currency and index rows are always CFDs [M].
+- Account Activity `Type` seen: `Open Position`, `Position closed`, `Dividend`, `Overnight fee`, `Overnight refund`, `Interest Payment`, `SDRT`, `Withdraw Request`, `Withdraw Fee`, `Withdrawal Conversion Fee` [M]; other parsers also name `Deposit`, `Adjustment`, `Commission`, `corp action: Split`, `Staking`, `AirDrop` and cancellations of withdrawals and fees [L].
+- `"-"` marks N/A, including the FX columns for USD-quoted instruments, `Copied From`, and a cash row's `Units` and `Position ID` [M].
+- The withholding rate is written `15%` or, in the published statement, `10 %` with a space [M].
+- **Cell kinds are mixed** [M, the published statement]: dates, `Position ID`, `Units / Contracts`, `Leverage` and the rate are text, while `Amount`, the rates and the profit are number cells; the same column can be text on one sheet and a number on another (a closing row's units, `1.6506190000000001`, against `1.650619` as text), so a reader takes both and rounds a number cell to 15 digits.
+- **Dates** are text `DD/MM/YYYY HH:MM:SS` (`DD/MM/YYYY` for a payment date); a Slovenian locale writes `DD.MM.YYYY` with decimal commas [M]; one source says Excel serials [L]. A Spanish fixture writes negatives in brackets [M, DeclaRenta], and `Account Summary` says "Values shown in brackets indicate negative amounts" [M].
 
 **CFD vs real.** A row is a derivative (→ D-IFI) when any of these holds:
 
@@ -143,11 +152,12 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
 - `Amount`, `Profit(USD)`, spread and fee columns are in USD (the account base).
 - `Open Rate` / `Close Rate` are in the **instrument's** currency. `FX rate at open/close (USD)` converts that currency to USD.
 - For EUR- or GBP-quoted instruments, convert the native price with the BSI rate for that currency. For EUR instruments no conversion is needed. Avoid `masbug`'s detour (native → USD via eToro's rate → EUR via BSI), which adds error.
-- Since Oct 2024 EU users can fund trades from a EUR balance [H, press release]. The 2025.11 `Net dividends` + `Currency` columns are the native-currency amounts.
+- Since Oct 2024 EU users can fund trades from a EUR balance [H, press release]. The 2025.11 `Net dividends` + `Currency` columns are the native-currency amounts [L].
+- Since 2026-02-17 `masbug` prices a trade as `Open Rate` × `FX rate at open (USD)` (`-` read as 1), then converts USD at the BSI rate; before that it derived prices from `Amount`, `Units` and `Profit` and called the rates "bogus" [H, `masbug` history]. How a GBX price is written is unknown [L].
 
 **Dividends.**
 
-- There is no gross column: gross = net + WHT.
+- There is no gross column: gross = net + WHT. `Net Dividend Received (USD)` is net of the tax withheld [M]: in the published statement, 0.11 net with 0.0122 withheld at "10 %" gives a gross of 0.1222.
 - Rows are per position, so aggregate them (but see the conflict noted in §3, rule 5).
 - ISIN is absent from statements exported between roughly Jan and Feb 2025.
 
@@ -157,7 +167,22 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
 - Partial closes and copy-trading positions (`Copied From`).
 - Crypto rows (exclude).
 - `Open Date` must come from full history.
-- The statement time zone is not documented [L].
+- The statement time zone is not documented. Timestamps of market opens (14:31 for New York, 07:01 for Paris) suggest UTC [L]. Account Activity books dividends around midnight (00:03 to 00:45 in the published statement), so a reader that guesses the zone can put a dividend on the wrong day [M].
+- Partial closes: how they are recorded is unknown [L].
+
+**The published statement.** `nra-assist.com` publishes an example
+(`https://nra-assist.com/help/brokers/etoro/etoro-example.xlsx`, SHA-256 `ed0c91a1…`), the
+only real-looking statement found [M]. It was **saved again by a third party** (it has table
+parts and an `absPath`, which eToro's exporter does not write) and is **not an untouched
+export**:
+
+- dated 2025-09-20, covering 2024, it lacks `Profit(EUR)` and the dividends' EUR columns;
+- its first Account Activity row already shows a realized equity of 4291.25, so it does not
+  start at the account's opening;
+- it pays dividends on positions with no `Open Position` row (an Exxon dividend among them);
+- it keeps the cell kinds, dates and dividend times described above.
+
+A reader cannot be verified on it; it can only show shapes.
 
 **Synthetic sample (`Closed Positions`, TSV view of the sheet):**
 
@@ -517,7 +542,7 @@ The researcher rated these critical claims below high confidence:
 - Trade Republic CSV dividend fields: `amount` is the gross in EUR and `original_amount` the gross in the paying currency (§4.2, settled from exports that look real). Still open: what `tax` holds for a Slovenian resident; verify against a Slovenian resident's TR dividend PDF before using for Doh-Div (#12).
 - What Asset class / Transaction Type labels do Bitpanda Real Securities (real shares) use in the CSV, and is an ISIN ever exported? No primary sample found.
 - Tax classification under Slovenian law of Bitpanda legacy "Stock (derivative)" contracts: D-IFI (derivative) versus Doh-KDVP. No FURS position found.
-- eToro statement time zone (GMT vs local), whether eToro records splits as explicit Account Activity rows, and how partial closes create new Position IDs.
+- eToro statement time zone (GMT vs local), whether eToro records splits as explicit Account Activity rows, and how partial closes create new Position IDs. Also: how a GBX or EUR instrument's rates and FX columns are written, whether `Profit(USD)` includes fees, whether Account Activity's `Asset type` uses `Type`'s words, which statements lack the EUR columns, and whether eToro ever writes dates as Excel serials. ADR 0020 refuses each until an untouched export answers it.
 - Whether Slovenian domestic custodians (NLB, Ilirika, Alta, InterCapital) act as withholding agents on FOREIGN-issuer dividends credited to client accounts, or whether clients must still file Doh-Div. Not documented in the sources found.
 - How eDavki merges a user-imported Doh-KDVP XML with the pre-filled data from domestic brokers (overwrite versus append), and how to avoid double-reporting when a user has both. ([01 §9](01-furs-doh-kdvp.md#9-importing-into-edavki): an imported PLVP or PLD list that already exists in the return is merged into it, PLVPGB is always added; the merge key is unknown.)
 - Effective date and transitional rules of the October 2025 ZDDOIFI amendment (flat 25% on derivatives), which affects eToro/XTB CFD D-IFI computations for tax year 2026. (Effective date answered in [04 §2.4](04-si-tax-rules.md#24-contrast-derivatives-under-zddoifi-filed-on-doh-ifi-not-doh-kdvp), verified: tax years from 1 Jan 2026 under ZDDOIFI-B art. 5. Leveraged trading uses 0.25% + 0.25% normed costs, and CFD financing income is interest on Doh-Obr. Transitional rules beyond that were not covered.)

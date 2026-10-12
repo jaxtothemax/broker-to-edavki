@@ -10,11 +10,13 @@ import { demoPreview } from "../demo/demoPreview";
 import { LIMITS } from "@taxreporter/core";
 
 import {
+  accountsAsked,
   asksAccounts,
   blockingReason,
   canEnter,
   initialWizardState,
   isPayerIncomplete,
+  isSupportedFile,
   isValidTaxNumber,
   labelsOf,
   normalizeTaxNumber,
@@ -244,8 +246,17 @@ describe("own files", () => {
     ).toBeNull();
   });
 
-  it("asks about accounts only with two Trading 212 files", () => {
+  it("asks about accounts only with two files of one unnamed broker", () => {
     expect(asksAccounts(readOwn([summary()]))).toBe(false);
+    // One Trading 212 file and one eToro statement: two accounts already.
+    const mixed = readOwn([summary(), summary({ broker: "etoro" })]);
+    expect(asksAccounts(mixed)).toBe(false);
+    const etoro = readOwn([
+      summary(),
+      summary({ broker: "etoro" }),
+      summary({ broker: "etoro" }),
+    ]);
+    expect(accountsAsked(etoro)).toEqual(["etoro"]);
     expect(
       asksAccounts(readOwn([summary(), summary({ unnamedAccount: false })])),
     ).toBe(false);
@@ -573,12 +584,21 @@ describe("own files", () => {
     expect(back.preparing).toEqual({ status: "idle" });
   });
 
+  it("takes CSV, XML and XLSX files by name, in any case, and nothing else", () => {
+    for (const name of ["a.csv", "b.XML", "statement.xlsx", "c.XLSX"]) {
+      expect(isSupportedFile(name), name).toBe(true);
+    }
+    for (const name of ["d.pdf", "e.xls", "f.xlsx.pdf", "g.zip", "xlsx"]) {
+      expect(isSupportedFile(name), name).toBe(false);
+    }
+  });
+
   it("blocks the files step while an unsupported file is listed", () => {
     const state = run(
       { type: "startOwn" },
       {
         type: "addFiles",
-        files: [file("file-1", "a.csv", 1), file("file-2", "b.xlsx", 1)],
+        files: [file("file-1", "a.csv", 1), file("file-2", "b.pdf", 1)],
       },
     );
     expect(state.files.map((f) => f.kind === "own" && f.refusal)).toEqual([

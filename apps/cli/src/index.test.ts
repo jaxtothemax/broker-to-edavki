@@ -13,6 +13,16 @@ import { crc32 } from "node:zlib";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  APPLE,
+  closing,
+  EXXON,
+  n,
+  opened,
+  position,
+  ROUND_TRIP,
+  statement,
+} from "@taxreporter/brokers/testing";
 import { accountScope, LIMITS } from "@taxreporter/core";
 import { writeDohDiv, writeDohKdvp } from "@taxreporter/furs";
 import { RateTable } from "@taxreporter/fx";
@@ -330,6 +340,208 @@ describe("taxreporter", () => {
       expect(lot.account).toBe("trading212-1");
       expect(lot.costEur).toMatch(/^\d+\.\d{2}$/);
     }
+  });
+
+  it("writes both returns from an eToro statement, its open lot in its JSON", () => {
+    const dir = scratch();
+    const file = join(dir, "etoro.xlsx");
+    writeFileSync(file, statement());
+    const payers = join(dir, "payers.json");
+    writeFileSync(
+      payers,
+      JSON.stringify({
+        [APPLE]: {
+          name: "Apple Inc.",
+          address: "One Apple Park Way, Cupertino, CA 95014, United States",
+          country: "US",
+        },
+      }),
+    );
+    const result = run([
+      file,
+      "--year",
+      "2024",
+      "--tax-number",
+      "12345678",
+      "--out",
+      join(dir, "out"),
+      "--payers",
+      payers,
+      "--json",
+    ]);
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
+    const report = JSON.parse(result.stdout) as {
+      files: { format: string }[];
+      written: string[];
+      holdings: {
+        accounts: { account: string }[];
+        securities: {
+          lots: { purchaseDate: string; price: { amount: string } }[];
+        }[];
+      };
+    };
+    expect(report.files.map((f) => f.format)).toEqual(["etoro-xlsx-2025.2.15"]);
+    expect(report.written).toHaveLength(2);
+    expect(report.holdings.accounts.map((a) => a.account)).toEqual(["etoro-1"]);
+    // Bought at 200 / 1.1, kept exact until printed (ADR 0020 §5).
+    const lot = report.holdings.securities
+      .flatMap((s) => s.lots)
+      .find((l) => l.purchaseDate === "2024-01-08");
+    expect(lot?.price.amount).toBe("181.81818182");
+  });
+
+  it("holds back only the Doh-KDVP a position the eToro statement does not name can change (ADR 0017 §3)", () => {
+    const dir = scratch();
+    // MSFT, bought on 20 February 2024, which no row names an ISIN for.
+    const unnamed = opened(
+      "1004",
+      "20/02/2024 15:00:00",
+      "MSFT/USD",
+      "400",
+      "1",
+    );
+    const file = (name: string, exxon: boolean) => {
+      const path = join(dir, name);
+      writeFileSync(
+        path,
+        statement({
+          ...ROUND_TRIP,
+          activity: [
+            ...ROUND_TRIP.activity,
+            unnamed,
+            ...(exxon
+              ? [
+                  opened("1005", "21/02/2024 10:00:00", "XOM/USD", "200", "2"),
+                  closing(
+                    "1005",
+                    "22/02/2024 10:00:00",
+                    "XOM/USD",
+                    "202",
+                    n("2"),
+                  ),
+                ]
+              : []),
+          ],
+          closed: [
+            ...ROUND_TRIP.closed,
+            ...(exxon
+              ? [
+                  position({
+                    id: "1005",
+                    amount: "200",
+                    units: "2",
+                    open: "21/02/2024 10:00:00",
+                    close: "22/02/2024 10:00:00",
+                    profit: "2",
+                    openRate: "100",
+                    closeRate: "101",
+                    isin: EXXON,
+                  }),
+                ]
+              : []),
+          ],
+        }),
+      );
+      return path;
+    };
+    const payers = join(dir, "payers.json");
+    writeFileSync(
+      payers,
+      JSON.stringify({
+        [APPLE]: {
+          name: "Apple Inc.",
+          address: "One Apple Park Way, Cupertino, CA 95014, United States",
+          country: "US",
+        },
+      }),
+    );
+    const report = (name: string, exxon: boolean) => {
+      const result = run([
+        file(name, exxon),
+        "--year",
+        "2024",
+        "--tax-number",
+        "12345678",
+        "--out",
+        join(dir, `out-${name}`),
+        "--payers",
+        payers,
+        "--json",
+      ]);
+      return {
+        code: result.code,
+        report: JSON.parse(result.stdout) as {
+          returns: { kdvp: string; div: string };
+          diagnostics: { severity: string; code: string; params: unknown }[];
+        },
+      };
+    };
+    // The only sale of 2024 is on 16 January, before 21 January.
+    const quiet = report("quiet.xlsx", false);
+    expect(quiet.code).toBe(0);
+    expect(quiet.report.returns).toEqual({ kdvp: "written", div: "written" });
+    expect(
+      quiet.report.diagnostics
+        .filter((d) => d.code === "unresolvedElsewhere")
+        .map((d) => [d.severity, d.params]),
+    ).toEqual([
+      ["info", { broker: "etoro", date: "2024-02-20", year: "2024" }],
+    ]);
+    expect(
+      quiet.report.diagnostics.some((d) => d.severity === "blocking"),
+    ).toBe(false);
+    // Exxon is sold on 22 February: the Doh-KDVP waits, the Doh-Div is written.
+    const reached = report("reached.xlsx", true);
+    expect(reached.code).toBe(1);
+    expect(reached.report.returns).toEqual({
+      kdvp: "withheld",
+      div: "written",
+    });
+    expect(
+      reached.report.diagnostics
+        .filter((d) => d.severity === "blocking")
+        .map((d) => d.code),
+    ).toEqual(["isinUnresolved"]);
+  });
+
+  it("says to keep the latest of two statements of one eToro account", () => {
+    const dir = scratch();
+    const first = join(dir, "etoro.xlsx");
+    const second = join(dir, "etoro-later.xlsx");
+    writeFileSync(first, statement());
+    writeFileSync(
+      second,
+      statement({
+        ...ROUND_TRIP,
+        activity: [
+          ...ROUND_TRIP.activity,
+          {
+            ...ROUND_TRIP.activity[0],
+            Date: "20/03/2024 10:00:00",
+            "Realized Equity Change": { n: "100" },
+            "Realized Equity": { n: "5100" },
+          },
+        ],
+      }),
+    );
+    const args = (...more: string[]) => [
+      first,
+      second,
+      "--year",
+      "2024",
+      "--tax-number",
+      "12345678",
+      "--out",
+      join(dir, "out"),
+      ...more,
+    ];
+    const same = run(args());
+    expect(same.code).toBe(1);
+    expect(same.stdout + same.stderr).toContain("secondStatement");
+    expect(same.stdout + same.stderr).toContain("keep the latest");
+    const separate = run(args("--accounts", "separate"));
+    expect(separate.stdout + separate.stderr).not.toContain("secondStatement");
   });
 
   it("names accounts in its JSON by broker and number, never by the account", () => {
