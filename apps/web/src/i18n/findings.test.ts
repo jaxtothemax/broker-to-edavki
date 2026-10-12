@@ -149,6 +149,7 @@ describe("the findings catalog", () => {
       "date",
       "unpaired",
       "netAmount",
+      "class",
     ]);
     expect(findingsEn.historyIncomplete({ broker, gap: "start" })).toMatch(
       /^eToro: the statement does not start when the account was opened/,

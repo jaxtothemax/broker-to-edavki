@@ -1308,6 +1308,58 @@ describe("etoro, dividends", () => {
     ).toEqual(["pairing"]);
   });
 
+  it("refuses a dividend whose type is not the class its closed position was read as", () => {
+    // A closed position's class comes from its Closed Positions row, not from
+    // its activity rows: a closed CFD's dividend called a share's would go on
+    // Doh-Div.
+    const details = "NVDA/USD";
+    expect(
+      mismatch({
+        ...ROUND_TRIP,
+        activity: [
+          ...ROUND_TRIP.activity,
+          opened("1003", "20/02/2024 15:00:00", details, "100", "2", "CFD"),
+          dividendPaid("1003", "21/02/2024 12:00:00", details, "0.3"),
+          closing(
+            "1003",
+            "22/02/2024 15:00:00",
+            details,
+            "100.5",
+            n("2"),
+            "CFD",
+          ),
+        ],
+        closed: [
+          ...ROUND_TRIP.closed,
+          position({
+            id: "1003",
+            amount: "100",
+            units: "2",
+            open: "20/02/2024 15:00:00",
+            close: "22/02/2024 15:00:00",
+            profit: "0.5",
+            openRate: "50",
+            closeRate: "50.25",
+            isin: "",
+            type: "CFD",
+          }),
+        ],
+        dividends: [
+          ...swapPayment({}),
+          payment({
+            date: "21/02/2024",
+            id: "1003",
+            net: "0.3",
+            rate: "0%",
+            withheld: n("0"),
+            isin: APPLE,
+            type: "Stocks",
+          }),
+        ],
+      }),
+    ).toEqual(["class"]);
+  });
+
   it("refuses a dividend with a sign it cannot have", () => {
     expect(
       mismatch({
