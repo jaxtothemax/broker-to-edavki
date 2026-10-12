@@ -14,6 +14,11 @@
 > dashboard. The app frame now holds the dashboard's view (`DashboardView`: its page and
 > open securities), the stops show dashboard pages, and the tour waits for a page's
 > entrance (`.dash-page`) as for a screen's.
+>
+> **Amended 2026-10-12 (§5):** a line crosses no text and no control. It is routed through
+> the free space between them (`tour/route.ts`, `tour/obstacles.ts`), and a presentation
+> whose lines cannot be drawn clear, or whose boxes would leave the band between the sticky
+> header and the dock, gives way to the sheet.
 
 ## Context
 
@@ -62,7 +67,7 @@ at a time on a phone; and the demo data stays as it is (#26).
    When the dialog opens, Next has focus (`autofocus`), so Enter goes on; Skip is first in
    the DOM and Tab order. Focus goes back to a named element, never to whatever had it: the
    heading of the screen the demo opened on, or the button that started the tour where the
-   page still shows it (the banner's replay, or "Use demo files" with the scroll the user
+   page still shows it (the replay beside the demo's chip, or "Use demo files" with the scroll the user
    left), since WebKit does not focus a button on a click. That element is focused just
    before the dialog opens, because WebKit gives focus back to it on close after the app's
    own restore. The tab title keeps following the user's screen, not the stop shown.
@@ -80,6 +85,39 @@ at a time on a phone; and the demo data stays as it is (#26).
    off by the window or its table gets its explanation with no line. In the one-at-a-time
    sheet the ring marks whatever part of the target shows, because a short window can leave
    less room above the sheet than the target needs.
+
+   **A line crosses no text and no control** (amended 2026-10-12; before it, a line ran
+   straight from a box to the target's near edge and crossed whatever lay between, in the
+   card and over the dimmed page: 68 of 198 lines at four window sizes in both languages).
+   Once a stop has settled, the page's visible text runs and its controls and pictures
+   (`tour/obstacles.ts`) are measured, and moved with the page as it scrolls; what a scroll
+   container clips away, or an explanation box wholly hides, is not one. Containers (cards,
+   disclosure rows) are not obstacles: their own text and marks are. Where the straight line
+   crosses none of them it is kept; otherwise `tour/route.ts` finds the shortest orthogonal
+   route with the fewest bends through the free space, leaving the box squarely and reaching
+   a ring on whichever edge of the target it can, keeping 8px from them where there is room
+   and 4px where there is not; a straight line is kept only if it clears them by 6px. A
+   routed line may cross the highlight's frame but not run along it (a 20px band over each
+   edge), and a route ending in a stretch shorter than 8px into its ring pays extra, so the
+   line arrives rather than hooks. The ring sits 12px from the target's edge and needs 10px
+   of room round its center: its halo is drawn 8px out. Text inside a closed `<details>` is
+   not an obstacle, though Chromium still reports where it last stood. Where no route exists, the line is
+   not drawn: the stop gives up that presentation for the next, the sheet at last, which has
+   no line. That is decided once, when the stop has settled, and kept for the stop, so
+   scrolling cannot flip it; a line the page's scrolling later leaves without a route is
+   left out, as for a target out of view. `apps/web/e2e/tour-lines.spec.ts` walks the tour
+   in three windows and both languages and fails on any line that crosses text or a control,
+   measured on its own and not by the app's measuring.
+
+   **Every explanation box stays between the sticky header and the dock.** A row's box sits
+   above or below the card wherever the card is, so a card near the header or the dock could
+   push its row out of that band. Such a placement is `blocked` like a line with no route,
+   and the stop gives the presentation up the same way. The same spec fails on any box
+   outside the band. The router's work is bounded at each stage (grid nodes, cells marked,
+   states searched), each far above the demo's densest stop; past a bound there is no route,
+   so a page of many obstacles costs the sheet, never a stalled tab. In the sheet the ring
+   goes beside the target on the first side, of left, right, above and below, that is in the
+   window, clear of text and controls and off the highlight's frame.
 6. **Explanations are concepts in the message catalog, figures come from the preview.**
    Each explanation is a concept entry (`t.explain.*`) in Slovenian and English, written
    descriptively ("here", "this sale"); demo framing lives only in the tour's own intros.
@@ -121,7 +159,7 @@ at a time on a phone; and the demo data stays as it is (#26).
   says so instead of waiting; and anchors are found by name with their keys compared
   as text, never parsed, since keys will come from the user's own files.
 - **Removing the tour is cheap:** the tour module, the override in the app frame and the
-  banner action. The anchors, the review's view and the explanations stay useful.
+  replay button beside the demo's chip. The anchors, the review's view and the explanations stay useful.
 
 Alternatives considered: a tour library (decision 1); driving the wizard and restoring a
 snapshot, which loses the user's tab and rows when the screen changes; a non-modal panel

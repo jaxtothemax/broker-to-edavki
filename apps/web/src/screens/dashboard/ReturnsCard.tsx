@@ -12,6 +12,7 @@ import {
   DownloadSimpleIcon,
   FileCodeIcon,
 } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 
 import type { BuiltForm } from "../../engine/demoReturns";
 import { saveFile } from "../../engine/saveFile";
@@ -133,12 +134,15 @@ export function ReturnsCard({
   preview,
   writing,
   demo,
+  attention = null,
   onShowNotes,
 }: {
   readonly preview: ReturnPreview;
   readonly writing: Writing;
   /** Whether these are the demo's files, which must never be imported. */
   readonly demo: boolean;
+  /** The notes to read before downloading, said beside the downloads. */
+  readonly attention?: ReactNode;
   readonly onShowNotes: () => void;
 }) {
   const { locale, t } = useI18n();
@@ -164,6 +168,7 @@ export function ReturnsCard({
           </Chip>
         </div>
         <p className="muted">{t.download.intro(deadline)}</p>
+        {attention}
         <ul className="return-rows" role="list">
           {forms.map((id) =>
             id === "kdvp" ? (
@@ -208,7 +213,7 @@ export function ReturnsCard({
         ) : demo ? (
           <Note tone="warn">{t.download.demoFiles}</Note>
         ) : (
-          <Note tone="neutral">{t.download.ownFiles}</Note>
+          <Note tone="warn">{t.download.ownFiles}</Note>
         )}
       </section>
 

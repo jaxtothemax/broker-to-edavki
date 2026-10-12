@@ -46,7 +46,7 @@ import {
   type NavGroup,
 } from "../../ui/AppShell";
 import { Main } from "../../ui/AppChrome";
-import { DemoBanner, Eur, TOUR_BUTTON_ID } from "../../ui/bits";
+import { DemoChip, Eur, TOUR_BUTTON_ID } from "../../ui/bits";
 import { MonthBars, StackBar } from "../../ui/charts";
 import { ErrorBoundary } from "../../ui/ErrorBoundary";
 import { Amount, Button, Chip, Note } from "../../ui/kit";
@@ -113,17 +113,23 @@ function PageHeader({
   eyebrow,
   title,
   lead,
+  badge,
   actions,
 }: {
   readonly eyebrow: string;
   readonly title: string;
   readonly lead?: string;
+  /** Beside the eyebrow: the demo's chip. */
+  readonly badge?: ReactNode;
   readonly actions?: ReactNode;
 }) {
   return (
     <header className="page-head">
       <div className="page-head-text">
-        <p className="page-eyebrow">{eyebrow}</p>
+        <div className="page-eyebrow-row">
+          <p className="page-eyebrow">{eyebrow}</p>
+          {badge}
+        </div>
         <h1 tabIndex={-1}>{title}</h1>
         {lead === undefined ? null : <p className="lead">{lead}</p>}
       </div>
@@ -430,8 +436,10 @@ export function DashboardShell({
       </>
     );
 
+  // Beside the downloads it is about, on the overview's Returns card, not
+  // above every page: the sidebar's Notes count says it everywhere else.
   const attention =
-    !ready || needAttention === 0 || page === "notes" ? null : (
+    !ready || needAttention === 0 ? null : (
       <Note
         tone={blocking > 0 ? "danger" : "warn"}
         id="dash-attention"
@@ -475,6 +483,7 @@ export function DashboardShell({
             : t.dash.eyebrowYear(year)
       }
       title={pageTitle(t, preview, shownView)}
+      {...(demo ? { badge: <DemoChip /> } : {})}
       {...(page === "gains"
         ? { lead: t.dash.gainsLead }
         : page === "dividends"
@@ -552,6 +561,7 @@ export function DashboardShell({
               writing={at.writing}
               demo={demo}
               withheld={withheldForms}
+              attention={attention}
               onNavigate={navigate}
             />
           </>
@@ -612,7 +622,6 @@ export function DashboardShell({
     >
       <Main>
         <div className="shell-page">
-          {demo ? <DemoBanner /> : null}
           {/* Said once the user's own results are ready; in the demo they
               are ready from the start, so nothing changes to be said. */}
           <p role="status" className="visually-hidden">
@@ -629,7 +638,6 @@ export function DashboardShell({
           >
             <div className="screen">
               {head}
-              {attention}
               {body}
               {/* On a phone the sidebar's actions move here, below
                   everything, in every state: a failure says to go back. */}

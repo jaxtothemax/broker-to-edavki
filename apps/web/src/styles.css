@@ -1409,6 +1409,23 @@ input {
   min-width: 0;
 }
 
+/* The eyebrow, and beside it the demo's chip (ui/bits.tsx). */
+.page-eyebrow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+/* The demo's chip and the tour's button, under the wizard's stepper. */
+.demo-mark {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
 .page-eyebrow {
   color: var(--text-2);
   font-size: var(--fs-sm);
@@ -3853,18 +3870,7 @@ button.step-item:hover {
   }
 }
 
-/* ─── Preview notice and the framed page (#70, #4) ────────────────────────
-   The notice sits in the page flow under the sticky header, never inside it:
-   the header's height is --header-h, which the dashboard's sidebar and the
-   guided tour measure against. */
-
-.preview-notice {
-  padding-top: 16px;
-}
-
-.app.has-shell .preview-notice .container {
-  max-width: none;
-}
+/* ─── The framed page (#4) ──────────────────────────────────────────────── */
 
 /* What index.ts shows instead of the app inside another site's frame
    (frameGuard.ts): plain text outside .app, on the page's own colors. */

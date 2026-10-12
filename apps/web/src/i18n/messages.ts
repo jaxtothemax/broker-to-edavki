@@ -63,7 +63,11 @@ export interface Messages {
     readonly dashboard: string;
     readonly done: string;
   };
-  readonly demoBanner: { readonly title: string; readonly body: string };
+  /**
+   * The demo's mark: a chip by each page's title, and once, where the figures
+   * are explained, what is made up and what is real.
+   */
+  readonly demoData: { readonly chip: string; readonly body: string };
   readonly nav: { readonly next: string; readonly back: string };
   readonly files: {
     readonly title: string;
@@ -110,7 +114,6 @@ export interface Messages {
       to: string,
       rows: string,
     ) => string;
-    readonly ownFilesNotice: string;
     readonly needFiles: string;
   };
   readonly details: {
@@ -504,9 +507,11 @@ export interface Messages {
     readonly accountAsOf: (date: string) => string;
   };
   /**
-   * Publishing the app as a preview (#70): the notice on every screen, and
-   * what the page shows instead of the app when another site frames it (#4,
-   * frameGuard.ts). The framed page is plain text, outside React.
+   * Publishing the app as a preview (#70): the caution where the user adds
+   * their own files (the Returns card says it again by the downloads, as
+   * `download.ownFiles`), and what the page shows instead of the app when
+   * another site frames it (#4, frameGuard.ts). The framed page is plain
+   * text, outside React.
    */
   readonly preview: {
     readonly noticeTitle: string;
@@ -591,8 +596,8 @@ export const en: Messages = {
     dashboard: "Results",
     done: "completed",
   },
-  demoBanner: {
-    title: "Demo data.",
+  demoData: {
+    chip: "Demo data",
     body: "These trades and dividends are made up, but the exchange rates are real Banka Slovenije rates.",
   },
   nav: { next: "Continue", back: "Back" },
@@ -655,8 +660,6 @@ export const en: Messages = {
     rows: { one: "{n} row", other: "{n} rows" },
     coverage: (broker, from, to, rows) =>
       `${broker}, ${from} to ${to}, ${rows}`,
-    ownFilesNotice:
-      "Your files are read in this browser tab and never uploaded.",
     needFiles: "Add at least one file to continue.",
   },
   details: {
@@ -834,7 +837,7 @@ export const en: Messages = {
     demoFiles:
       "These files hold the demo's made-up trades for a made-up taxpayer, tax number 12345678. They are written exactly as yours are, so you can see what eDavki receives, but do not import them into eDavki.",
     ownFiles:
-      "Check each form against these results before you submit it in eDavki. TaxReporter prepares the returns; filing them is up to you.",
+      "How TaxReporter reads broker exports has not been checked against real exports yet. Compare these results with your broker's statements, and each form with these results, before you submit it in eDavki. TaxReporter prepares the returns; filing them is up to you.",
     notWritten: {
       one: "Not written: {n} problem in the notes must be fixed first.",
       other: "Not written: {n} problems in the notes must be fixed first.",
@@ -1167,7 +1170,7 @@ export const en: Messages = {
   preview: {
     noticeTitle: "Preview.",
     noticeBody:
-      "How TaxReporter reads broker exports has not been checked against real exports yet, so check every figure before you file. Nothing leaves this device.",
+      "How TaxReporter reads broker exports has not been checked against real exports yet, so check every figure against your broker's statements before you file. Your files are read in this browser tab and never uploaded.",
     framedBody:
       "TaxReporter does not start inside another website. Open it in its own tab to use it.",
     framedLink: "Open TaxReporter in its own tab",
@@ -1249,8 +1252,8 @@ export const sl: Messages = {
     dashboard: "Rezultati",
     done: "končano",
   },
-  demoBanner: {
-    title: "Demo podatki.",
+  demoData: {
+    chip: "Demo podatki",
     body: "Posli in dividende so izmišljeni, tečaji pa so pravi tečaji Banke Slovenije.",
   },
   nav: { next: "Naprej", back: "Nazaj" },
@@ -1331,8 +1334,6 @@ export const sl: Messages = {
     },
     coverage: (broker, from, to, rows) =>
       `${broker}, od ${from} do ${to}, ${rows}`,
-    ownFilesNotice:
-      "Datoteke se berejo v tem zavihku brskalnika in se nikamor ne naložijo.",
     needFiles: "Za nadaljevanje dodajte vsaj eno datoteko.",
   },
   details: {
@@ -1527,7 +1528,7 @@ export const sl: Messages = {
     demoFiles:
       "Datoteki vsebujeta izmišljene posle iz demonstracije za izmišljenega zavezanca z davčno številko 12345678. Zapisani sta natanko tako kot vaše, zato vidite, kaj prejmejo eDavki, vendar ju v eDavke ne uvažajte.",
     ownFiles:
-      "Pred oddajo v eDavkih vsak obrazec primerjajte s temi rezultati. TaxReporter napovedi pripravi, oddate jih vi.",
+      "Branje izvozov borznih posrednikov še ni preverjeno na pravih izvozih. Pred oddajo v eDavkih te rezultate primerjajte z izpiski posrednika, vsak obrazec pa s temi rezultati. TaxReporter napovedi pripravi, oddate jih vi.",
     notWritten: {
       one: "Ni zapisano: najprej je treba odpraviti {n} težavo v opombah.",
       two: "Ni zapisano: najprej je treba odpraviti {n} težavi v opombah.",
@@ -1863,7 +1864,7 @@ export const sl: Messages = {
   preview: {
     noticeTitle: "Predogled.",
     noticeBody:
-      "Branje izvozov borznih posrednikov še ni preverjeno na pravih izvozih, zato pred oddajo napovedi preverite vsako številko. Nič ne zapusti te naprave.",
+      "Branje izvozov borznih posrednikov še ni preverjeno na pravih izvozih, zato pred oddajo napovedi vsako številko preverite v izpiskih posrednika. Datoteke se berejo v tem zavihku brskalnika in se nikamor ne naložijo.",
     framedBody:
       "TaxReporter se znotraj drugega spletnega mesta ne zažene. Za uporabo ga odprite v samostojnem zavihku.",
     framedLink: "Odpri TaxReporter v samostojnem zavihku",
