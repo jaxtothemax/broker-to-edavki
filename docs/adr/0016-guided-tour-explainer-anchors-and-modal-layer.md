@@ -14,6 +14,10 @@
 > dashboard. The app frame now holds the dashboard's view (`DashboardView`: its page and
 > open securities), the stops show dashboard pages, and the tour waits for a page's
 > entrance (`.dash-page`) as for a screen's.
+>
+> **Amended 2026-10-12 (§5):** a line crosses no text and no control. It is routed through
+> the free space between them (`tour/route.ts`, `tour/obstacles.ts`), and a presentation
+> whose lines cannot be drawn clear gives way to the sheet.
 
 ## Context
 
@@ -80,6 +84,24 @@ at a time on a phone; and the demo data stays as it is (#26).
    off by the window or its table gets its explanation with no line. In the one-at-a-time
    sheet the ring marks whatever part of the target shows, because a short window can leave
    less room above the sheet than the target needs.
+
+   **A line crosses no text and no control** (amended 2026-10-12; before it, a line ran
+   straight from a box to the target's near edge and crossed whatever lay between, in the
+   card and over the dimmed page: 68 of 198 lines at four window sizes in both languages).
+   Once a stop has settled, the page's visible text runs and its controls and pictures
+   (`tour/obstacles.ts`) are measured, and moved with the page as it scrolls; what a scroll
+   container clips away, or an explanation box wholly hides, is not one. Containers (cards,
+   disclosure rows) are not obstacles: their own text and marks are. Where the straight line
+   crosses none of them it is kept; otherwise `tour/route.ts` finds the shortest orthogonal
+   route with the fewest bends through the free space, leaving the box squarely and reaching
+   a ring on whichever edge of the target it can, keeping 8px from them where there is room
+   and 4px where there is not. The ring needs room too. Where no route exists, the line is
+   not drawn: the stop gives up that presentation for the next, the sheet at last, which has
+   no line. That is decided once, when the stop has settled, and kept for the stop, so
+   scrolling cannot flip it; a line the page's scrolling later leaves without a route is
+   left out, as for a target out of view. `apps/web/e2e/tour-lines.spec.ts` walks the tour
+   in three windows and both languages and fails on any line that crosses text or a control,
+   measured on its own and not by the app's measuring.
 6. **Explanations are concepts in the message catalog, figures come from the preview.**
    Each explanation is a concept entry (`t.explain.*`) in Slovenian and English, written
    descriptively ("here", "this sale"); demo framing lives only in the tour's own intros.

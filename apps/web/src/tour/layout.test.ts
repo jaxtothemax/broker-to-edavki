@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   bottom,
   choose,
+  CLEARANCE,
   cutoutOf,
   dimPath,
   gutterWidth,
@@ -22,6 +23,7 @@ import {
   type Frame,
   type Placed,
 } from "./layout";
+import { lineClear } from "./route";
 
 const frame = (width: number, height: number): Frame => ({
   width,
@@ -285,5 +287,154 @@ describe("drawing", () => {
     expect(within({ left: 90, top: 10, width: 20, height: 20 }, outer)).toBe(
       false,
     );
+  });
+});
+
+describe("lines that keep off the text and the controls", () => {
+  const f = frame(1440, 900);
+  // The gains-tax card with its gutter on the right: a box level with the
+  // target, its line running straight along y = 232 from x = 868 to 813.
+  const card: Box = { left: 144, top: 200, width: 676, height: 300 };
+  const cutout = cutoutOf(card, 8, f);
+  const target: Box = { left: 740, top: 220, width: 64, height: 24 };
+  const second: Box = { left: 160, top: 330, width: 640, height: 28 };
+  const straight = placeGutter(f, cutout, [target], [70], 320)[0];
+
+  it("keeps a line that already crosses nothing, as it was", () => {
+    const far = { left: 100, top: 600, width: 50, height: 20 };
+    const placed = placeGutter(f, cutout, [target], [70], 320, [far])[0];
+    expect(placed?.line).toEqual(straight?.line);
+    expect(placed?.ring).toEqual(straight?.ring);
+    expect(placed?.blocked).toBe(false);
+  });
+
+  it("routes round text that stands on the way", () => {
+    const text: Box = { left: 840, top: 224, width: 20, height: 16 };
+    const placed = placeGutter(f, cutout, [target], [70], 320, [text])[0];
+    expect(placed?.blocked).toBe(false);
+    expect(placed?.line).not.toEqual(straight?.line);
+    const line = placed?.line ?? [];
+    expect(lineClear(line, [text], CLEARANCE.comfortable - 0.01)).toBe(true);
+    // From the box's edge, to the ring it draws.
+    expect(line[0]?.[0]).toBe(placed?.box.left);
+    expect(line.at(-1)).toEqual(placed?.ring);
+  });
+
+  it("leaves out a line it cannot draw clear, and says so", () => {
+    // The target is walled in by text on all sides.
+    const walls: Box[] = [
+      { left: 700, top: 190, width: 160, height: 8 },
+      { left: 700, top: 262, width: 160, height: 8 },
+      { left: 700, top: 190, width: 8, height: 80 },
+      { left: 852, top: 190, width: 8, height: 80 },
+    ];
+    const placed = placeGutter(
+      f,
+      cutout,
+      [target, second],
+      [70, 90],
+      320,
+      walls,
+    );
+    expect(placed[0]?.line).toBeNull();
+    expect(placed[0]?.ring).toBeNull();
+    expect(placed[0]?.blocked).toBe(true);
+    // The other explanation is not held back by it.
+    expect(placed[1]?.blocked).toBe(false);
+    expect(placed[1]?.line).not.toBeNull();
+  });
+
+  it("is not blocked where its target is out of view", () => {
+    const placed = placeGutter(f, cutout, [null], [70], 320, [
+      { left: 700, top: 190, width: 160, height: 80 },
+    ])[0];
+    expect(placed?.line).toBeNull();
+    expect(placed?.blocked).toBe(false);
+  });
+
+  it("counts text that peeks out from under a box, but not what it wholly hides", () => {
+    // Under the box and out of it, on the line: the part in view is in the way.
+    const peeking: Box = { left: 850, top: 224, width: 40, height: 16 };
+    const placed = placeGutter(f, cutout, [target], [70], 320, [peeking])[0];
+    expect(placed?.line).not.toEqual(straight?.line);
+    const inView: Box = { left: 850, top: 224, width: 18, height: 16 };
+    expect(
+      lineClear(placed?.line ?? [], [inView], CLEARANCE.comfortable - 0.01),
+    ).toBe(true);
+    // Wholly under the box, it is hidden: nothing to cross.
+    const hidden: Box = { left: 880, top: 224, width: 60, height: 16 };
+    const kept = placeGutter(f, cutout, [target], [70], 320, [hidden])[0];
+    expect(kept?.line).toEqual(straight?.line);
+  });
+
+  it("keeps clear of the other explanation boxes too", () => {
+    // Two targets level with each other; the second box sits where the first
+    // line would run if it went straight.
+    const placed = placeGutter(
+      f,
+      cutout,
+      [target, { left: 740, top: 262, width: 64, height: 24 }],
+      [70, 70],
+      320,
+    );
+    const [a, b] = placed;
+    for (const p of [a, b]) {
+      for (const other of placed) {
+        if (p !== other && p?.line)
+          expect(
+            lineClear(p.line, [other.box], 0),
+            "a line runs through another explanation",
+          ).toBe(true);
+      }
+    }
+  });
+
+  it("routes a row's vertical line round text between the card and the target", () => {
+    const wide = frame(1280, 900);
+    const row = cutoutOf(
+      { left: 120, top: 300, width: 1040, height: 200 },
+      8,
+      wide,
+    );
+    const aim: Box = { left: 400, top: 320, width: 60, height: 20 };
+    const w = rowWidth(wide, 1) ?? 0;
+    const text: Box = { left: 410, top: 350, width: 40, height: 14 };
+    const clean = placeRow(wide, row, [aim], [80], w, ["below"])[0];
+    const around = placeRow(wide, row, [aim], [80], w, ["below"], [text])[0];
+    expect(around?.blocked).toBe(false);
+    expect(around?.line).not.toEqual(clean?.line);
+    expect(
+      lineClear(around?.line ?? [], [text], CLEARANCE.comfortable - 0.01),
+    ).toBe(true);
+  });
+});
+
+describe("a presentation whose lines cannot be drawn clear", () => {
+  const f = frame(1280, 800);
+  const card = cutoutOf(fullWidthCard(f, 200, 200), 8, f);
+  const targets: Box[] = [{ left: 300, top: 220, width: 80, height: 20 }];
+  const heights = { gutter: [90], row: [90] };
+
+  it("is asked about, and the next one is tried", () => {
+    const asked: string[] = [];
+    const chosen = choose(f, card, targets, heights, "gutter", false, (p) => {
+      asked.push(p.mode);
+      return true;
+    });
+    expect(asked).toEqual(["row"]);
+    expect(chosen.mode).toBe("row");
+  });
+
+  it("falls to the sheet, which has no line, when none can", () => {
+    const chosen = choose(
+      f,
+      card,
+      targets,
+      heights,
+      "gutter",
+      false,
+      () => false,
+    );
+    expect(chosen.mode).toBe("sheet");
   });
 });

@@ -60,6 +60,7 @@ import {
   WIDE,
 } from "./layout";
 import { atEnd, atStart, inView, type TourRun } from "./machine";
+import { measureObstacles, shifted } from "./obstacles";
 import { TOUR, type NoteText, type TourStop } from "./script";
 
 /** What the app gives back when the tour ends: recorded as the tour goes. */
@@ -266,6 +267,22 @@ interface Geometry {
   readonly sheetRing: Point | null;
 }
 
+/**
+ * What a stop's presentation was chosen from, kept so it can be chosen again
+ * without the presentations whose lines could not be drawn clear of the text.
+ */
+interface Basis {
+  readonly frame: Frame;
+  readonly grown: Box;
+  readonly targets: readonly (Box | null)[];
+  readonly heights: {
+    readonly gutter: readonly number[];
+    readonly row: readonly number[];
+  };
+  readonly prefer: TourStop["prefer"];
+  readonly phone: boolean;
+}
+
 export function TourLayer({
   run,
   preview,
@@ -307,6 +324,18 @@ export function TourLayer({
   // Bumped when a stop has been prepared: the next layout scrolls it into view.
   const [prepared, setPrepared] = useState(0);
   const scrolledFor = useRef(-1);
+  // The text and controls the lines keep off (ADR 0016), in window pixels at
+  // the scroll position noted with them. Measured when a stop has settled; null
+  // until then, and again when a table scrolls, which moves what is inside it.
+  const obstacles = useRef<{
+    readonly boxes: readonly Box[];
+    readonly x: number;
+    readonly y: number;
+  } | null>(null);
+  // What the presentation was chosen from, and the presentations whose lines
+  // could not be drawn clear of the content: not chosen again for this stop.
+  const basis = useRef<Basis | null>(null);
+  const refused = useRef(new Set<Presentation["mode"]>());
 
   const texts: readonly (NoteText | null)[] = useMemo(
     () =>
@@ -357,83 +386,122 @@ export function TourLayer({
     element.querySelector<HTMLButtonElement>(".tour-next")?.focus();
   }, []);
 
-  /** Lays the stop out where it is now, without scrolling. */
-  const place = useCallback(() => {
-    if (stop === undefined || presentation === null) return;
-    const frame = readFrame(dock.current);
-    const focusElements = stop.focus
-      .map((anchors) => resolve(document, anchors))
-      .filter((element): element is Element => element !== null);
-    const lit = union(
-      focusElements.map((element) => boxOf(element.getBoundingClientRect())),
-    );
-    if (lit === null) {
+  /**
+   * Lays the stop out where it is now, without scrolling. With `judge`, once a
+   * stop has scrolled into place: where a line cannot be drawn clear of the
+   * text and controls, the presentation is given up for the next one (the
+   * sheet at last, which has no line), for good, so scrolling never flips it.
+   */
+  const place = useCallback(
+    (judge = false) => {
+      if (stop === undefined || presentation === null) return;
+      const frame = readFrame(dock.current);
+      const focusElements = stop.focus
+        .map((anchors) => resolve(document, anchors))
+        .filter((element): element is Element => element !== null);
+      const lit = union(
+        focusElements.map((element) => boxOf(element.getBoundingClientRect())),
+      );
+      if (lit === null) {
+        setGeometry({
+          key: `${String(run.stop)}:${String(shown.from)}`,
+          frame,
+          cutout: null,
+          radius: 0,
+          placed: null,
+          sheetRing: null,
+        });
+        return;
+      }
+      const grown = inflate(lit, stop.pad);
+      const firstElement = focusElements[0];
+      const cornered =
+        firstElement === undefined || firstElement.tagName === "TR"
+          ? 0
+          : parseFloat(getComputedStyle(firstElement).borderTopLeftRadius) || 0;
+      // The lit element's own corner, grown with the padding; never rounder
+      // than the largest radius of the design (--r-lg), so a pill among the lit
+      // elements cannot turn the cutout into an ellipse.
+      const radius =
+        firstElement?.tagName === "TR"
+          ? 8
+          : Math.min(cornered, MAX_RADIUS) + stop.pad;
+      const targets = stop.notes.map((note, i) =>
+        i >= shown.from && i < shown.to ? visibleBox(note.target, frame) : null,
+      );
+      let placed: readonly Placed[] | null = null;
+      let sheetRing: Point | null = null;
+      // What the lines keep off, moved by however far the page has scrolled
+      // since it was measured (only the lines' presentations need it).
+      const seen = (): readonly Box[] => {
+        obstacles.current ??= {
+          boxes: measureObstacles(),
+          x: window.scrollX,
+          y: window.scrollY,
+        };
+        const { boxes, x, y } = obstacles.current;
+        return shifted(boxes, x - window.scrollX, y - window.scrollY);
+      };
+      if (presentation.mode === "gutter") {
+        placed = placeGutter(
+          frame,
+          grown,
+          targets,
+          heights.gutter,
+          presentation.width,
+          seen(),
+        );
+      } else if (presentation.mode === "row") {
+        placed = placeRow(
+          frame,
+          grown,
+          targets,
+          heights.row,
+          presentation.width,
+          presentation.sides,
+          seen(),
+        );
+      } else {
+        const note = stop.notes[shown.from];
+        const target =
+          note === undefined ? null : visibleBox(note.target, frame, false);
+        if (target !== null) {
+          const leftRing = target.left - SPACE.ring;
+          sheetRing =
+            leftRing >= SPACE.ring
+              ? [leftRing, centerY(target)]
+              : [right(target) + SPACE.ring, centerY(target)];
+        }
+      }
+      const given = basis.current;
+      if (judge && given !== null && placed?.some((p) => p.blocked) === true) {
+        refused.current.add(presentation.mode);
+        setChosen({
+          stop: run.stop,
+          value: choose(
+            given.frame,
+            given.grown,
+            given.targets,
+            given.heights,
+            given.prefer,
+            given.phone,
+            (p) => !refused.current.has(p.mode),
+          ),
+        });
+        setPrepared((n) => n + 1);
+        return;
+      }
       setGeometry({
         key: `${String(run.stop)}:${String(shown.from)}`,
         frame,
-        cutout: null,
-        radius: 0,
-        placed: null,
-        sheetRing: null,
+        cutout: cutoutOf(lit, stop.pad, frame),
+        radius,
+        placed,
+        sheetRing,
       });
-      return;
-    }
-    const grown = inflate(lit, stop.pad);
-    const firstElement = focusElements[0];
-    const cornered =
-      firstElement === undefined || firstElement.tagName === "TR"
-        ? 0
-        : parseFloat(getComputedStyle(firstElement).borderTopLeftRadius) || 0;
-    // The lit element's own corner, grown with the padding; never rounder
-    // than the largest radius of the design (--r-lg), so a pill among the lit
-    // elements cannot turn the cutout into an ellipse.
-    const radius =
-      firstElement?.tagName === "TR"
-        ? 8
-        : Math.min(cornered, MAX_RADIUS) + stop.pad;
-    const targets = stop.notes.map((note, i) =>
-      i >= shown.from && i < shown.to ? visibleBox(note.target, frame) : null,
-    );
-    let placed: readonly Placed[] | null = null;
-    let sheetRing: Point | null = null;
-    if (presentation.mode === "gutter") {
-      placed = placeGutter(
-        frame,
-        grown,
-        targets,
-        heights.gutter,
-        presentation.width,
-      );
-    } else if (presentation.mode === "row") {
-      placed = placeRow(
-        frame,
-        grown,
-        targets,
-        heights.row,
-        presentation.width,
-        presentation.sides,
-      );
-    } else {
-      const note = stop.notes[shown.from];
-      const target =
-        note === undefined ? null : visibleBox(note.target, frame, false);
-      if (target !== null) {
-        const leftRing = target.left - SPACE.ring;
-        sheetRing =
-          leftRing >= SPACE.ring
-            ? [leftRing, centerY(target)]
-            : [right(target) + SPACE.ring, centerY(target)];
-      }
-    }
-    setGeometry({
-      key: `${String(run.stop)}:${String(shown.from)}`,
-      frame,
-      cutout: cutoutOf(lit, stop.pad, frame),
-      radius,
-      placed,
-      sheetRing,
-    });
-  }, [stop, presentation, heights, shown.from, shown.to, run.stop]);
+    },
+    [stop, presentation, heights, shown.from, shown.to, run.stop],
+  );
 
   /** Waits for the stop, scrolls its tables, measures, and picks a presentation. */
   const prepare = useCallback(
@@ -482,6 +550,18 @@ export function TourLayer({
         row: heightsAt(rowWidth(frame, stop.notes.length) ?? BOX_WIDTH.rowMin),
       };
       setHeights(measured);
+      // A fresh stop (or window size): nothing is refused yet, and the page's
+      // text and controls are measured again once it has scrolled into place.
+      refused.current = new Set();
+      obstacles.current = null;
+      basis.current = {
+        frame,
+        grown,
+        targets,
+        heights: measured,
+        prefer: stop.prefer,
+        phone: narrowWindow(),
+      };
       setChosen({
         stop: forStop,
         value: choose(
@@ -520,6 +600,8 @@ export function TourLayer({
         : prepared * 1000;
     if (scrolledFor.current !== scrollKey) {
       scrolledFor.current = scrollKey;
+      // The scroll below can move what is inside a table: measure it afresh.
+      obstacles.current = null;
       const frame = readFrame(dock.current);
       const focusElements = stop.focus
         .map((anchors) => resolve(document, anchors))
@@ -585,13 +667,16 @@ export function TourLayer({
         }
       }
     }
-    place();
+    place(true);
   }, [stop, presentation, prepared, shown.from, heights, place, restore]);
 
   // Follow the page: scrolling (the window or a table) and resizing.
   useEffect(() => {
     let pending = 0;
-    const later = () => {
+    const later = (event: Event) => {
+      // A table scrolling moves the text inside it: measure it again.
+      if (event.target !== document && event.target !== window)
+        obstacles.current = null;
       if (pending !== 0) return;
       pending = requestAnimationFrame(() => {
         pending = 0;

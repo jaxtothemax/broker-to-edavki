@@ -175,3 +175,7 @@ why:  The only check that the docs sidebar links the web app exactly when the ap
 path: .github/workflows/docs.yml
 call: if [ "${PUBLISH_WEB_APP:-}" != "true" ]; then
 why:  The only thing keeping the web app out of the Pages artifact until PUBLISH_WEB_APP is true. Delete the guard and the next push to main publishes the app with every gate green.
+
+path: apps/web/src/tour/TourLayer.tsx
+call: place(true);
+why:  The only place a stop is judged: with `judge`, a presentation whose lines cannot be drawn clear of the text and controls gives way to the next, the sheet at last (ADR 0016, section 5). Delete it and such a stop still draws every line it can, but an explanation whose line cannot be drawn is left with no line and no ring: it floats beside the card with nothing saying which target it explains. No stop of the demo needs the fallback today, so every test stays green; the first stop that does, a new screen or a denser table, shows it.

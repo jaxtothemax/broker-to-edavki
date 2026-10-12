@@ -13,9 +13,18 @@
  * Whether a presentation fits depends only on sizes (the window, the dock,
  * the card and every box of the stop), never on the scroll position, so it
  * cannot flip back and forth while the user scrolls. Placement then follows
- * the card wherever it is. A box never covers the card: boxes sit outside it,
- * and a line enters the card only to end in a ring at its target's edge.
+ * the card wherever it is. A box never covers the card: boxes sit outside it.
+ *
+ * A line crosses no text and no control: where the straight way from a box to
+ * its target's edge would, the line is routed through the free space between
+ * them (route.ts), to a ring on whichever edge of the target it reaches. Where
+ * there is no such way the line is left out and the placement says it is
+ * `blocked`, so the stop is shown as the sheet instead of with a line through
+ * the content. The component measures the text and controls; these functions
+ * only see their rectangles.
  */
+
+import { lineClear, route, type Dir, type End, type Route } from "./route";
 
 export interface Box {
   readonly left: number;
@@ -43,6 +52,12 @@ export interface Placed {
   /** From the box to the ring; null where the target is not in view. */
   readonly line: readonly Point[] | null;
   readonly ring: Point | null;
+  /**
+   * True where the target is in view but no line from the box reaches it
+   * without crossing text or a control: the line and the ring are then left
+   * out, and the stop is shown another way.
+   */
+  readonly blocked: boolean;
 }
 
 /** At this width and below (the phone breakpoint), one at a time. */
@@ -65,6 +80,18 @@ export const SPACE = {
   inset: 16,
   /** Below the header, before the focus card. */
   header: 8,
+} as const;
+
+/** How far a line keeps from text and controls (px). */
+export const CLEARANCE = {
+  /** A line that already runs straight is kept if it clears by this much. */
+  straight: 3,
+  /** A routed line keeps this far from them where there is room for it... */
+  comfortable: 8,
+  /** ...and this far where there is not, so it never grazes a word. */
+  routed: 4,
+  /** A ring (8px across with its halo) needs this much room around its center. */
+  ring: 7,
 } as const;
 
 export const BOX_WIDTH = { min: 240, max: 320, rowMin: 200 } as const;
@@ -212,11 +239,15 @@ export function placeGutter(
   targets: readonly (Box | null)[],
   heights: readonly number[],
   width: number,
+  obstacles: readonly Box[] = [],
 ): readonly Placed[] {
   const sides =
     gutterSides(frame, cutout, targets) ?? targets.map(() => "right" as const);
   const band = boxBand(frame);
-  const placed: Placed[] = new Array<Placed>(targets.length);
+  const placed: { box: Box; side: "left" | "right" }[] = new Array<{
+    box: Box;
+    side: "left" | "right";
+  }>(targets.length);
   for (const side of ["left", "right"] as const) {
     const order = targets
       .map((target, i) => ({
@@ -254,14 +285,25 @@ export function placeGutter(
         width,
         height: heights[i] ?? 0,
       };
-      placed[i] = {
-        box,
-        side,
-        ...gutterLine(box, side, cutout, targets[i] ?? null),
-      };
+      placed[i] = { box, side };
     });
   }
-  return placed;
+  const room = lineRoom(frame);
+  const boxes = placed.map((p) => p.box);
+  return placed.map((p, i) => {
+    const target = targets[i] ?? null;
+    return {
+      ...p,
+      ...joined(
+        gutterLine(p.box, p.side, cutout, target),
+        target === null ? null : gutterEnds(p.box, p.side, target),
+        room,
+        obstacles,
+        boxes,
+        i,
+      ),
+    };
+  });
 }
 
 function gutterLine(
@@ -362,8 +404,12 @@ export function placeRow(
   heights: readonly number[],
   width: number,
   sides: readonly ("above" | "below")[],
+  obstacles: readonly Box[] = [],
 ): readonly Placed[] {
-  const placed: Placed[] = new Array<Placed>(targets.length);
+  const placed: { box: Box; side: "above" | "below" }[] = new Array<{
+    box: Box;
+    side: "above" | "below";
+  }>(targets.length);
   for (const side of ["above", "below"] as const) {
     const order = targets
       .map((target, i) => ({
@@ -396,14 +442,25 @@ export function placeRow(
         width,
         height: h,
       };
-      placed[i] = {
-        box,
-        side,
-        ...rowLine(box, side, cutout, targets[i] ?? null),
-      };
+      placed[i] = { box, side };
     });
   }
-  return placed;
+  const room = lineRoom(frame);
+  const boxes = placed.map((p) => p.box);
+  return placed.map((p, i) => {
+    const target = targets[i] ?? null;
+    return {
+      ...p,
+      ...joined(
+        rowLine(p.box, p.side, cutout, target),
+        target === null ? null : rowEnds(p.box, p.side, target),
+        room,
+        obstacles,
+        boxes,
+        i,
+      ),
+    };
+  });
 }
 
 function rowLine(
@@ -426,6 +483,255 @@ function rowLine(
       ? cutout.top - SPACE.row / 2
       : bottom(cutout) + SPACE.row / 2;
   return { line: [[leave, edge], [leave, elbow], [x, elbow], ring], ring };
+}
+
+// ─── Keeping lines off the content ───────────────────────────────────────────
+
+/** The room a line may use: the window between the header and the dock. */
+function lineRoom(frame: Frame): Box {
+  const band = boxBand(frame);
+  return {
+    left: SPACE.edge,
+    top: band.top,
+    width: Math.max(0, frame.width - 2 * SPACE.edge),
+    height: Math.max(0, band.bottom - band.top),
+  };
+}
+
+/** What is left of `piece` when `cover` is taken out of it (up to four boxes). */
+function without(piece: Box, cover: Box): readonly Box[] {
+  const shared = intersect(piece, cover);
+  if (shared === null) return [piece];
+  const parts: Box[] = [
+    // Left and right of the covered part, over the piece's whole height.
+    {
+      left: piece.left,
+      top: piece.top,
+      width: shared.left - piece.left,
+      height: piece.height,
+    },
+    {
+      left: right(shared),
+      top: piece.top,
+      width: right(piece) - right(shared),
+      height: piece.height,
+    },
+    // Above and below it, across the covered part's width.
+    {
+      left: shared.left,
+      top: piece.top,
+      width: shared.width,
+      height: shared.top - piece.top,
+    },
+    {
+      left: shared.left,
+      top: bottom(shared),
+      width: shared.width,
+      height: bottom(piece) - bottom(shared),
+    },
+  ];
+  return parts.filter((p) => p.width >= 0.5 && p.height >= 0.5);
+}
+
+/**
+ * The text and controls as an explanation box leaves them in view: what lies
+ * wholly under a box is gone, and one that peeks out from under it keeps only
+ * the part in view, so a line never crosses what shows and never starts inside
+ * what is hidden.
+ */
+function uncovered(
+  obstacles: readonly Box[],
+  boxes: readonly Box[],
+): readonly Box[] {
+  return obstacles.flatMap((o) =>
+    boxes.reduce<readonly Box[]>(
+      (pieces, cover) => pieces.flatMap((p) => without(p, cover)),
+      [o],
+    ),
+  );
+}
+
+/** Whether the ring has room around its center. */
+function ringClear(ring: Point | null, obstacles: readonly Box[]): boolean {
+  if (ring === null) return true;
+  return !obstacles.some(
+    (o) =>
+      ring[0] > o.left - CLEARANCE.ring &&
+      ring[0] < right(o) + CLEARANCE.ring &&
+      ring[1] > o.top - CLEARANCE.ring &&
+      ring[1] < bottom(o) + CLEARANCE.ring,
+  );
+}
+
+/**
+ * The line as the layout first draws it, when it crosses nothing; otherwise
+ * the cheapest route through the free space to a ring on any edge of the
+ * target; otherwise no line, and `blocked`. The other explanation boxes count
+ * as things to keep clear of, and so do the text and controls an explanation
+ * box does not hide.
+ */
+function joined(
+  straight: Pick<Placed, "line" | "ring">,
+  ends: {
+    readonly starts: readonly End[];
+    readonly rings: readonly End[];
+  } | null,
+  room: Box,
+  obstacles: readonly Box[],
+  boxes: readonly Box[],
+  own: number,
+): Pick<Placed, "line" | "ring" | "blocked"> {
+  if (straight.line === null || ends === null)
+    return { ...straight, blocked: false };
+  const keepClear = [
+    ...uncovered(obstacles, boxes),
+    ...boxes.filter((_, k) => k !== own),
+  ];
+  if (
+    keepClear.length === 0 ||
+    (lineClear(straight.line, keepClear, CLEARANCE.straight) &&
+      ringClear(straight.ring, keepClear))
+  )
+    return { ...straight, blocked: false };
+  // As much room as there is: the comfortable distance, else the tight one.
+  let found: Route | null = null;
+  for (const clearance of [CLEARANCE.comfortable, CLEARANCE.routed]) {
+    found = route({
+      bounds: room,
+      obstacles: keepClear,
+      clearance,
+      starts: ends.starts,
+      rings: ends.rings,
+      ringClearance: CLEARANCE.ring,
+    });
+    if (found !== null) break;
+  }
+  return found === null
+    ? { line: null, ring: null, blocked: true }
+    : { line: found.line, ring: found.ring, blocked: false };
+}
+
+/** Where a line may leave a gutter box: its edge toward the card. */
+function gutterEnds(box: Box, side: "left" | "right", target: Box) {
+  const x = side === "right" ? box.left : right(box);
+  const low = box.top + SPACE.inset;
+  const high = Math.max(low, bottom(box) - SPACE.inset);
+  const start: End = {
+    a: [x, low],
+    b: [x, high],
+    dir: side === "right" ? 2 : 0,
+    base: 0,
+    prefer: clamp(centerY(target), low, high),
+  };
+  return {
+    starts: [start],
+    rings: ringsAround(target, side, [x, centerY(box)]),
+  };
+}
+
+/** Where a line may leave a row box: its edge toward the card. */
+function rowEnds(box: Box, side: "above" | "below", target: Box) {
+  const y = side === "below" ? box.top : bottom(box);
+  const low = box.left + SPACE.inset;
+  const high = Math.max(low, right(box) - SPACE.inset);
+  const start: End = {
+    a: [low, y],
+    b: [high, y],
+    dir: side === "below" ? 3 : 1,
+    base: 0,
+    prefer: clamp(centerX(target), low, high),
+  };
+  return {
+    starts: [start],
+    rings: ringsAround(target, side === "below" ? "bottom" : "top", [
+      centerX(box),
+      y,
+    ]),
+  };
+}
+
+/**
+ * Where the ring may sit: just outside any edge of the target, the one facing
+ * the box at no extra cost (centered), the others at a price and as near the
+ * box as they go. The line arrives squarely, toward the target.
+ */
+function ringsAround(
+  target: Box,
+  facing: "left" | "right" | "top" | "bottom",
+  from: Point,
+): End[] {
+  const gap = SPACE.ring;
+  const inset = 4;
+  const span = (low: number, high: number): [number, number] =>
+    high - low > 2 * inset
+      ? [low + inset, high - inset]
+      : [(low + high) / 2, (low + high) / 2];
+  const [x0, x1] = span(target.left, right(target));
+  const [y0, y1] = span(target.top, bottom(target));
+  const opposite = {
+    left: "right",
+    right: "left",
+    top: "bottom",
+    bottom: "top",
+  } as const;
+  const edges: readonly {
+    edge: "left" | "right" | "top" | "bottom";
+    a: Point;
+    b: Point;
+    dir: Dir;
+    middle: number;
+    near: number;
+    low: number;
+    high: number;
+  }[] = [
+    {
+      edge: "right",
+      a: [right(target) + gap, y0],
+      b: [right(target) + gap, y1],
+      dir: 2,
+      middle: centerY(target),
+      near: from[1],
+      low: y0,
+      high: y1,
+    },
+    {
+      edge: "left",
+      a: [target.left - gap, y0],
+      b: [target.left - gap, y1],
+      dir: 0,
+      middle: centerY(target),
+      near: from[1],
+      low: y0,
+      high: y1,
+    },
+    {
+      edge: "bottom",
+      a: [x0, bottom(target) + gap],
+      b: [x1, bottom(target) + gap],
+      dir: 3,
+      middle: centerX(target),
+      near: from[0],
+      low: x0,
+      high: x1,
+    },
+    {
+      edge: "top",
+      a: [x0, target.top - gap],
+      b: [x1, target.top - gap],
+      dir: 1,
+      middle: centerX(target),
+      near: from[0],
+      low: x0,
+      high: x1,
+    },
+  ];
+  return edges.map((e) => ({
+    a: e.a,
+    b: e.b,
+    dir: e.dir,
+    base: e.edge === facing ? 0 : e.edge === opposite[facing] ? 90 : 40,
+    prefer: e.edge === facing ? e.middle : clamp(e.near, e.low, e.high),
+  }));
 }
 
 // ─── Choosing, scrolling, drawing ────────────────────────────────────────────
@@ -454,6 +760,13 @@ export function choose(
   prefer: "gutter" | "row",
   /** A phone's window, as the stylesheet's media query sees it. */
   phone: boolean = frame.width <= WIDE,
+  /**
+   * Whether every line of a presentation that fits can be drawn without
+   * crossing text or a control; one that cannot is skipped, and the sheet,
+   * which has no line, is what is left. Measured once when the stop settles,
+   * so what is shown does not change as the page scrolls.
+   */
+  linesClear: (presentation: Presentation) => boolean = () => true,
 ): Presentation {
   if (phone) return { mode: "sheet" };
   const tryGutter = (): Presentation | null => {
@@ -472,7 +785,7 @@ export function choose(
   const order = prefer === "gutter" ? [tryGutter, tryRow] : [tryRow, tryGutter];
   for (const attempt of order) {
     const found = attempt();
-    if (found !== null) return found;
+    if (found !== null && linesClear(found)) return found;
   }
   return { mode: "sheet" };
 }
