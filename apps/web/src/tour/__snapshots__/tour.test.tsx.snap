@@ -412,7 +412,7 @@ exports[`the sentences the tour renders > sl: says what was reviewed, word for w
   {
     "stop": "stillHeld",
     "title": "Kaj še imate",
-    "intro": "Loti, ki ostanejo po vseh prodajah, povezani prek posrednikov, na zadnji dan datotek in ne za davčno leto.",
+    "intro": "Loti, ki ostanejo po vseh prodajah, povezani prek vseh posrednikov, na zadnji dan, ki ga pokrivajo datoteke, in ne ob koncu davčnega leta.",
     "notes": [
       {
         "lead": "18. 6. 2026",
@@ -420,7 +420,7 @@ exports[`the sentences the tour renders > sl: says what was reviewed, word for w
       },
       {
         "lead": "20\\u00a0% od 6. 8. 2029",
-        "body": "Od 6. 8. 2029 je prodaja tega lota obdavčena po 20\\u00a0%: dan po obletnici, varno ne glede na to, kako FURS šteje ta dan."
+        "body": "Od 6. 8. 2029 je prodaja tega lota obdavčena po stopnji 20\\u00a0%: to je dan po obletnici nakupa, varen ne glede na to, kako FURS šteje dan obletnice."
       },
       {
         "lead": "Interactive Brokers",
@@ -435,15 +435,15 @@ exports[`the sentences the tour renders > sl: says what was reviewed, word for w
     "notes": [
       {
         "lead": "Stanje na dan 13. 8. 2026",
-        "body": "Zadnji dan, ki ga pokrivajo datoteke tega računa. Nič po dnevu 13. 8. 2026 ni v teh številkah."
+        "body": "Zadnji dan, ki ga pokrivajo datoteke tega računa. Posli po 13. 8. 2026 v teh številkah niso zajeti."
       },
       {
-        "lead": "Morda se ne ujema s posrednikom",
-        "body": "Prenos delnic med vašimi računi ne ustvari lota in nobenega ne konča, zato loti po metodi FIFO niso prizadeti. Napačno je le stanje tega računa, dokler prenosov ne beremo."
+        "lead": "Morda se ne ujema s stanjem pri posredniku",
+        "body": "Prenos delnic med vašimi računi ne ustvari lota in nobenega ne konča, zato loti po metodi FIFO niso prizadeti. Napačno je le stanje tega računa, dokler aplikacija prenosov ne bere."
       },
       {
         "lead": "NVDA",
-        "body": "To je stanje pri Interactive Brokers, ki ga primerjate z njegovo aplikacijo. Pod ničlo je, ker so bile delnice, prodane tu, prenesene od Trading 212, prenosov med računi pa aplikacija še ne bere."
+        "body": "To je stanje računa pri Interactive Brokers, ki ga primerjate z aplikacijo posrednika. Pod ničlo je, ker so bile delnice, prodane tu, prenesene od Trading 212, prenosov med računi pa aplikacija še ne bere."
       }
     ]
   },

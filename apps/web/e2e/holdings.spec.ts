@@ -21,7 +21,7 @@ const COPY = {
     nav: "Rezultati",
     holdings: "Imetje",
     accounts: "Računi",
-    flag: "Morda se ne ujema s posrednikom: delnice so bile prenesene",
+    flag: "Morda se ne ujema s stanjem pri posredniku: delnice so bile prenesene",
   },
 } as const;
 

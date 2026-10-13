@@ -1618,7 +1618,7 @@ export const sl: Messages = {
     intro:
       "Loti, ki jih bo porabila naslednja prodaja, najprej najstarejši, prek vseh vaših računov. Vsak papir je prikazan na zadnji dan, ki ga pokrivajo datoteke njegovih računov, ne na današnji dan.",
     noPrices:
-      "Le nabavna vrednost po tečajih Banke Slovenije. Podatki o cenah vaše naprave ne zapustijo in vanjo ne pridejo, zato tržne vrednosti ni.",
+      "Le nabavna vrednost po tečajih Banke Slovenije. Aplikacija tržnih cen ne pridobiva, zato tržne vrednosti ni.",
     history:
       "Le iz vaših datotek: če manjka starejši izvoz, manjkajo tudi delnice, kupljene v njem.",
     whyDiffer:
@@ -1659,7 +1659,7 @@ export const sl: Messages = {
           return `Banka Slovenije za ${currency} na ta dan nima tečaja.`;
       }
     },
-    incomplete: "Prodanih več, kot je kupljenih v datotekah",
+    incomplete: "Prodano več, kot je v datotekah kupljeno",
     incompleteBody: (security, date) =>
       `Do ${date} vaše datoteke prodajo več papirja ${security}, kot ga kupijo. Manjka starejši izvoz, zato ti loti morda niso tisti, ki jih imate.`,
     cardWithoutRate: {
@@ -1691,10 +1691,10 @@ export const sl: Messages = {
     colShares: "Delnice",
     none: "V datotekah tega računa ni več delnic.",
     transferred:
-      "Morda se ne ujema s posrednikom: delnice so bile prenesene na račun ali z njega, prenosov pa aplikacija še ne bere.",
+      "Morda se ne ujema s stanjem pri posredniku: delnice so bile prenesene na račun ali z njega, prenosov pa aplikacija še ne bere.",
     refused:
-      "Morda se ne ujema s posrednikom: vrstica iz teh datotek je bila zavrnjena.",
-    short: "Prodanih več, kot je kupljenih v datotekah",
+      "Morda se ne ujema s stanjem pri posredniku: vrstica iz teh datotek je bila zavrnjena.",
+    short: "Prodano več, kot je v datotekah kupljeno",
   },
   tour: {
     action: "Vodeni ogled",
@@ -1771,7 +1771,7 @@ export const sl: Messages = {
       stillHeld: {
         title: "Kaj še imate",
         intro:
-          "Loti, ki ostanejo po vseh prodajah, povezani prek posrednikov, na zadnji dan datotek in ne za davčno leto.",
+          "Loti, ki ostanejo po vseh prodajah, povezani prek vseh posrednikov, na zadnji dan, ki ga pokrivajo datoteke, in ne ob koncu davčnega leta.",
       },
       accountCheck: {
         title: "Preverite račun pri posredniku",
@@ -1851,15 +1851,15 @@ export const sl: Messages = {
     heldAsOf: (date) =>
       `Loti veljajo na dan ${date}, zadnji dan, ki ga pokrivajo vsi računi s tem papirjem. Posla po tem dnevu ni v vaših datotekah.`,
     nextBucketDay: (rate, date) =>
-      `Od ${date} je prodaja tega lota obdavčena po ${rate}: dan po obletnici, varno ne glede na to, kako FURS šteje ta dan.`,
+      `Od ${date} je prodaja tega lota obdavčena po stopnji ${rate}: to je dan po obletnici nakupa, varen ne glede na to, kako FURS šteje dan obletnice.`,
     lotLeft: (soldAt, oldestAt, leftAt) =>
       `Prodaja pri ${soldAt} je porabila najstarejši lot, kupljen pri ${oldestAt}: FIFO velja prek vseh vaših posrednikov. Preostali lot je pri ${leftAt}.`,
     accountPosition: (broker, other) =>
-      `To je stanje pri ${broker}, ki ga primerjate z njegovo aplikacijo. Pod ničlo je, ker so bile delnice, prodane tu, prenesene od ${other}, prenosov med računi pa aplikacija še ne bere.`,
+      `To je stanje računa pri ${broker}, ki ga primerjate z aplikacijo posrednika. Pod ničlo je, ker so bile delnice, prodane tu, prenesene od ${other}, prenosov med računi pa aplikacija še ne bere.`,
     transferNotRead:
-      "Prenos delnic med vašimi računi ne ustvari lota in nobenega ne konča, zato loti po metodi FIFO niso prizadeti. Napačno je le stanje tega računa, dokler prenosov ne beremo.",
+      "Prenos delnic med vašimi računi ne ustvari lota in nobenega ne konča, zato loti po metodi FIFO niso prizadeti. Napačno je le stanje tega računa, dokler aplikacija prenosov ne bere.",
     accountAsOf: (date) =>
-      `Zadnji dan, ki ga pokrivajo datoteke tega računa. Nič po dnevu ${date} ni v teh številkah.`,
+      `Zadnji dan, ki ga pokrivajo datoteke tega računa. Posli po ${date} v teh številkah niso zajeti.`,
   },
   preview: {
     noticeTitle: "Predogled.",

@@ -1,0 +1,1 @@
+- **Web app, Slovenian: clearer wording on the holdings and account pages**: "Morda se ne ujema s stanjem pri posredniku" names what may not match; a short position reads "Prodano več, kot je v datotekah kupljeno"; the next-rate explanation says "po stopnji 20 %"; and the guided tour no longer switches to "we" ("dokler prenosov ne beremo"). No computed figure changes.
