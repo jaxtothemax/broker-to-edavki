@@ -3,7 +3,7 @@
 **Date:** 2026-10-07
 **Status:** Accepted (2026-10-07)
 
-> **Implementation status (2026-10-07):** the snapshot and the lookup ship in
+> **Implementation status (2026-10-13):** the snapshot and the lookup ship in
 > `packages/fx`: `data/bsi-daily.csv`, `data/bsi-monthly.csv` and `data/snapshot.json`
 > (built by `scripts/build-snapshot.mjs`, attribution in `data/DATA-NOTICE.md`), read by
 > `RateTable` with the 10-day lookback, the monthly fallback, the euro changeover rates,

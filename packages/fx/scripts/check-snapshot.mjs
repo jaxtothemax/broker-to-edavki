@@ -196,6 +196,13 @@ const changed =
 const through = JSON.parse(
   readFileSync(join(DATA, "snapshot.json"), "utf8"),
 ).completeThrough;
+// `through` goes into a commit message, a pull request title and the README.
+if (typeof through !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(through)) {
+  console.error(
+    "check-snapshot: could not run: snapshot.json has no completeThrough date",
+  );
+  process.exit(2);
+}
 console.log(
   changed
     ? `check-snapshot: OK, new rates through ${through}`

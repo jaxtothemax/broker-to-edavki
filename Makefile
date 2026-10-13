@@ -262,7 +262,7 @@ check-rates-snapshot:  ## Check a snapshot rebuilt by packages/fx/scripts/build-
 	@# appear with no diff to cause it. The rates workflow runs it after each rebuild.
 	@pnpm --filter "@taxreporter/fx..." build
 	@node packages/fx/scripts/check-snapshot.mjs --self-test
-	@node packages/fx/scripts/check-snapshot.mjs
+	@node packages/fx/scripts/check-snapshot.mjs --base HEAD
 
 check-stale-refs:  ## STUB/WIP markers, and TODO(#N)/SUPPRESSED-UNTIL(#N) against closed issues
 	@# NOT in pre-push-checks on purpose: its oracle is the issue tracker, so a

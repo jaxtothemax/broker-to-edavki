@@ -64,7 +64,7 @@ jobs:
         id: check
         run: |
           node packages/fx/scripts/check-snapshot.mjs --self-test
-          node packages/fx/scripts/check-snapshot.mjs
+          node packages/fx/scripts/check-snapshot.mjs --base HEAD
       - name: Say in the README which day the rates run to
         if: steps.check.outputs.changed == 'true'
         env:
