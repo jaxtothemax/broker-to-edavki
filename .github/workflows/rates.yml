@@ -1,0 +1,120 @@
+# ─── Banka Slovenije rate snapshot refresh (ADR 0005, #21) ───────────────────
+#
+# Rebuilds packages/fx/data/ from Banka Slovenije's published lists every
+# weekday after they are out, checks the result (check-snapshot.mjs: no rate
+# already in the snapshot changed, and BSI still matches the ECB except on the
+# known days), and when there are new lists opens or updates one pull request
+# on the branch `chore/rates-refresh`. A person merges it; nothing here writes
+# to `main`.
+#
+# A finding stops the job and proposes nothing: a published rate that changed
+# is a tax-rule event and needs a person and a primary source (CLAUDE.md). A
+# failed scheduled run notifies the repository's maintainers by email.
+#
+# The pull request must run the required checks, and GitHub does not start
+# workflows for a pull request opened with the workflow's own GITHUB_TOKEN. So
+# the job pushes and opens it with RATES_REFRESH_TOKEN, a fine-grained token
+# for this repository only (Contents and Pull requests: read and write). Without
+# it the job falls back to GITHUB_TOKEN and says in the pull request that its
+# checks will not start on their own.
+#
+# BSI publishes its daily list in the afternoon, Ljubljana time; 16:23 UTC is
+# after 17:00 in both winter (CET) and summer (CEST, 18:23).
+
+name: rates
+
+on:
+  schedule:
+    - cron: "23 16 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rates
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter "@taxreporter/fx..." build
+      - name: Rebuild the snapshot from bsi.si
+        run: node packages/fx/scripts/build-snapshot.mjs
+      - name: Check the rebuilt snapshot
+        id: check
+        run: |
+          node packages/fx/scripts/check-snapshot.mjs --self-test
+          node packages/fx/scripts/check-snapshot.mjs --base HEAD
+      - name: Say in the README which day the rates run to
+        if: steps.check.outputs.changed == 'true'
+        env:
+          THROUGH: ${{ steps.check.outputs.through }}
+        run: |
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            const day = new Date(`${process.env.THROUGH}T00:00:00Z`);
+            const text = new Intl.DateTimeFormat("en-GB", {
+              day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+            }).format(day);
+            const readme = readFileSync("README.md", "utf8");
+            // The README wraps its lines, so "run to" and the date may be apart.
+            const marker = /run to(\s+)\*\*[^*]+\*\*/;
+            if (!marker.test(readme)) {
+              console.error("README.md: no \"run to **…**\" date to update");
+              process.exit(1);
+            }
+            writeFileSync(
+              "README.md",
+              readme.replace(marker, (_, gap) => `run to${gap}**${text}**`),
+            );
+          '
+      - name: Open or update the pull request
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RATES_REFRESH_TOKEN || github.token }}
+          OWN_TOKEN: ${{ secrets.RATES_REFRESH_TOKEN == '' }}
+          THROUGH: ${{ steps.check.outputs.through }}
+          REPO: ${{ github.repository }}
+        run: |
+          branch=chore/rates-refresh
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$branch"
+          git add packages/fx/data README.md
+          git commit -m "chore(fx): Banka Slovenije rates through ${THROUGH}" \
+            -m "Rebuilt by the rates workflow (ADR 0005) and checked by check-snapshot.mjs: no published rate changed, and the daily list matches the ECB's except on the known days."
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${branch}"
+          note=""
+          if [ "$OWN_TOKEN" = "true" ]; then
+            note=$'\n\n> **The required checks will not start on their own:** this pull request was opened with the workflow'"'"'s own token, for which GitHub runs no workflows. Add the `RATES_REFRESH_TOKEN` secret (see `.github/workflows/rates.yml`), or push any commit to this branch to start them.'
+          fi
+          body="Banka Slovenije's lists through **${THROUGH}**, rebuilt by the \`rates\` workflow and checked by \`check-snapshot.mjs\`: no rate already in the snapshot changed, and the daily list matches the ECB's reference rates except on the known days (ADR 0005).${note}
+
+          Merge when the checks are green. No computed figure for a date already covered changes."
+          existing="$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --repo "$REPO" --title "chore(fx): Banka Slovenije rates through ${THROUGH}" --body "$body"
+          else
+            gh pr create --repo "$REPO" --base main --head "$branch" \
+              --title "chore(fx): Banka Slovenije rates through ${THROUGH}" --body "$body"
+          fi

@@ -63,8 +63,8 @@ broker exports ─► read ─► one ledger ─► Banka Slovenije rates ─►
    uses the monthly one. The broker's own exchange rate is never used. Banka Slovenije's lists
    since 2007 come with the app, so converting needs no other server, and every converted
    amount keeps its rate, the list's date and its source. The lists included today run to
-   7 October 2026; a later date stops with a finding until they are refreshed
-   ([#21](https://github.com/jaxtothemax/broker-to-edavki/issues/21)).
+   **7 October 2026**, and a workflow adds Banka Slovenije's new lists every weekday; a later
+   date stops with a finding until they are added.
 4. **Sales are matched first in, first out (FIFO)** per security, by ISIN, across all your
    brokers and accounts. How long each purchase was held sets the rate on its part of the
    gain: 25%, falling to 20% after five years, 15% after ten and none after fifteen. The part of

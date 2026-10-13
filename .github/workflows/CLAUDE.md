@@ -15,6 +15,14 @@ there. See @../../scripts/CLAUDE.md.
 The application's own lint/typecheck/test/build jobs live in `ci.yml`. See
 "What `ci.yml` must carry" below.
 
+`rates.yml` (weekday schedule, manual) rebuilds the Banka Slovenije rate snapshot,
+checks it with `packages/fx/scripts/check-snapshot.mjs` (self-test first) and opens
+or updates one pull request on `chore/rates-refresh`. It is the only workflow that
+pushes a branch and opens pull requests, so its job alone has `contents: write` and
+`pull-requests: write`; it never pushes to `main`. It pushes with the
+`RATES_REFRESH_TOKEN` secret because GitHub runs no workflows for a pull request
+opened with `GITHUB_TOKEN`.
+
 ## Rules for every job
 
 - **Call gate scripts directly from `run:`** (`bash scripts/check-x.sh`), never

@@ -151,7 +151,11 @@ describe("lookup rules", () => {
       ok: false,
       error: "beforeSnapshot",
     });
-    expect(table.lookup("USD", "2026-10-08")).toEqual({
+    // The day after the snapshot's own last day, whichever day that is: a
+    // refreshed snapshot (ADR 0005) moves it.
+    const after = new Date(`${snapshot.completeThrough}T00:00:00Z`);
+    after.setUTCDate(after.getUTCDate() + 1);
+    expect(table.lookup("USD", after.toISOString().slice(0, 10))).toEqual({
       ok: false,
       error: "afterSnapshot",
     });
