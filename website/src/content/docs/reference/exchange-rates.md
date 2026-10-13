@@ -84,7 +84,10 @@ its place.
 Banka Slovenije publishes its lists on its website, but a web app on another site cannot
 download them directly. So the project will publish its own copy of the Banka Slovenije daily
 and monthly lists, with the values exactly as Banka Slovenije published them. An automated job
-will refresh the copy every day and cross-check it against the ECB data.
+will add Banka Slovenije's new lists every weekday and cross-check them against the ECB data. If
+a rate already in the copy would change, or a rate differs from the ECB's on a day not already
+known to differ, the job stops and a person looks before anything changes. The project's README
+says which day the copy runs to.
 
 The app will load this copy together with the app itself. It is the same for everyone and
 contains nothing about you. If one of your transactions is more recent than the copy you have,
