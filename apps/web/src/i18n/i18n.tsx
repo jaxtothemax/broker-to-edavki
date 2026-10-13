@@ -24,11 +24,15 @@ export interface I18n {
 
 const I18nContext = createContext<I18n | null>(null);
 
-/** Slovenian for anyone whose browser prefers it, English otherwise. */
-export function detectLocale(languages: readonly string[]): Locale {
-  return languages.some((tag) => tag.toLowerCase().startsWith("sl"))
-    ? "sl"
-    : "en";
+/**
+ * The language the app opens in: Slovenian, whatever the browser prefers,
+ * because the forms it fills are Slovenian and many people here run their
+ * browser in English. `?lang=en` in the address opens it in English, for a
+ * link shared with someone who does not read Slovenian; the language switch
+ * changes it at any time.
+ */
+export function initialLocale(search: string): Locale {
+  return new URLSearchParams(search).get("lang") === "en" ? "en" : "sl";
 }
 
 export function I18nProvider({

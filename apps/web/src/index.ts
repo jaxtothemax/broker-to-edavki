@@ -12,7 +12,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
 import { isFramed, showFramedNotice } from "./frameGuard";
-import { detectLocale } from "./i18n/i18n";
+import { initialLocale } from "./i18n/i18n";
 
 const container = document.getElementById("root");
 if (container === null) {
@@ -20,8 +20,7 @@ if (container === null) {
     'TaxReporter: index.html has no <div id="root"> to mount into',
   );
 }
-const languages = typeof navigator === "undefined" ? [] : navigator.languages;
-const locale = detectLocale(languages);
+const locale = initialLocale(window.location.search);
 // Checked before anything mounts: GitHub Pages cannot forbid framing (no
 // frame-ancestors without headers), so in a frame the app never starts.
 if (isFramed(window)) {

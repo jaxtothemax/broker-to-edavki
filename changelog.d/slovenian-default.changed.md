@@ -1,0 +1,1 @@
+- **The app opens in Slovenian**: it no longer follows the browser's language, since many people in Slovenia run their browser in English. The language switch still changes it at any time, and a link ending in `?lang=en` opens it in English.
