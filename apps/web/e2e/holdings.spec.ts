@@ -10,6 +10,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 const COPY = {
   "en-GB": {
+    // The app opens in Slovenian whatever the browser prefers.
+    path: "/?lang=en",
     demo: "Explore the demo",
     nav: "Results",
     holdings: "Holdings",
@@ -17,6 +19,7 @@ const COPY = {
     flag: "May not match your broker: shares were transferred",
   },
   "sl-SI": {
+    path: "/",
     demo: "Preizkusi demo",
     nav: "Rezultati",
     holdings: "Imetje",
@@ -33,8 +36,12 @@ const WINDOWS = [
 
 const heading = (page: Page) => page.locator("#main h1");
 
-async function demoResults(page: Page, demo: string): Promise<void> {
-  await page.goto("/");
+async function demoResults(
+  page: Page,
+  demo: string,
+  path: string,
+): Promise<void> {
+  await page.goto(path);
   await page.getByRole("button", { name: demo }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -54,7 +61,7 @@ for (const locale of ["en-GB", "sl-SI"] as const) {
       test("the accounts are a keypress away, and the transferred one is flagged", async ({
         page,
       }) => {
-        await demoResults(page, copy.demo);
+        await demoResults(page, copy.demo, copy.path);
         const nav = page.getByRole("navigation", { name: copy.nav });
         // One navigation at every width.
         await expect(page.getByRole("navigation")).toHaveCount(1);

@@ -160,12 +160,16 @@ async function crossings(page: Page): Promise<{
 }
 
 /** Steps through the whole tour, collecting what each stop's lines cross. */
-async function walk(page: Page): Promise<{
+async function walk(
+  page: Page,
+  locale: string,
+): Promise<{
   readonly stops: number;
   readonly withoutLines: readonly number[];
   readonly problems: readonly string[];
 }> {
-  await page.goto("/");
+  // The app opens in Slovenian whatever the browser prefers; English is asked for.
+  await page.goto(locale === "en-GB" ? "/?lang=en" : "/");
   await page.getByRole("button", { name: DEMO }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
@@ -204,7 +208,7 @@ for (const { locale, width, height } of WINDOWS) {
       browserName,
     }) => {
       test.skip(browserName !== "chromium", "geometry, decided from sizes");
-      const { stops, problems } = await walk(page);
+      const { stops, problems } = await walk(page, locale);
       expect(stops).toBeGreaterThan(5);
       expect(problems).toEqual([]);
     });
@@ -223,7 +227,7 @@ test.describe("in a wide window", () => {
     // line that cannot be drawn clear; in a window this wide nothing should
     // cost it, so a stop without lines means the content is measured as more
     // than it is, or a route was lost.
-    const { withoutLines } = await walk(page);
+    const { withoutLines } = await walk(page, "sl-SI");
     expect(withoutLines).toEqual([]);
   });
 });
