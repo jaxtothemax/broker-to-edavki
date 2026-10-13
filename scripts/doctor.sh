@@ -136,11 +136,10 @@ echo ""
 #
 # Node.js and pnpm are reported as WARNINGS for now, although every application
 # target (make setup/lint/format-check/typecheck/test/build, and the pre-commit
-# hook that runs three of them) needs both: scripts/tests/customize-e2e.test.sh,
-# run by the onboarding-customize-e2e job in .github/workflows/governance.yml,
-# requires this script to exit 0 on a stock ubuntu-latest runner, which ships
-# Node.js 22 and no pnpm. Promote both to hard checks once that job installs
-# them (actions/setup-node with .nvmrc, pnpm/action-setup).
+# hook that runs three of them) needs both: a template-onboarding test (since
+# removed) required this script to exit 0 on a stock ubuntu-latest runner, which
+# ships Node.js 22 and no pnpm. Nothing requires that now, so both can become
+# hard checks.
 
 echo "=== Application ==="
 

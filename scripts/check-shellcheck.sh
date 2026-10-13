@@ -16,7 +16,7 @@
 #
 # This gate opened with a backlog at the default (every severity, including
 # `info` and `style`): two pre-existing `SC2015` (`info`) findings in
-# `scripts/customize.sh` and `scripts/release-notes.sh`, neither touched by
+# `scripts/customize.sh` (since removed) and `scripts/release-notes.sh`, neither touched by
 # the change that added this gate, and neither visible locally — a version
 # of the shellcheck binary newer than the CI image's Alpine 3.19 package
 # (0.9.0) apparently changed what SC2015 reports at the same severity. Per

@@ -152,10 +152,10 @@ the Feature issue template shape:
 
 ---
 
-## Step 5 — Run customize check and report
+## Step 5 — Run the toolchain check and report
 
 ```bash
-make customize
+make doctor
 ```
 
 Show the output and summarize what remains to be configured manually (GitHub
@@ -174,4 +174,3 @@ the app-specific CI jobs in `.github/workflows/`).
   origin remote, which `gh` resolves on its own)
 - Personas must use the user's language and domain — do not genericize them
 - Write files before creating issues — never create issues then fail on file writes
-- If `make customize` is not available, report remaining gaps manually

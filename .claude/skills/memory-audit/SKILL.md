@@ -19,8 +19,7 @@ in ways that are individually invisible. Upstream, one store reached 801 files /
 2.5 MB with 130 files carrying no `description:` — invisible to recall no matter
 how good their contents — and 266 indexed by nothing at all.
 
-The policy that governs the store lives in `global-claude-md.example`
-("Memory discipline"). **This skill is its enforcement.** A policy with no sweep
+The policy that governs the store lives in `.claude/memory-discipline.md`. **This skill is its enforcement.** A policy with no sweep
 is the exact shape this harness exists to eliminate: a rule that lives only in
 prose.
 

@@ -278,16 +278,10 @@ scripts/CLAUDE.md    <- loads when editing anything under scripts/
 frontend/CLAUDE.md   <- loads when editing anything under frontend/
 ```
 
-Blueprint ships this pattern two ways:
-
-- **`scripts/CLAUDE.md`** is live today — real rules for this repo's own CI gate
-  scripts (`ci/CLAUDE.md` is a one-line `@` import of it, so `ci/**` picks up the same
-  rules without duplicating them).
-- **`frontend/CLAUDE.md.example`, `tests/CLAUDE.md.example`**
-  are portable rule sets with nowhere to live yet — Blueprint ships no application code,
-  so there is no real `frontend/` or `tests/` tree to put a real `CLAUDE.md` in. Once your
-  project creates one, **move** (not copy) the matching `.example` file into it and
-  rename to `CLAUDE.md`.
+This repository uses the pattern in two places: **`scripts/CLAUDE.md`**, the rules for
+its own CI gate scripts (`ci/CLAUDE.md` is a one-line `@` import of it, so `ci/**` picks up
+the same rules without duplicating them), and **`apps/web/CLAUDE.md`**, the web app's
+design system.
 
 A glob that does not map to one real directory — "every `*.test.*` file, wherever it
 lives" — cannot be expressed this way; put that content in the nearest directory that
@@ -731,7 +725,6 @@ alias for at least one minor release.
 ## Frontend UI conventions
 
 The web app (`apps/web`) has no design system yet. When one exists, generate
-`apps/web/CLAUDE.md` with `/import-design` (move `frontend/CLAUDE.md.example` there as the
-starting point) so `ux-design` and `ux-review` check against it. Until then: Slovenian and
+`apps/web/CLAUDE.md` with `/import-design` so `ux-design` and `ux-review` check against it. Until then: Slovenian and
 English UI strings come from one message catalog, never inline literals, and every screen is
 usable by keyboard alone.

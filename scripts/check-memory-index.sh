@@ -52,7 +52,7 @@ set -euo pipefail
 MEMORY_MAX_BYTES="${MEMORY_MAX_BYTES:-23800}"
 
 # Memory types whose whole purpose is to be reachable. `project_*` is exempt: per-issue
-# records are file-only by design (see "Memory discipline" in global-claude-md.example).
+# records are file-only by design (see .claude/memory-discipline.md).
 INDEXED_PREFIXES_RE='^(feedback|user|reference|env)[_-]'
 
 resolve_memory_dir() {

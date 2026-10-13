@@ -48,8 +48,8 @@ The application's own lint/typecheck/test/build jobs live in `ci.yml`. See
   SHA and never canceled, because `release-pipeline-gate` needs a completed run
   for the tagged commit.
 - **A skipped job reports success to branch protection.** That is why the
-  GitLab `changes:` rules became a scope step inside the job (`app-fixture-gates`,
-  `onboarding-customize-e2e`): the job always exists and says why it did nothing.
+  GitLab `changes:` rules became a scope step inside the job (`app-fixture-gates`):
+  the job always exists and says why it did nothing.
   Do not make a required check conditional on something a PR author controls.
 - **There is no `allow_failure: exit_codes`.** `continue-on-error` swallows every
   failure, so never use it on a gate. To map one exit code to a warning, catch it
