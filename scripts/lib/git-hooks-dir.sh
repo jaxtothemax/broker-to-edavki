@@ -9,7 +9,7 @@
 # main checkout's `.git/worktrees/<name>/` — so a literal `.git/hooks` path
 # does not exist there even when hooks ARE installed, and every caller that
 # assumed the literal path either errored (`scripts/setup-hooks.sh`, issue #49)
-# or silently misreported hook state (`scripts/doctor.sh`, `scripts/customize.sh`).
+# or silently misreported hook state (`scripts/doctor.sh`).
 #
 # `git rev-parse --git-common-dir` gives the real, SHARED git dir from any
 # worktree — installing there means one install serves the main checkout and

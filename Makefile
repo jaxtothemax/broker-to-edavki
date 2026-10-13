@@ -10,15 +10,12 @@
 # The application is a TypeScript pnpm workspace (packages/*, apps/*); its
 # targets are in the "Application" section below.
 
-.PHONY: setup install-deps lint format format-check typecheck test test-e2e build doctor customize clean pre-push-checks check-collision check-selftest-parity check-version-lockstep check-licenses print-coverage-layers release-pipeline-check gitleaks-check check-nul-bytes check-invisible-chars check-complexity
+.PHONY: setup install-deps lint format format-check typecheck test test-e2e build doctor clean pre-push-checks check-collision check-selftest-parity check-version-lockstep check-licenses print-coverage-layers release-pipeline-check gitleaks-check check-nul-bytes check-invisible-chars check-complexity
 
 # ─── Universal targets ────────────────────────────────────────────────────────
 
 setup: install-hooks install-deps  ## First-time project setup (install hooks and the pnpm workspace)
-	@echo "Setup complete. Run 'make customize' to check template configuration."
-
-customize:  ## Check and guide template customization (run after cloning)
-	@bash scripts/customize.sh
+	@echo "Setup complete. Run 'make doctor' to check the toolchain."
 
 install-hooks:
 	@scripts/setup-hooks.sh
@@ -329,9 +326,6 @@ gate-self-tests:  ## Prove the check scripts can still fail
 	@bash scripts/tests/pre-mr-security-gate.test.sh
 	@bash scripts/tests/setup-hooks.test.sh
 	@bash scripts/tests/app-fixture-gates.test.sh
-	@# customize.sh/doctor.sh are onboarding checks, not CI gates — same bucket
-	@# as the wt-*/setup-hooks tests above. See onboarding-customize-e2e in .github/workflows/governance.yml.
-	@bash scripts/tests/customize-e2e.test.sh
 
 release-pipeline-check:  ## Assert this commit's branch pipeline passed before a tag publishes
 	@# NOT in pre-push-checks on purpose: its oracle is the forge API and it only
