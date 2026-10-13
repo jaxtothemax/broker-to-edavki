@@ -255,6 +255,15 @@ check-load-bearing:  ## Every call site declared load-bearing is still present
 check-pages-build:  ## The web app's Pages build check proves it can still fail (self-test only)
 	@node apps/web/scripts/pages-build/check-pages-build.mjs --self-test
 
+.PHONY: check-rates-snapshot
+check-rates-snapshot:  ## Check a snapshot rebuilt by packages/fx/scripts/build-snapshot.mjs against the committed one and the ECB
+	@# NOT in pre-push-checks on purpose: its input is a snapshot just rebuilt
+	@# from bsi.si and the ECB's rate history, both downloaded, so a failure can
+	@# appear with no diff to cause it. The rates workflow runs it after each rebuild.
+	@pnpm --filter "@taxreporter/fx..." build
+	@node packages/fx/scripts/check-snapshot.mjs --self-test
+	@node packages/fx/scripts/check-snapshot.mjs
+
 check-stale-refs:  ## STUB/WIP markers, and TODO(#N)/SUPPRESSED-UNTIL(#N) against closed issues
 	@# NOT in pre-push-checks on purpose: its oracle is the issue tracker, so a
 	@# failure can appear with no diff to cause it and no commit that fixes it.

@@ -28,6 +28,13 @@ export {
   type RateSource,
 } from "./rates.js";
 export {
+  ecbDifferences,
+  historyChanges,
+  parseEcbHistory,
+  type EcbDifference,
+  type HistoryChange,
+} from "./refresh.js";
+export {
   dailyCsv,
   isIsoDate,
   monthlyCsv,

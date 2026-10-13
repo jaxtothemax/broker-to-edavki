@@ -179,3 +179,7 @@ why:  The only thing keeping the web app out of the Pages artifact until PUBLISH
 path: apps/web/src/tour/TourLayer.tsx
 call: place(true);
 why:  The only place a stop is judged: with `judge`, a presentation whose lines cannot be drawn clear of the text and controls, or whose boxes would leave the band between the sticky header and the dock, gives way to the next, the sheet at last (ADR 0016, section 5). The silent break is not deleting this line (then no stop is ever laid out and every e2e spec waiting for `data-ready` fails) but changing it to `place()`: every stop still lays out, but a line that cannot be drawn is left out and a box may sit under the header, with nothing saying which target it explains. No stop of the demo at 1440x900 needs the fallback, so the unit tests stay green; tour-lines.spec.ts at 1280x800 catches it.
+
+path: .github/workflows/rates.yml
+call: node packages/fx/scripts/check-snapshot.mjs
+why:  The only check between a snapshot rebuilt from bsi.si and a pull request proposing it: no rate already in the snapshot changed, and BSI still matches the ECB except on the known days (ADR 0005). The workflow runs on a schedule and nothing in the test suite reads it, so deleting the check leaves every check green; the refresh then either stops proposing anything without saying why (no `changed` output) or, if the condition is rewritten, proposes an unchecked snapshot.
