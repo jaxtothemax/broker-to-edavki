@@ -1,7 +1,7 @@
 /**
- * eToro account statements for the tests (ADR 0020): no real export has
- * been read yet (R1), so every statement is written at test time, with
- * the shapes research 07 §4.1 records. The Apple round trip and its
+ * eToro account statements for the tests (ADR 0020): no real export with
+ * a row has been read yet (R1), so every statement is written at test
+ * time, with the shapes research 07 §4.1 records. The Apple round trip and its
  * dividend carry the figures of the one statement research saw, under
  * made-up IDs and dates; the holder's name is a canary.
  */

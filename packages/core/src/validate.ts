@@ -87,6 +87,7 @@ const IGNORED_REASONS = {
   gift: true,
   crypto: true,
   brokerTaxSettlement: true,
+  explanation: true,
 } as const satisfies Record<IgnoredReason, true>;
 
 /** Whether a value is a reason of `IgnoredReason`, own keys only. */

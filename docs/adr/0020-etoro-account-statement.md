@@ -12,12 +12,21 @@
 > Consequences ask for one real, anonymized export before an XLSX adapter ships, and that
 > precondition stands. The adapter is not to be released until such an export passes, or
 > shows which of the decisions below are wrong.
+>
+> **Update (2026-10-21):** one real export has been read: the owner's own statement of an
+> account with no activity, exported on 2026-10-21 and committed anonymized as
+> `packages/brokers/test/fixtures/etoro/2026-10-no-activity.xlsx`. It showed a sixth sheet,
+> Glossary, which decision 1 refused, so every current statement was refused; decision 1
+> now skips it. Its three data sheets' headers match the revisions accepted, column for
+> column. With no row, it says nothing about trades, dividends or the clock, so R1 stays
+> open.
 
 ## Context
 
 eToro is the broker Slovenian investors use most (research 07 §2). It exports only an
 account statement: an XLSX workbook of five sheets, Account Summary, Closed Positions,
-Account Activity, Dividends and Financial Summary (research 07 §4.1). ADR 0014's reader
+Account Activity, Dividends and Financial Summary, and in a statement exported in October
+2026 a sixth, Glossary (research 07 §4.1). ADR 0014's reader
 opens it. This ADR settles how the adapter reads it.
 
 The evidence is thin, and it is collected in research 07 §4.1:
@@ -50,6 +59,11 @@ open. This ADR records the decisions and what was chosen for each risk.
    - It skips Account Summary and Financial Summary whole: their rows are never read
      (Account Summary holds the holder's name and username). Each skipped sheet becomes
      one ignored row, with the reason `summary`.
+   - It skips a sheet named Glossary whole when there is one, and does not need one
+     (amended 2026-10-21). A statement exported in October 2026 has it: plain-language
+     definitions with no figure (research 07 §4.1). One described before has none, so the
+     workbook is still recognized by the five sheets alone. The Glossary becomes one
+     ignored row, with the reason `explanation`.
    - Any other sheet, a chart sheet included, refuses the file (`unknownSheet`, by
      position). So does a read sheet that is hidden (`hiddenSheet`).
    - Hidden rows or columns in a read sheet raise a warning (`hiddenCells`).
@@ -102,6 +116,14 @@ open. This ADR records the decisions and what was chosen for each risk.
 
    Without this, a sale would be matched against the wrong lots, at eToro or another
    broker, and nothing would say so.
+
+   **A statement with no row** in any of the three sheets gives the gate nothing to check
+   (amended 2026-10-21). An account that never held anything looks the same as a period
+   chosen too short for an account that did. It is read, with one warning
+   (`statementEmpty`) that says to export again from the account's opening if the account
+   ever held anything. It is not refused: an empty account would then hold back every other
+   broker's return. Refusing it, or reading Account Summary's opening equity to tell the
+   two apart, is the owner's call (open questions).
 5. **Lots (D5).**
    - **A closed position** is a purchase at Open Rate and a sale at Close Rate, in US
      dollars, of its units, on the times of its two Account Activity rows. It is refused
@@ -250,15 +272,17 @@ open. This ADR records the decisions and what was chosen for each risk.
 12. **Findings (D12).** New codes, each in English and Slovenian:
     - for the sheets: `unknownSheet`, `hiddenSheet`, `hiddenCells`;
     - for the statement: `columnMissing`, `statementFormat`, `historyIncomplete`,
-      `dateUncertain`, `dividendDatesUncertain`, `openPositionsAssumed`,
-      `isinUnresolved`, `dividendInconsistent`;
+      `statementEmpty` (a warning, added 2026-10-21), `dateUncertain`,
+      `dividendDatesUncertain`, `openPositionsAssumed`, `isinUnresolved`,
+      `dividendInconsistent`;
     - for the pipeline: `secondStatement`.
 
     `tradeInconsistent` gains the checks `closeAmount`, `dates`, `units` and `activity`.
+    The ignored reasons gain `crypto` and `explanation` (the Glossary).
     A finding names no position ID, `Copied From`, `Notes` or cash row's Details. Sheet
     names never appear in one either: sheets are named by position. Sheet `part` IDs are
     letters only (`closedPositions`, `accountActivity`, `dividends`, `accountSummary`,
-    `financialSummary`).
+    `financialSummary`, `glossary`).
 
 ### The owner's risks, and what was chosen
 
@@ -269,6 +293,9 @@ open. This ADR records the decisions and what was chosen for each risk.
   found none online: every public parser builds its test data in code, and the one published
   statement was saved again by a third party and is refused by the history gate. Only an
   export from a real account, anonymized as the fixtures README describes, can settle it.
+  On 2026-10-21 the owner exported their own statement, from an account with no activity.
+  It settled the sheets (the Glossary, decision 1) and the headers, and is the first
+  binary fixture. It has no trade or dividend, so R1 stays open for one that does.
 - **R2, a position still open with no ISIN in the file: option (b), settled 2026-10-12,
   with the any-security scope.** The owner chose (b), withholding only the Doh-KDVP the lot
   can change. The review that followed found that no key on a security is safe without an
@@ -356,12 +383,20 @@ open. This ADR records the decisions and what was chosen for each risk.
   statement is mostly caught (a day past 12 is no month, and the date-order gate), but one
   whose every day is 12 or less would be read with day and month swapped, consistently
   across its sheets, so no cross-check would notice. An untouched export settles the order.
+  The one read so far (2026-10-21) writes Account Summary's period as `01/10/2026
+  00:00:00` to `20/10/2026 23:59:59`, day first, for a statement asked for 1 to 20
+  October. Its data sheets have no row, so the order in them is still unseen.
 - **How deep the start check goes.** The history gate's `start` compares Realized Equity
   with Realized Equity Change on Account Activity's first row only. A history cut cleanly
   after a first row that was edited would pass `start`, `order` and `openRow`. Whether
   Realized Equity includes the capital invested, and so whether a running-balance check
   across rows is possible, depends on the same untouched export.
-- **The owner's answer to R1.** One real, untouched export. R2 and R3 are settled above.
+- **An empty statement.** Should a statement with no row be refused, or should its
+  opening equity be read from Account Summary's table (row 11, below the preamble that
+  holds the name) to tell an empty account from a period chosen too short? Today it is
+  read with a warning (decision 4).
+- **The owner's answer to R1.** One real, untouched export with trades and dividends. The
+  one read on 2026-10-21 has neither. R2 and R3 are settled above.
 
 ## On Acceptance
 

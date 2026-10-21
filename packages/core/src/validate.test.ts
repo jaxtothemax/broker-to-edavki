@@ -246,6 +246,7 @@ describe("validateLedger", () => {
       "gift",
       "brokerTaxSettlement",
       "crypto",
+      "explanation",
     ] as const satisfies readonly IgnoredReason[];
     for (const reason of reasons) {
       expect(codes([{ ...ignored, reason }]), reason).toEqual([]);

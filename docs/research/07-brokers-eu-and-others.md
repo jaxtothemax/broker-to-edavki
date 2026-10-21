@@ -96,7 +96,28 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
 > written `10 %`; some statements lack the EUR columns; and each claim now carries its
 > evidence tag. The header tables below are quoted from that commit.
 
-**Workbook.** Formats are PDF and XLS(X). The XLSX has five sheets: `Account Summary`, `Closed Positions`, `Account Activity` (formerly "Transactions Report"), `Dividends` and `Financial Summary` [M]. The data sheets have their header on row 1; `Account Summary` has a preamble (name, username, currency and the statement's dates), with its table's header on row 10 [M]. `Account Summary` holds the holder's **Name and Username**, so a reader should never open it.
+> **A real export (2026-10-21, #8).** The owner exported their own account statement as XLSX,
+> through Settings → Account → Account Statement, for 1 to 20 October 2026. The account has
+> never had any activity. It is committed anonymized as
+> `packages/brokers/test/fixtures/etoro/2026-10-no-activity.xlsx`, with only the name, username
+> and creation date replaced. What it shows [H for this one export]:
+>
+> - One click on the XLS icon downloads the whole workbook, whichever tab is open.
+> - It has **six sheets**: the five below and a sixth, `Glossary`, of plain-language
+>   definitions with no figure ("Account Statement Glossary", grouped by the statement's
+>   sections). No earlier source mentions it.
+> - Its data sheets' headers are exactly Closed Positions 2025.2.15 (with `Profit(EUR)`),
+>   Account Activity 2025.2 and Dividends 2025.11 (with the EUR columns), in the order the
+>   tables below give.
+> - A sheet with no row keeps its header row, and nothing under it.
+> - Each table is an Excel table part (`xl/tables/`), and the workbook has no `absPath`. It
+>   was written by the Open XML SDK (`x:` prefixes, a `package/services/metadata` part),
+>   though `docProps/app.xml` names Microsoft Excel.
+> - `Account Summary` writes its amounts as number cells, and its period day first
+>   (`01/10/2026 00:00:00` to `20/10/2026 23:59:59`). The downloaded file's name writes the
+>   same period month first (`10-1-2026-10-20-2026`).
+
+**Workbook.** Formats are PDF and XLS(X). The XLSX has five sheets: `Account Summary`, `Closed Positions`, `Account Activity` (formerly "Transactions Report"), `Dividends` and `Financial Summary` [M], and in the export of 2026-10-21 a sixth, `Glossary` [H]. The data sheets have their header on row 1; `Account Summary` has a preamble (name, username, currency, the account's creation date and the statement's dates), with its table's header on row 10 [H]. `Account Summary` holds the holder's **Name and Username**, so a reader should never open it.
 
 - Sheet names and headers are translated with the UI language. The Spanish export uses `Posiciones cerradas`, `Actividad de la cuenta` and `Dividendos`, with headers such as `Acción`, `Ganancias (EUR)` and `Tipo de cambio de apertura (USD)` [M].
 - Use the **XLSX**; the PDF is for humans.
@@ -172,9 +193,9 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
 
 **The published statement.** `nra-assist.com` publishes an example
 (`https://nra-assist.com/help/brokers/etoro/etoro-example.xlsx`, SHA-256 `ed0c91a1…`), the
-only real-looking statement found [M]. It was **saved again by a third party** (it has table
-parts and an `absPath`, which eToro's exporter does not write) and is **not an untouched
-export**:
+only real-looking statement found [M]. It was **saved again by a third party** (it has an
+`absPath`, which eToro's exporter does not write; its table parts do not show it, as the
+real export of 2026-10-21 has them too) and is **not an untouched export**:
 
 - dated 2025-09-20, covering 2024, it lacks `Profit(EUR)` and the dividends' EUR columns;
 - its first Account Activity row already shows a realized equity of 4291.25, so it does not

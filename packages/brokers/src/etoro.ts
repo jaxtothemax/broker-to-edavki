@@ -1,18 +1,21 @@
 /**
  * eToro's account statement (XLSX), its current revision only (research 07
  * §4.1; ADR 0020). **Unverified:** written from parsers of real exports
- * and one statement a third party saved again, never from an untouched
- * export, which it waits for before it ships (ADR 0014, Consequences).
+ * and one statement a third party saved again. The one untouched export
+ * read, of an account with no activity, settled only its sheets and
+ * headers; one with trades is what it waits for before it ships (ADR 0014,
+ * Consequences).
  *
  * What it reads, and why:
  *
  * - **Recognized by its five sheets**, by their exact English names. It
  *   reads Closed Positions, Account Activity and Dividends; Account Summary,
  *   which holds the holder's name and username, and Financial Summary are
- *   skipped whole, their rows never read. (The workbook's shared strings
- *   are inflated whole, but a string is reached only through a cell of a
- *   sheet that is read.) Any other sheet, or a hidden one it
- *   reads, refuses the file (ADR 0014 §6).
+ *   skipped whole, their rows never read, and so is a Glossary when there
+ *   is one (a statement exported in October 2026 has it). (The
+ *   workbook's shared strings are inflated whole, but a string is reached
+ *   only through a cell of a sheet that is read.) Any other sheet, or a
+ *   hidden one it reads, refuses the file (ADR 0014 §6).
  * - **Columns by their exact header** on row 1, in any order, each once;
  *   a column outside the revision's list refuses the file, as does an older
  *   revision's layout, which another export fixes.
@@ -101,6 +104,16 @@ const READ: ReadonlyMap<string, string> = new Map([
 const SKIPPED: ReadonlyMap<string, string> = new Map([
   ["Account Summary", "accountSummary"],
   ["Financial Summary", "financialSummary"],
+]);
+
+/**
+ * Sheets skipped whole when present, and never required: a statement
+ * exported in October 2026 adds a Glossary of plain-language definitions
+ * (research 07 §4.1), one described before it has none. Known by its exact
+ * name, it holds no figure to read; any other sheet still refuses the file.
+ */
+const EXPLAINED: ReadonlyMap<string, string> = new Map([
+  ["Glossary", "glossary"],
 ]);
 
 /** A sheet's columns in one revision: those it must have, and may. */
@@ -616,7 +629,10 @@ function read(book: Workbook, context: ReadContext): ImportResult {
   const refusals: Diagnostic[] = [];
   const positions = new Map<string, number>();
   for (const sheet of book.sheets) {
-    const part = READ.get(sheet.name) ?? SKIPPED.get(sheet.name);
+    const part =
+      READ.get(sheet.name) ??
+      SKIPPED.get(sheet.name) ??
+      EXPLAINED.get(sheet.name);
     if (part === undefined || !sheet.worksheet) {
       refusals.push(
         diagnostic("blocking", "unknownSheet", { sheet: sheet.position }),
@@ -663,6 +679,20 @@ function read(book: Workbook, context: ReadContext): ImportResult {
       [...formats].map((f) =>
         diagnostic("blocking", "statementFormat", { broker: ETORO, format: f }),
       ),
+    );
+  }
+  // With no row, the history gate below has nothing to check: an account
+  // that never held anything looks the same as a period chosen too short.
+  // A warning, not a refusal, so an empty account blocks no other broker's
+  // return.
+  if (
+    closedTable.rows.length +
+      activityTable.rows.length +
+      dividendTable.rows.length ===
+    0
+  ) {
+    diagnostics.push(
+      diagnostic("warning", "statementEmpty", { broker: ETORO }),
     );
   }
 
@@ -1412,6 +1442,11 @@ function read(book: Workbook, context: ReadContext): ImportResult {
       ignore({ fileId: context.fileId, row: 1, part }, "summary");
     }
   }
+  for (const [name, part] of EXPLAINED) {
+    if (positions.has(name)) {
+      ignore({ fileId: context.fileId, row: 1, part }, "explanation");
+    }
+  }
   const lastDate = days.reduce<IsoDate | null>(
     (latest, day) => (latest === null || day > latest ? day : latest),
     null,
@@ -1493,13 +1528,16 @@ function trade(
   };
 }
 
-/** The five sheets an English account statement has, each by its name. */
+/**
+ * The five sheets every English account statement has, each by its name;
+ * not the Glossary, which older statements lack.
+ */
 const SHEETS = [...READ.keys(), ...SKIPPED.keys()];
 
 /**
  * eToro's account statement: recognized when all five of its sheets are
- * there, by exact name, so that one it adds is refused by name in `read`
- * rather than going unrecognized.
+ * there, by exact name, so that one it adds is refused by position in
+ * `read` rather than going unrecognized.
  */
 export const etoro: XlsxAdapter = {
   broker: ETORO,

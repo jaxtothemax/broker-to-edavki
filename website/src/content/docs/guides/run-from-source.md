@@ -16,7 +16,7 @@ file.
 - **Interactive Brokers (IBKR):** an Activity Flex Query in XML (see below for its sections).
 - **Trade Republic:** the transaction export (CSV), with all transactions. Its dividends are
   not read yet: a file with one stops both returns and says why.
-- **eToro, not yet checked against a real export:** the account statement (XLSX), from the
+- **eToro, not yet checked against a real export with trades:** the account statement (XLSX), from the
   day you opened the account to today, exported from eToro and not opened or saved in a
   spreadsheet program. TaxReporter reads US-dollar shares and ETFs held long, closed or still
   open, and their dividends. It leaves out CFDs with a note, sets crypto aside, and counts a
@@ -26,8 +26,10 @@ file.
   currency, an activity type TaxReporter does not know, or a trade too close to midnight to
   date stops both returns, and the finding says why. A position still open whose ISIN no row
   of the file gives is refused too, but it holds back only the Doh-KDVP of a year with a sale
-  of any security from 30 days before its purchase on, never the Doh-Div. The reader was written from other
-  tools' code and one published sample, never from a real statement, so check its figures
+  of any security from 30 days before its purchase on, never the Doh-Div. A statement with no
+  rows at all is read with a warning: if the account ever held anything, export it again from
+  the day you opened it. The reader was written from other tools' code and one published
+  sample, and checked only against one real statement with no activity, so check its figures
   against eToro's with extra care
   ([#8](https://github.com/jaxtothemax/broker-to-edavki/issues/8)).
 

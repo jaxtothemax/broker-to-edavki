@@ -421,6 +421,8 @@ export const findingsEn: FindingMessages = {
     `${p.broker}: the statement ${pick(p.format, STATEMENT_FORMATS_EN, "writes values in a form TaxReporter does not know")}. TaxReporter does not read that yet, so no number in it is read on a guess. If you opened and saved it in a spreadsheet program, export it again from your broker, unchanged; otherwise please report it.`,
   historyIncomplete: (p) =>
     `${p.broker}: ${pick(p.gap, HISTORY_GAPS_EN, "the statement does not hold the account's whole history")}. FIFO needs every purchase since the account was opened, so the statement is not read. Export the account statement again, from the day you opened the account or earlier.`,
+  statementEmpty: (p) =>
+    `${p.broker}: the statement has no closed positions, account activity or dividends. If the account never held anything, there is nothing in it to report. If it did, export the account statement again, from the day you opened the account: a statement with no rows cannot show that it covers the account's whole history.`,
   dateUncertain: (p) =>
     at(
       p,
@@ -919,6 +921,8 @@ export const findingsSl: FindingMessages = {
     `${p.broker}: izpisek ${pick(p.format, STATEMENT_FORMATS_SL, "zapisuje vrednosti v obliki, ki je TaxReporter ne pozna")}. TaxReporter tega še ne bere, zato nobeno število iz njega ni prebrano na slepo. Če ste ga odprli in shranili v programu za preglednice, ga pri posredniku izvozite znova, nespremenjenega; sicer nam to sporočite.`,
   historyIncomplete: (p) =>
     `${p.broker}: ${pick(p.gap, HISTORY_GAPS_SL, "izpisek ne zajema celotne zgodovine računa")}. Za FIFO so potrebni vsi nakupi od odprtja računa, zato izpisek ni prebran. Izpisek računa izvozite znova, od dne, ko ste odprli račun, ali od prej.`,
+  statementEmpty: (p) =>
+    `${p.broker}: izpisek nima zaprtih pozicij, dejavnosti računa ne dividend. Če na računu nikoli ni bilo ničesar, iz njega ni ničesar za napoved. Če je bilo, izpisek računa izvozite znova, od dne, ko ste odprli račun: izpisek brez vrstic ne more pokazati, da zajema celotno zgodovino računa.`,
   dateUncertain: (p) =>
     at(
       p,

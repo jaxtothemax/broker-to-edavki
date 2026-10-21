@@ -198,7 +198,12 @@ export type IgnoredReason =
    * on neither return, as Slovenia taxes no gain on it for now (research 07
    * §3, rule 4). A leveraged or short one is refused, not left out.
    */
-  | "crypto";
+  | "crypto"
+  /**
+   * A sheet of explanations with no figures, such as the Glossary eToro
+   * adds to its statement (research 07 §4.1): never read.
+   */
+  | "explanation";
 
 export interface IgnoredRow {
   readonly kind: "ignored";

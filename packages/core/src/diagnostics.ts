@@ -501,6 +501,12 @@ export interface DiagnosticParams {
     readonly broker: string;
     readonly gap: "start" | "order" | "openRow";
   };
+  /**
+   * The statement has no row in any sheet read. Right for an account that
+   * never held anything; but with no row, `historyIncomplete` has nothing
+   * to check, so a period chosen too short would pass unseen.
+   */
+  statementEmpty: { readonly broker: string };
   /** A time so near midnight that the broker's unstated zone decides the day. */
   dateUncertain: MaybeWhere & { readonly broker: string };
   /** Dividends dated by the payment date where the time could say otherwise. */

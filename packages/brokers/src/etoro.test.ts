@@ -1,7 +1,11 @@
 /**
  * eToro's account statement (ADR 0020), on the synthetic statements of
- * ./testing/etoro.ts: no real export has been read yet (R1).
+ * ./testing/etoro.ts, and on one real statement of an account with no
+ * activity (test/fixtures/etoro/README.md). No real statement with a trade
+ * or a dividend has been read yet (R1).
  */
+import { readFileSync } from "node:fs";
+
 import {
   Decimal,
   diagnostic,
@@ -69,6 +73,24 @@ const refusal = (
   row: number,
 ) => diagnostic("blocking", code as never, params as never, at(part, row));
 
+/** A statement read with every sheet it asks for noted, by position. */
+function readWatched(bytes: Uint8Array) {
+  const book = openWorkbook(bytes) as Workbook;
+  const asked: number[] = [];
+  const result = etoro.read(
+    {
+      sheets: book.sheets,
+      date1904: book.date1904,
+      rows(position) {
+        asked.push(position);
+        return book.rows(position);
+      },
+    },
+    context,
+  );
+  return { asked: asked.sort(), result, book };
+}
+
 /**
  * Every data row of the three sheets read is an event, an ignored row, or
  * the source of a blocking finding: none is dropped (CLAUDE.md).
@@ -132,6 +154,58 @@ describe("etoro, choosing the statement", () => {
       diagnostic("blocking", "unknownSheet", { sheet: 6 }),
     ]);
     expect(result.events).toEqual([]);
+  });
+
+  it("skips a Glossary, hidden or not, and reads the rest as without one", () => {
+    const explained = (result: ImportResult) =>
+      result.events.filter(
+        (e) => e.kind === "ignored" && e.reason === "explanation",
+      );
+    for (const state of [undefined, "hidden"]) {
+      const result = read({
+        ...ROUND_TRIP,
+        sheets: (sheets) => [
+          ...sheets,
+          { name: "Glossary", data: "", ...(state ? { state } : {}) },
+        ],
+      });
+      expect(codes(result), state).toEqual([]);
+      expect(trades(result)).toEqual(trades(read()));
+      expect(explained(result)).toEqual([
+        expect.objectContaining({ source: at("glossary", 1) }),
+      ]);
+    }
+    expect(explained(read())).toEqual([]);
+  });
+
+  it("is not chosen by a Glossary in place of one of its five sheets", () => {
+    const result = importFile({
+      bytes: statement({
+        ...ROUND_TRIP,
+        sheets: (sheets) => [
+          ...sheets.filter((s) => s.name !== "Financial Summary"),
+          { name: "Glossary", data: "" },
+        ],
+      }),
+      ...context,
+    });
+    expect(result.diagnostics).toEqual([
+      diagnostic("blocking", "unknownFormat", {}),
+    ]);
+  });
+
+  it("still refuses a sheet it does not know beside a Glossary", () => {
+    const result = read({
+      ...ROUND_TRIP,
+      sheets: (sheets) => [
+        ...sheets,
+        { name: "Glossary", data: "" },
+        { name: "Notes", data: "" },
+      ],
+    });
+    expect(result.diagnostics).toEqual([
+      diagnostic("blocking", "unknownSheet", { sheet: 7 }),
+    ]);
   });
 
   it("refuses a hidden sheet it reads, but not a hidden one it skips", () => {
@@ -483,6 +557,27 @@ describe("etoro, the whole history or nothing", () => {
         }),
       ).map((d) => d.params),
     ).toEqual([{ broker: ETORO, gap: "openRow" }]);
+  });
+
+  it("warns of a statement with no row, which the gate cannot check, and refuses nothing", () => {
+    const empty = read({ closed: [], activity: [], dividends: [] });
+    expect(empty.diagnostics).toEqual([
+      diagnostic("warning", "statementEmpty", { broker: ETORO }),
+    ]);
+    expect(empty.events.every((e) => e.kind === "ignored")).toBe(true);
+    // Blank rows, as a spreadsheet keeps them styled, are no rows either.
+    const blank = { "Position ID": "", Date: "", "Date of Payment": "" };
+    expect(
+      read({ closed: [blank], activity: [blank], dividends: [blank] })
+        .diagnostics,
+    ).toEqual([diagnostic("warning", "statementEmpty", { broker: ETORO })]);
+    // A row in any one sheet, and the statement is not empty.
+    expect(
+      read({ activity: [deposit()] }).diagnostics.map((d) => d.code),
+    ).not.toContain("statementEmpty");
+    expect(read().diagnostics.map((d) => d.code)).not.toContain(
+      "statementEmpty",
+    );
   });
 });
 
@@ -1664,6 +1759,20 @@ describe("etoro, privacy", () => {
     expect(asked.sort()).toEqual([2, 3, 4]);
   });
 
+  it("never reads a Glossary, not even one it could not parse", () => {
+    const { asked, result } = readWatched(
+      statement({
+        ...ROUND_TRIP,
+        sheets: (sheets) => [
+          ...sheets,
+          { name: "Glossary", data: "<row><c><v>1</c></row" },
+        ],
+      }),
+    );
+    expect(asked).toEqual([2, 3, 4]);
+    expect(codes(result)).toEqual([]);
+  });
+
   it("reads none of a skipped sheet, its shared strings or its damage", () => {
     // As a spreadsheet saves it: the name and username in the shared-string
     // table, and the Financial Summary's part damaged. Neither is read.
@@ -1756,5 +1865,67 @@ describe("etoro, privacy", () => {
     expect(JSON.stringify(result.diagnostics.map(forExport))).not.toContain(
       "CANARY",
     );
+  });
+});
+
+describe("etoro, a real statement (test/fixtures/etoro/README.md)", () => {
+  // An account with no activity, exported on 2026-10-21 and anonymized:
+  // it settles the sheets and headers, and nothing that reads a row (R1).
+  const bytes = new Uint8Array(
+    readFileSync(
+      new URL(
+        "../test/fixtures/etoro/2026-10-no-activity.xlsx",
+        import.meta.url,
+      ),
+    ),
+  );
+
+  it("reads an account with no activity to its skipped sheets and one warning", () => {
+    const result = importFile({ bytes, ...context });
+    expect(result.broker).toBe(ETORO);
+    expect(result.format).toBe("etoro-xlsx-2025.11");
+    expect(result.diagnostics).toEqual([
+      diagnostic("warning", "statementEmpty", { broker: ETORO }),
+    ]);
+    expect(result.events).toEqual([
+      expect.objectContaining({
+        reason: "summary",
+        source: at("accountSummary", 1),
+      }),
+      expect.objectContaining({
+        reason: "summary",
+        source: at("financialSummary", 1),
+      }),
+      expect.objectContaining({
+        reason: "explanation",
+        source: at("glossary", 1),
+      }),
+    ]);
+  });
+
+  it("has six sheets, reads three, and heads each as the synthetic statements do", () => {
+    const { asked, book } = readWatched(bytes);
+    expect(book.sheets.map((s) => s.name)).toEqual([
+      "Account Summary",
+      "Closed Positions",
+      "Account Activity",
+      "Dividends",
+      "Financial Summary",
+      "Glossary",
+    ]);
+    expect(asked).toEqual([2, 3, 4]);
+    // An empty sheet keeps its header row, in the order ./testing/etoro.ts
+    // writes it: the synthetic statements match eToro's columns.
+    const headerOf = (position: number) => {
+      const { rows } = book.rows(position);
+      expect(rows).toHaveLength(1);
+      const [header] = rows;
+      return [...(header?.cells.entries() ?? [])]
+        .sort(([a], [b]) => a - b)
+        .map(([, cell]) => cell.text);
+    };
+    expect(headerOf(2)).toEqual(CLOSED_HEADER);
+    expect(headerOf(3)).toEqual(ACTIVITY_HEADER);
+    expect(headerOf(4)).toEqual(DIVIDEND_HEADER_2025_11);
   });
 });
