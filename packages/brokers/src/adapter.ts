@@ -146,7 +146,7 @@ export const XML_ADAPTERS: readonly XmlAdapter[] = Object.freeze([ibkr]);
 /**
  * Every XLSX adapter; a workbook must match exactly one of them. eToro's
  * account statement first (ADR 0014, ADR 0020), not yet checked against
- * an untouched export.
+ * an untouched export with trades.
  */
 export const XLSX_ADAPTERS: readonly XlsxAdapter[] = Object.freeze([etoro]);
 

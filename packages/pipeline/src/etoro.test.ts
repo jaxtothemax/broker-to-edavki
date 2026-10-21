@@ -2,8 +2,8 @@
  * An eToro statement through the whole pipeline (ADR 0020): beside a
  * Trading 212 export of the same share, to Doh-KDVP and Doh-Div XML that
  * the vendored FURS schemas accept, whatever the order of the files. The
- * statement is synthetic, written at test time: no real export has been
- * read yet (R1).
+ * statement is synthetic, written at test time: no real export with a
+ * trade or a dividend has been read yet (R1).
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

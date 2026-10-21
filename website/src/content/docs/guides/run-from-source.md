@@ -27,8 +27,8 @@ file.
   date stops both returns, and the finding says why. A position still open whose ISIN no row
   of the file gives is refused too, but it holds back only the Doh-KDVP of a year with a sale
   of any security from 30 days before its purchase on, never the Doh-Div. A statement with no
-  rows at all is read with a warning: if the account ever held anything, export it again from
-  the day you opened it, and use it in place of the empty one. The reader was written from other tools' code and one published
+  rows at all is read with a warning: if the account ever held anything, use a statement
+  exported from the day you opened it in its place. The reader was written from other tools' code and one published
   sample, and checked only against one real statement with no activity, so check its figures
   against eToro's with extra care
   ([#8](https://github.com/jaxtothemax/broker-to-edavki/issues/8)).

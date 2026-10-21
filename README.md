@@ -92,7 +92,8 @@ From source, before the first release:
 | eToro (not yet checked against a real export with trades) | Account statement, XLSX, current layout, from the account's opening ([ADR 0020](docs/adr/0020-etoro-account-statement.md)) | US-dollar shares and ETFs held long, closed or still open; dividends with the tax withheld; CFDs left out with a note, crypto set aside, CFD dividend adjustments counted as interest | A statement that starts later, older layouts, short or leveraged positions, a position still open that paid an overnight fee or whose ticker the file gives two ISINs (one whose ISIN no row of the file gives is refused too, but holds back only the Doh-KDVP of a year with a sale from 30 days before its purchase on), partial closes, other currencies, activity types it does not know, a trade too near midnight to date |
 
 The project's tests use synthetic exports that follow each format as far as the research
-reconstructs it from public samples, not real accounts' data. Each reader still has to be
+reconstructs it from public samples, not real accounts' data, apart from one anonymized eToro
+statement of an account with no activity. Each reader still has to be
 checked against real, anonymized exports before v0.1 ships ([#22](https://github.com/jaxtothemax/broker-to-edavki/issues/22),
 [#12](https://github.com/jaxtothemax/broker-to-edavki/issues/12)). Both the browser app
 and the command-line tool write the same XML for the same files and payer details (the browser app

@@ -29,7 +29,7 @@ export const BROKERS = [
 /**
  * The brokers v0.1 is built to read, as the roadmap lists them. eToro's
  * reader is in the app but unverified, and waits for a real statement
- * before a release names it (ADR 0020): the start screen shows it as
+ * with trades before a release names it (ADR 0020): the start screen shows it as
  * planned, never as being built for v0.1.
  */
 export const V01_BROKERS = [

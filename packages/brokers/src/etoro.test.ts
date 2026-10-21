@@ -583,13 +583,18 @@ describe("etoro, the whole history or nothing", () => {
       read({ closed: [blank], activity: [blank], dividends: [blank] })
         .diagnostics,
     ).toEqual([diagnostic("warning", "statementEmpty", { broker: ETORO })]);
-    // A row in any one sheet, and the statement is not empty.
-    expect(
-      read({ activity: [deposit()] }).diagnostics.map((d) => d.code),
-    ).not.toContain("statementEmpty");
-    expect(read().diagnostics.map((d) => d.code)).not.toContain(
-      "statementEmpty",
-    );
+    // A row in any one sheet, and the statement is not empty: the gate has
+    // a row to check, and refuses the two without their activity rows.
+    for (const spec of [
+      { activity: [deposit()] },
+      { closed: ROUND_TRIP.closed },
+      { dividends: ROUND_TRIP.dividends },
+      ROUND_TRIP,
+    ]) {
+      expect(read(spec).diagnostics.map((d) => d.code)).not.toContain(
+        "statementEmpty",
+      );
+    }
   });
 });
 

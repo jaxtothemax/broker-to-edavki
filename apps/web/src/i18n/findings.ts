@@ -422,7 +422,7 @@ export const findingsEn: FindingMessages = {
   historyIncomplete: (p) =>
     `${p.broker}: ${pick(p.gap, HISTORY_GAPS_EN, "the statement does not hold the account's whole history")}. FIFO needs every purchase since the account was opened, so the statement is not read. Export the account statement again, from the day you opened the account or earlier.`,
   statementEmpty: (p) =>
-    `${p.broker}: the statement has no closed positions, account activity or dividends. If the account never held anything, there is nothing in it to report. If it did, export the account statement again, from the day you opened the account, and use it in place of this one: a statement with no rows cannot show that it covers the account's whole history.`,
+    `${p.broker}: the statement has no closed positions, account activity or dividends. If the account never held anything, there is nothing in it to report. If it did, use a statement exported from the day you opened the account in its place: one with nothing on these sheets cannot show that it covers the account's whole history.`,
   dateUncertain: (p) =>
     at(
       p,
@@ -922,7 +922,7 @@ export const findingsSl: FindingMessages = {
   historyIncomplete: (p) =>
     `${p.broker}: ${pick(p.gap, HISTORY_GAPS_SL, "izpisek ne zajema celotne zgodovine računa")}. Za FIFO so potrebni vsi nakupi od odprtja računa, zato izpisek ni prebran. Izpisek računa izvozite znova, od dne, ko ste odprli račun, ali od prej.`,
   statementEmpty: (p) =>
-    `${p.broker}: izpisek nima zaprtih pozicij, dejavnosti računa ali dividend. Če na računu nikoli ni bilo ničesar, iz njega ni ničesar za napoved. Če je bilo, izpisek računa izvozite znova, od dne, ko ste odprli račun, in ga uporabite namesto tega: izpisek brez vrstic ne more pokazati, da zajema celotno zgodovino računa.`,
+    `${p.broker}: izpisek nima zaprtih pozicij, dejavnosti računa ali dividend. Če na računu nikoli ni bilo ničesar, iz njega ni ničesar za napoved. Če je bilo, namesto njega uporabite izpisek, izvožen od dne, ko ste odprli račun: izpisek, ki na teh listih nima ničesar, ne more pokazati, da zajema celotno zgodovino računa.`,
   dateUncertain: (p) =>
     at(
       p,

@@ -286,8 +286,8 @@ open. This ADR records the decisions and what was chosen for each risk.
 
 ### The owner's risks, and what was chosen
 
-- **R1, no real export: open.** The adapter was built in full on synthetic statements made
-  by `makeWorkbook` at test time, with no binary fixture. It is marked unverified here and in
+- **R1, no real export with trades: open.** The adapter was built in full on synthetic
+  statements made by `makeWorkbook` at test time, with no binary fixture until 2026-10-21. It is marked unverified here and in
   `packages/brokers/test/fixtures/etoro/README.md`. ADR 0014's precondition is not set
   aside: it waits for one real, untouched export before it ships. A search on 2026-10-12
   found none online: every public parser builds its test data in code, and the one published
@@ -365,7 +365,10 @@ open. This ADR records the decisions and what was chosen for each risk.
 - **Dividend merging.** Should eToro's per-position rows of one corporate payment become
   one Doh-Div record (research 02 §5, research 07 §3, rule 5)?
 - **Cell kinds.** Which cells are numbers and which are text in an untouched export? The
-  statement seen mixes them, after another program saved it. Both are read today.
+  statement seen mixes them, after another program saved it. Both are read today. The
+  untouched export of 2026-10-21 has no data row, but its Account Summary writes amounts
+  as number cells with the format `#,##0.00;(#,##0.00)` (so its brackets are formatting,
+  not text), and its Financial Summary writes them as the text `0.00`.
 - **Does Profit(USD) include fees?** If it includes fees or dividends, the close check
   would refuse real positions.
 - **Asset type.** Does Account Activity's Asset type use Closed Positions' Type
@@ -394,7 +397,9 @@ open. This ADR records the decisions and what was chosen for each risk.
 - **An empty statement.** Should a statement with no row be refused, or should its
   opening equity be read from Account Summary's table (row 11, below the preamble that
   holds the name) to tell an empty account from a period chosen too short? Today it is
-  read with a warning (decision 4).
+  read with a warning (decision 4). The owner asked on 2026-10-21 for a reassuring note; it
+  was made a warning rather than `info` because the gate checks nothing on such a file, and
+  a warning still blocks no return. The owner may still make it `info`.
 - **The owner's answer to R1.** One real, untouched export with trades and dividends. The
   one read on 2026-10-21 has neither. R2 and R3 are settled above.
 
