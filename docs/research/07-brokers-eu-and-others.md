@@ -102,7 +102,8 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
 > `packages/brokers/test/fixtures/etoro/2026-10-no-activity.xlsx`, with only the name, username
 > and creation date replaced. What it shows [H for this one export]:
 >
-> - One click on the XLS icon downloads the whole workbook, whichever tab is open.
+> - One download with the XLS icon, from the Summary tab, held all six sheets. Whether a
+>   download from another tab does too was not tried.
 > - It has **six sheets**: the five below and a sixth, `Glossary`, of plain-language
 >   definitions with no figure ("Account Statement Glossary", grouped by the statement's
 >   sections). No earlier source mentions it.

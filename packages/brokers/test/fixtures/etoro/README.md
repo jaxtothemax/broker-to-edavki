@@ -21,9 +21,12 @@ anonymized by a script that rewrote one part, `xl/sharedStrings.xml`, replacing 
 strings: the Account Summary's name (B3, now `Account Holder`), username (B4, now
 `anonymized`) and account creation date (B6, now `15/03/2021 09:00:00`). Every other part
 is byte for byte as eToro wrote it, in the same order and compression; only the archive
-was written again. It settles the sheets (a sixth, Glossary, ADR 0020 decision 1) and the
-headers, and that an empty sheet keeps its header row. It says nothing about trades,
-dividends, cell kinds in the data sheets or the statement's clock.
+was written again. The script checked, rather than anyone looking, that every other part
+is unchanged and that neither the three strings replaced nor any word of three letters or
+more in them is left in any part. Every amount was checked to be 0. It settles the sheets
+(a sixth, Glossary, ADR 0020 decision 1) and the headers, and that an empty sheet keeps
+its header row. It says nothing about trades, dividends, cell kinds in the data sheets or
+the statement's clock.
 
 **What this directory still waits for.** One real, untouched account statement with
 trades and dividends, from the account's opening to the export day, exported as XLSX from
