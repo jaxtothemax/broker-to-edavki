@@ -210,6 +210,27 @@ describe("a second statement of one eToro account", () => {
         .map((d) => d.code),
     ).toContain("accountsShareEvents");
   });
+
+  it("lets a statement with no row stand beside one, changing no return", () => {
+    // It reaches no day, so it is no second statement of the account; its
+    // warning is all it adds.
+    const empty: ExportFile = {
+      name: "etoro-empty.xlsx",
+      bytes: statement({ closed: [], activity: [], dividends: [] }),
+    };
+    const alone = prepareReturns(input([etoro, trading212]));
+    const both = prepareReturns(input([empty, etoro, trading212]));
+    expect(both.ledger.diagnostics.map((d) => d.code)).not.toContain(
+      "secondStatement",
+    );
+    expect(both.scope.findings.map((d) => d.code)).toContain("statementEmpty");
+    const xml = (p: typeof alone) =>
+      p.kdvp.form === null || p.div.form === null
+        ? null
+        : [writeDohKdvp(p.kdvp.form), writeDohDiv(p.div.form)];
+    expect(xml(both)).not.toBeNull();
+    expect(xml(both)).toEqual(xml(alone));
+  });
 });
 
 describe("a position still open that no row of the statement names (ADR 0017 §3)", () => {

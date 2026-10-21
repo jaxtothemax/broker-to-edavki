@@ -208,6 +208,18 @@ describe("etoro, choosing the statement", () => {
     ]);
   });
 
+  it("knows the Glossary by its exact name only", () => {
+    for (const name of ["glossary", "Glossary ", "GLOSSARY"]) {
+      const result = read({
+        ...ROUND_TRIP,
+        sheets: (sheets) => [...sheets, { name, data: "" }],
+      });
+      expect(result.diagnostics, name).toEqual([
+        diagnostic("blocking", "unknownSheet", { sheet: 6 }),
+      ]);
+    }
+  });
+
   it("refuses a hidden sheet it reads, but not a hidden one it skips", () => {
     const hide = (name: string) => (sheets: SheetSpec[]) =>
       sheets.map((s) => (s.name === name ? { ...s, state: "hidden" } : s));
@@ -1901,6 +1913,8 @@ describe("etoro, a real statement (test/fixtures/etoro/README.md)", () => {
         source: at("glossary", 1),
       }),
     ]);
+    // Nothing of Account Summary, its stand-in name included, is read.
+    expect(JSON.stringify(result)).not.toMatch(/Account Holder|anonymized/);
   });
 
   it("has six sheets, reads three, and heads each as the synthetic statements do", () => {

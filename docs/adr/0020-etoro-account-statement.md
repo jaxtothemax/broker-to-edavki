@@ -13,7 +13,7 @@
 > precondition stands. The adapter is not to be released until such an export passes, or
 > shows which of the decisions below are wrong.
 >
-> **Update (2026-10-21):** one real export has been read: the owner's own statement of an
+> **Update (2026-10-21):** one real export has been read: a contributor's statement of an
 > account with no activity, exported on 2026-10-21 and committed anonymized as
 > `packages/brokers/test/fixtures/etoro/2026-10-no-activity.xlsx`. It showed a sixth sheet,
 > Glossary, which decision 1 refused, so every current statement was refused; decision 1
@@ -293,7 +293,7 @@ open. This ADR records the decisions and what was chosen for each risk.
   found none online: every public parser builds its test data in code, and the one published
   statement was saved again by a third party and is refused by the history gate. Only an
   export from a real account, anonymized as the fixtures README describes, can settle it.
-  On 2026-10-21 the owner exported their own statement, from an account with no activity.
+  On 2026-10-21 a contributor exported a statement of an account with no activity.
   It settled the sheets (the Glossary, decision 1) and the headers, and is the first
   binary fixture. It has no trade or dividend, so R1 stays open for one that does.
 - **R2, a position still open with no ISIN in the file: option (b), settled 2026-10-12,

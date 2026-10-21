@@ -922,7 +922,7 @@ export const findingsSl: FindingMessages = {
   historyIncomplete: (p) =>
     `${p.broker}: ${pick(p.gap, HISTORY_GAPS_SL, "izpisek ne zajema celotne zgodovine računa")}. Za FIFO so potrebni vsi nakupi od odprtja računa, zato izpisek ni prebran. Izpisek računa izvozite znova, od dne, ko ste odprli račun, ali od prej.`,
   statementEmpty: (p) =>
-    `${p.broker}: izpisek nima zaprtih pozicij, dejavnosti računa ne dividend. Če na računu nikoli ni bilo ničesar, iz njega ni ničesar za napoved. Če je bilo, izpisek računa izvozite znova, od dne, ko ste odprli račun, in ga uporabite namesto tega: izpisek brez vrstic ne more pokazati, da zajema celotno zgodovino računa.`,
+    `${p.broker}: izpisek nima zaprtih pozicij, dejavnosti računa ali dividend. Če na računu nikoli ni bilo ničesar, iz njega ni ničesar za napoved. Če je bilo, izpisek računa izvozite znova, od dne, ko ste odprli račun, in ga uporabite namesto tega: izpisek brez vrstic ne more pokazati, da zajema celotno zgodovino računa.`,
   dateUncertain: (p) =>
     at(
       p,

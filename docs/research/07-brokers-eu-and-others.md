@@ -96,7 +96,7 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
 > written `10 %`; some statements lack the EUR columns; and each claim now carries its
 > evidence tag. The header tables below are quoted from that commit.
 
-> **A real export (2026-10-21, #8).** The owner exported their own account statement as XLSX,
+> **A real export (2026-10-21, #8).** A contributor exported an account statement as XLSX,
 > through Settings → Account → Account Statement, for 1 to 20 October 2026. The account has
 > never had any activity. It is committed anonymized as
 > `packages/brokers/test/fixtures/etoro/2026-10-no-activity.xlsx`, with only the name, username
