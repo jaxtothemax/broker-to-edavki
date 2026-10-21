@@ -120,8 +120,8 @@ open. This ADR records the decisions and what was chosen for each risk.
    **A statement with no row** in any of the three sheets gives the gate nothing to check
    (amended 2026-10-21). An account that never held anything looks the same as a period
    chosen too short for an account that did. It is read, with one warning
-   (`statementEmpty`) that says to export again from the account's opening if the account
-   ever held anything. It is not refused: an empty account would then hold back every other
+   (`statementEmpty`) that says to use a statement exported from the account's opening in
+   its place if the account ever held anything. It is not refused: an empty account would then hold back every other
    broker's return. Refusing it, or reading Account Summary's opening equity to tell the
    two apart, is the owner's call (open questions).
 5. **Lots (D5).**
