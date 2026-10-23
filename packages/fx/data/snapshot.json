@@ -1,13 +1,13 @@
 {
-  "retrievedAt": "2026-10-07T21:11:00.000Z",
-  "completeThrough": "2026-10-07",
+  "retrievedAt": "2026-10-23T19:59:33.601Z",
+  "completeThrough": "2026-10-23",
   "daily": {
     "url": "https://www.bsi.si/_data/tecajnice/dtecbs-l.xml",
-    "lastModified": "Wed, 07 Oct 2026 13:58:47 GMT",
-    "sha256": "3b218cdcc616bcd3a57a62ee5e4ba8f7596acf71ed93c3d7893a4bbcbb2d40e3",
-    "lists": 5061,
+    "lastModified": "Fri, 23 Oct 2026 13:58:47 GMT",
+    "sha256": "4146b2858ec752a0f1e17c34c17a5d10af7e66459adf7e60761429ff38677111",
+    "lists": 5073,
     "first": "2007-01-01",
-    "last": "2026-10-07"
+    "last": "2026-10-23"
   },
   "monthly": {
     "url": "https://www.bsi.si/_data/tecajnice/EksotTecBS-l.xml",
