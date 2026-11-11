@@ -69,7 +69,7 @@ There are no official statistics by broker; FURS does not publish Doh-KDVP count
    | Freedom24 | `YYYY-MM-DD HH:MM:SS` |
    | Saxo | `DD-Mon-YYYY` |
 
-   Use the local trade **date**, not the UTC date, for the BSI rate lookup.
+   Use the local trade **date**, not the UTC date, for the BSI rate lookup (on which date a trade takes, see [04 §4.3.1](04-si-tax-rules.md#431-trades-near-midnight-and-the-brokers-time-zone)).
 4. **Route by asset class.**
    - Real share/ETF/fund → Doh-KDVP.
    - CFD or other derivative → D-IFI.

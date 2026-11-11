@@ -102,9 +102,13 @@ export interface TaxDate {
  * The date policy, the one place the rule lives (ADR 0011). For now: the
  * Ljubljana calendar date of the broker's instant where it gives one, else
  * the date it shows (IBKR's exchange date, used as is; research 06 §2).
- * Which clock decides a trade or payment date has no FURS source yet
- * (research 06, open questions); changing it is a change here and to the
- * golden files, nothing more. Null when the broker's clock is unusable.
+ * Research 04 §4.3.1 settles the trade-date half: the contract date, not
+ * the settlement date, decides (ZDoh-2 arts. 101 and 102). Which clock
+ * dates a contract near midnight has no primary source yet (§4.3.1).
+ * Changing the rule reaches more than this function and the golden files:
+ * the Trade Republic reader's refusal check, the Trading 212
+ * `dateMovedToLjubljana` warning, and `dayOf` in validate.ts, which calls
+ * `ljubljanaDate` directly. Null when the broker's clock is unusable.
  */
 export function taxDate(at: BrokerTime): TaxDate | null {
   if (at.instant !== null) {

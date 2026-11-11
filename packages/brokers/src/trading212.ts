@@ -550,9 +550,10 @@ function read(table: CsvTable, context: ReadContext): ImportResult {
       continue;
     }
     // The policy's date decides the tax year, the rate and the 30-day
-    // window; where it differs from the UTC date T212 shows, say so. Which
-    // clock defines a trade date has no FURS source yet (research 06, open
-    // questions).
+    // window; where it differs from the UTC date T212 shows, say so. The
+    // contract (trade) date, not the settlement date, decides (research 04
+    // §4.3.1; ZDoh-2 arts. 101 and 102); which clock dates a contract near
+    // midnight has no primary source yet (research 04 §4.3.1).
     if (when.moved) {
       diagnostics.push(
         diagnostic(

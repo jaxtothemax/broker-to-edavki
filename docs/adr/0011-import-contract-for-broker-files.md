@@ -119,8 +119,16 @@ We will change the import contract as follows, before the IBKR adapter is built.
    - Events carry `at: { instant, brokerDate }`. A core function derives the tax date from it.
    - For now that is the Ljubljana calendar date of the instant where there is one, with a
      warning wherever it differs from the broker's date.
-   - The final rule needs a FURS or ZDoh-2 source (research 06, open questions). Changing it
-     is then one policy change plus golden files.
+   - The trade-date half of the rule now has its primary-source reading in research 04
+     §4.3.1: the contract date, not the settlement date, decides (ZDoh-2 arts. 101 and 102).
+     No primary source says which time zone dates a contract, so the Ljubljana reading
+     stands. Changing the rule is not one policy change plus golden files: it also changes
+     the Trade Republic reader's refusal check and the Trading 212 `dateMovedToLjubljana`
+     warning, and it must reach `dayOf` in `packages/core/src/validate.ts`, which calls
+     `ljubljanaDate` directly, not `taxDate`, for the overlap findings' from and to days.
+     The exchange's local date cannot be computed inside `taxDate` either: `BrokerTime`
+     (`packages/core/src/ledger.ts`) holds no trading venue or time zone, and Trading 212
+     rows name no venue.
    - The clock also orders lots within a day. FIFO disposes first of what was acquired first
      (ZDoh-2 Art. 103(1), research 04 §4.4), so a day's lots are taken by their instants
      where the exports give them. Otherwise the order is fixed (broker, account, key), and
